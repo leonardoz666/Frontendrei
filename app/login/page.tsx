@@ -82,10 +82,11 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-black/10 z-10" />
         <div className="relative z-20 text-white text-center p-12">
           <div className="mb-8 flex justify-center">
-            <div className="w-80 h-80 bg-white rounded-full flex items-center justify-center p-6 shadow-2xl">
-              <img src="/logo.png" alt="Rei do Pirão" className="w-full h-full object-contain" />
+            <div className="w-32 h-32 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+              <ChefHat size={64} className="text-white" />
             </div>
           </div>
+          <h1 className="text-5xl font-bold mb-6">Rei do Pirão</h1>
           <p className="text-xl text-orange-100 max-w-md mx-auto">
             O melhor sabor da região, agora com um sistema de gestão à altura.
           </p>
