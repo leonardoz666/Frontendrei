@@ -621,7 +621,24 @@ export default function ProdutosPage() {
                     <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Categoria</label>
                     <select
                       value={categoriaId}
-                      onChange={e => setCategoriaId(e.target.value)}
+                      onChange={e => {
+                        const newId = e.target.value
+                        setCategoriaId(newId)
+                        
+                        // Auto-detect sector based on category name
+                        const cat = categorias.find(c => c.id.toString() === newId)
+                        if (cat) {
+                          const catNome = cat.nome.toLowerCase()
+                          
+                          if (catNome.includes('bebida') || catNome.includes('drink') || catNome.includes('cerveja') || catNome.includes('refrigerante') || catNome.includes('suco') || catNome.includes('água') || catNome.includes('vinho') || catNome.includes('dose') || catNome.includes('bar')) {
+                              setIsDrink(true)
+                              setIsFood(false)
+                          } else if (catNome.includes('prato') || catNome.includes('entrada') || catNome.includes('comida') || catNome.includes('lanche') || catNome.includes('sobremesa') || catNome.includes('porção') || catNome.includes('petisco') || catNome.includes('hambúrguer') || catNome.includes('pizza') || catNome.includes('salada') || catNome.includes('cozinha')) {
+                              setIsFood(true)
+                              setIsDrink(false)
+                          }
+                        }
+                      }}
                       className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                     >
                       {categorias.map(c => (
