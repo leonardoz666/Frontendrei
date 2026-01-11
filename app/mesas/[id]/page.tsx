@@ -463,6 +463,85 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
+      {/* Transfer Modal */}
+      {showTransferModal && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-50">
+              <h2 className="text-xl font-bold text-blue-900 flex items-center gap-2">
+                <ArrowRightLeft size={24} className="text-blue-600" />
+                Trocar de Mesa
+              </h2>
+              <button 
+                onClick={() => setShowTransferModal(false)}
+                className="p-2 hover:bg-blue-100 rounded-full text-blue-600 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Selecione a mesa de destino. Todos os pedidos da Mesa {mesaId} serão transferidos.
+              </p>
+              
+              <div className="grid grid-cols-3 gap-3 max-h-[300px] overflow-y-auto mb-6 p-1">
+                {availableTables.map(table => (
+                  <button
+                    key={table.id}
+                    onClick={() => setTargetTableId(table.id)}
+                    className={`
+                      p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all
+                      ${targetTableId === table.id 
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md transform scale-105' 
+                        : 'border-gray-100 bg-white text-gray-600 hover:border-blue-200 hover:bg-gray-50'
+                      }
+                      ${table.status === 'OCUPADA' ? 'opacity-75' : ''}
+                    `}
+                  >
+                    <span className="text-lg font-bold">Mesa {table.numero}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      table.status === 'LIVRE' ? 'bg-green-100 text-green-700' :
+                      table.status === 'OCUPADA' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {table.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowTransferModal(false)}
+                  className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleTransferTable}
+                  disabled={!targetTableId || isTransferring}
+                  className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {isTransferring ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Transferindo...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={20} />
+                      Confirmar
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
