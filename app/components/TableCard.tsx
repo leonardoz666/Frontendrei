@@ -30,8 +30,8 @@ export function TableCard({ mesa, onClick }: TableCardProps) {
   const isOcupada = mesa.status === 'OCUPADA'
   const isFechamento = mesa.status === 'FECHAMENTO'
   
-  let borderColor = "border-gray-100"
-  let numColor = "text-gray-900"
+  let borderColor = "border-green-200"
+  let numColor = "text-green-600"
   let badgeClass = "bg-green-50 text-green-500"
   let statusText: string = mesa.status
 
@@ -41,9 +41,9 @@ export function TableCard({ mesa, onClick }: TableCardProps) {
     badgeClass = "bg-yellow-50 text-yellow-600"
     statusText = "Em Andamento"
   } else if (isFechamento) {
-    borderColor = "border-red-100/50"
-    numColor = "text-red-500"
-    badgeClass = "bg-red-50 text-red-500"
+    borderColor = "border-red-200"
+    numColor = "text-red-600"
+    badgeClass = "bg-red-50 text-red-600"
     statusText = "FECHANDO"
   }
 
