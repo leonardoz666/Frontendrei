@@ -12,7 +12,6 @@ import {
   Armchair,
   Receipt,
   ClipboardList,
-  Printer,
   ShoppingBag,
   Settings
 } from 'lucide-react'
