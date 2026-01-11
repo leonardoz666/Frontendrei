@@ -16,7 +16,8 @@ import {
   Wine, 
   Pizza, 
   Utensils, 
-  Download 
+  Download,
+  Wand2
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -86,7 +87,68 @@ export default function ProdutosPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<number | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [fixStatus, setFixStatus] = useState<string | null>(null)
   
+  const handleFixSectors = async () => {
+    if (!confirm('Deseja corrigir automaticamente os setores (Cozinha/Bar) de todos os produtos baseados na categoria?')) return
+
+    setFixStatus('Iniciando correção...')
+    let updated = 0
+    let failed = 0
+
+    for (const p of produtos) {
+        if (!p.categoria) continue
+        
+        let shouldBeDrink = false
+        let shouldBeFood = false
+        const catNome = p.categoria.nome.toLowerCase()
+        
+        if (catNome.includes('bebida') || catNome.includes('drink') || catNome.includes('cerveja') || catNome.includes('refrigerante') || catNome.includes('suco') || catNome.includes('água') || catNome.includes('vinho') || catNome.includes('dose') || catNome.includes('bar')) {
+            shouldBeDrink = true
+            shouldBeFood = false
+        } else if (catNome.includes('prato') || catNome.includes('entrada') || catNome.includes('comida') || catNome.includes('lanche') || catNome.includes('sobremesa') || catNome.includes('porção') || catNome.includes('petisco') || catNome.includes('hambúrguer') || catNome.includes('pizza') || catNome.includes('salada') || catNome.includes('cozinha')) {
+            shouldBeFood = true
+            shouldBeDrink = false
+        } else {
+            continue
+        }
+
+        if (p.isDrink === shouldBeDrink && p.isFood === shouldBeFood) continue
+
+        try {
+            const formData = new FormData()
+            formData.append('nome', p.nome)
+            formData.append('preco', String(p.preco))
+            if (p.categoriaId) formData.append('categoriaId', String(p.categoriaId))
+            formData.append('ativo', String(p.ativo))
+            if (p.foto) formData.append('foto', p.foto)
+            formData.append('tipoOpcao', p.tipoOpcao || 'padrao')
+            formData.append('sabores', p.sabores || '[]')
+            formData.append('isDrink', String(shouldBeDrink))
+            formData.append('isFood', String(shouldBeFood))
+            formData.append('favorito', String(!!p.favorito))
+
+            const res = await fetch(`/api/products/${p.id}`, {
+                method: 'PUT',
+                body: formData
+            })
+
+            if (res.ok) {
+                updated++
+            } else {
+                failed++
+            }
+        } catch (e) {
+            console.error(e)
+            failed++
+        }
+    }
+    
+    setFixStatus(`Correção concluída: ${updated} atualizados, ${failed} falhas`)
+    queryClient.invalidateQueries({ queryKey: ['products'] })
+    setTimeout(() => setFixStatus(null), 5000)
+  }
+
   // Form States
   const [nome, setNome] = useState('')
   const [preco, setPreco] = useState('')
@@ -107,34 +169,12 @@ export default function ProdutosPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
 
-  const checkSector = (catNome: string) => {
-    const nome = catNome.toLowerCase()
-    if (nome.includes('bebida') || nome.includes('drink') || nome.includes('cerveja') || nome.includes('refrigerante') || nome.includes('suco') || nome.includes('água') || nome.includes('vinho') || nome.includes('dose') || nome.includes('bar')) {
-        setIsDrink(true)
-        setIsFood(false)
-    } else if (nome.includes('prato') || nome.includes('entrada') || nome.includes('comida') || nome.includes('lanche') || nome.includes('sobremesa') || nome.includes('porção') || nome.includes('petisco') || nome.includes('hambúrguer') || nome.includes('pizza') || nome.includes('salada') || nome.includes('cozinha')) {
-        setIsFood(true)
-        setIsDrink(false)
-    }
-  }
-
   // Effect to set default category
   useEffect(() => {
     if (categorias.length > 0 && !categoriaId && !editingId) {
-      const firstCat = categorias[0]
-      setCategoriaId(firstCat.id.toString())
-      checkSector(firstCat.nome)
+      setCategoriaId(categorias[0].id.toString())
     }
   }, [categorias, categoriaId, editingId])
-
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newCatId = e.target.value
-    setCategoriaId(newCatId)
-    const cat = categorias.find(c => c.id.toString() === newCatId)
-    if (cat) {
-      checkSector(cat.nome)
-    }
-  }
 
   const filteredProdutos = produtos.filter(p => {
     const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -385,6 +425,13 @@ export default function ProdutosPage() {
             <Plus size={20} />
           </button>
           <button
+            onClick={handleFixSectors}
+            title="Auto-corrigir setores (Cozinha/Bar)"
+            className="bg-white text-gray-700 font-bold p-2.5 rounded-xl flex items-center justify-center border border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform"
+          >
+            <Wand2 size={18} />
+          </button>
+          <button
             onClick={handleExport}
             title="Exportar cardápio (JSON)"
             className="bg-white text-gray-700 font-bold p-2.5 rounded-xl flex items-center justify-center border border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform"
@@ -408,10 +455,10 @@ export default function ProdutosPage() {
         </div>
       </header>
 
-      {importStatus && (
+      {(importStatus || fixStatus) && (
         <div className="px-4">
           <div className="mt-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-xl px-3 py-2">
-            {importStatus}
+            {importStatus || fixStatus}
           </div>
         </div>
       )}
@@ -574,7 +621,7 @@ export default function ProdutosPage() {
                     <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Categoria</label>
                     <select
                       value={categoriaId}
-                      onChange={handleCategoryChange}
+                      onChange={e => setCategoriaId(e.target.value)}
                       className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                     >
                       {categorias.map(c => (
