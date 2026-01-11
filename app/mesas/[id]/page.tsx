@@ -3,6 +3,8 @@
 import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { ArrowRightLeft, X, Check } from 'lucide-react'
+import { createPortal } from 'react-dom'
 
 type Produto = {
   id: number
@@ -67,6 +69,12 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null)
   const [tableStatus, setTableStatus] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  
+  // Transfer Table State
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [availableTables, setAvailableTables] = useState<{id: number, numero: number, status: string}[]>([])
+  const [targetTableId, setTargetTableId] = useState<number | null>(null)
+  const [isTransferring, setIsTransferring] = useState(false)
 
   const fetchTableData = useCallback(async () => {
     try {
@@ -104,6 +112,45 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       console.error('[DEBUG] Error fetching table data:', error)
     }
   }, [mesaId])
+
+  useEffect(() => {
+    if (showTransferModal) {
+      fetch('/api/tables')
+        .then(res => res.json())
+        .then(data => {
+          // Filter out current table
+          setAvailableTables(data.filter((t: any) => t.id !== mesaId))
+        })
+        .catch(err => console.error('Error fetching tables:', err))
+    }
+  }, [showTransferModal, mesaId])
+
+  const handleTransferTable = async () => {
+    if (!targetTableId) return
+    
+    setIsTransferring(true)
+    try {
+      const res = await fetch(`/api/tables/${mesaId}/transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetTableId })
+      })
+
+      if (res.ok) {
+        setFeedback({ type: 'success', message: 'Mesa transferida com sucesso!' })
+        setShowTransferModal(false)
+        router.push(`/mesas/${targetTableId}`)
+      } else {
+        const errorText = await res.text()
+        setFeedback({ type: 'error', message: `Erro ao transferir: ${errorText}` })
+      }
+    } catch (error) {
+      console.error('Error transferring table:', error)
+      setFeedback({ type: 'error', message: 'Erro ao conectar com o servidor' })
+    } finally {
+      setIsTransferring(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -260,9 +307,19 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-black">Mesa {mesaId}</h1>
-        <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
-          <span>←</span> Voltar ao Início
-        </Link>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setShowTransferModal(true)}
+            className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-200 transition-colors"
+            title="Trocar de Mesa"
+          >
+            <ArrowRightLeft size={20} />
+            <span className="hidden sm:inline">Trocar Mesa</span>
+          </button>
+          <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
+            <span>←</span> Voltar ao Início
+          </Link>
+        </div>
       </div>
 
       {tableStatus === 'FECHAMENTO' && (
