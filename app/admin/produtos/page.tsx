@@ -49,12 +49,17 @@ export default function ProdutosPage() {
   const { data: produtos = [], isLoading: loadingProd } = useQuery<Produto[]>({
     queryKey: ['products'],
     queryFn: async () => {
+      console.log('[DEBUG] fetching products');
       const res = await fetch('/api/products')
+      console.log(`[DEBUG] products status: ${res.status}`);
       if (res.status === 401) {
         router.push('/login')
         throw new Error('Unauthorized')
       }
-      if (!res.ok) throw new Error('Erro ao buscar produtos')
+      if (!res.ok) {
+        console.error(`[DEBUG] products fetch failed: ${res.status}`);
+        throw new Error('Erro ao buscar produtos')
+      }
       return res.json()
     }
   })
@@ -62,12 +67,17 @@ export default function ProdutosPage() {
   const { data: categorias = [], isLoading: loadingCat } = useQuery<Categoria[]>({
     queryKey: ['categories'],
     queryFn: async () => {
+      console.log('[DEBUG] fetching categories');
       const res = await fetch('/api/categories')
+      console.log(`[DEBUG] categories status: ${res.status}`);
       if (res.status === 401) {
         router.push('/login')
         throw new Error('Unauthorized')
       }
-      if (!res.ok) throw new Error('Erro ao buscar categorias')
+      if (!res.ok) {
+        console.error(`[DEBUG] categories fetch failed: ${res.status}`);
+        throw new Error('Erro ao buscar categorias')
+      }
       return res.json()
     }
   })

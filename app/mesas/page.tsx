@@ -103,13 +103,20 @@ export default function MesasPage() {
 
   const fetchMesas = async () => {
     try {
+      console.log('[DEBUG] fetching /api/tables');
       const res = await fetch('/api/tables')
+      console.log(`[DEBUG] /api/tables status: ${res.status}`);
       if (res.ok) {
         const data = await res.json()
+        console.log('[DEBUG] /api/tables success, count:', data.length);
         setMesas(data)
+      } else {
+         console.error(`[DEBUG] /api/tables failed: ${res.status}`);
+         const txt = await res.text();
+         console.error(`[DEBUG] /api/tables error text: ${txt}`);
       }
     } catch (error) {
-      console.error('Error fetching tables:', error)
+      console.error('[DEBUG] Error fetching tables:', error)
     }
   }
 

@@ -37,7 +37,9 @@ export default function KitchenPage() {
 
   const fetchOrders = async () => {
     try {
+      console.log('[DEBUG] Kitchen fetching orders');
       const res = await fetch('/api/kitchen')
+      console.log(`[DEBUG] Kitchen fetch status: ${res.status}`);
       if (res.status === 401) {
         router.replace('/login')
         return
@@ -46,14 +48,18 @@ export default function KitchenPage() {
         router.replace('/')
         return
       }
-      if (!res.ok) return
+      if (!res.ok) {
+          console.error(`[DEBUG] Kitchen fetch failed: ${res.status}`);
+          return
+      }
       
       const data = await res.json()
+      console.log(`[DEBUG] Kitchen orders count: ${Array.isArray(data) ? data.length : 'not array'}`);
       if (Array.isArray(data)) {
         setOrders(data)
       }
     } catch (err) {
-      console.error('Error fetching orders:', err)
+      console.error('[DEBUG] Error fetching orders:', err)
     }
   }
 

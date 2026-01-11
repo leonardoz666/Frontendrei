@@ -19,13 +19,16 @@ export default function LoginPage() {
 
     const run = async () => {
       try {
+        console.log('[DEBUG] Login check auth/me');
         const res = await fetch('/api/auth/me')
+        console.log(`[DEBUG] Login auth/me status: ${res.status}`);
         const data = await res.json()
         if (!cancelled && data.user) {
+          console.log('[DEBUG] User already logged in, redirecting');
           router.replace('/')
         }
       } catch (e) {
-        // ignore
+        console.error('[DEBUG] Login check error:', e);
       }
     }
 

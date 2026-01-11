@@ -22,20 +22,27 @@ export default function Home() {
     // Auth check and fetch tables
     const init = async () => {
       try {
+        console.log('[DEBUG] Home page init');
         const meRes = await fetch('/api/auth/me')
+        console.log(`[DEBUG] Home auth/me status: ${meRes.status}`);
         const meData = await meRes.json()
         if (!meData.user) {
+          console.warn('[DEBUG] Home: No user, redirecting');
           router.replace('/login')
           return
         }
 
+        console.log('[DEBUG] Home fetching tables');
         const tablesRes = await fetch('/api/tables')
+        console.log(`[DEBUG] Home tables status: ${tablesRes.status}`);
         if (tablesRes.ok) {
           const tablesData = await tablesRes.json()
           setTables(tablesData)
+        } else {
+             console.error(`[DEBUG] Home tables failed: ${tablesRes.status}`);
         }
       } catch (err) {
-        console.error(err)
+        console.error('[DEBUG] Home init error:', err)
       } finally {
         setLoading(false)
       }

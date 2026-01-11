@@ -70,9 +70,12 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   const fetchTableData = useCallback(async () => {
     try {
+      console.log(`[DEBUG] Fetching table data for mesaId: ${mesaId}`);
       const res = await fetch(`/api/tables/${mesaId}`, { cache: 'no-store' })
+      console.log(`[DEBUG] fetchTableData response status: ${res.status}`);
       if (res.ok) {
         const data = await res.json()
+        console.log(`[DEBUG] fetchTableData success:`, data);
         setTableStatus(data.status)
         if (data.comandas && data.comandas.length > 0) {
           const comanda = data.comandas[0]
@@ -92,9 +95,13 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           })
           setSubmittedItems(items)
         }
+      } else {
+        console.error(`[DEBUG] fetchTableData failed with status: ${res.status}`);
+        const errorText = await res.text();
+        console.error(`[DEBUG] fetchTableData error text: ${errorText}`);
       }
     } catch (error) {
-      console.error('Error fetching table data:', error)
+      console.error('[DEBUG] Error fetching table data:', error)
     }
   }, [mesaId])
 
@@ -103,14 +110,19 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
     const run = async () => {
       try {
+        console.log('[DEBUG] Starting init run in OrderPage');
         const meRes = await fetch('/api/auth/me')
+        console.log(`[DEBUG] auth/me status: ${meRes.status}`);
         const meData = await meRes.json()
         if (!meData.user) {
+          console.warn('[DEBUG] No user found, redirecting to login');
           router.replace('/login')
           return
         }
 
+        console.log('[DEBUG] Fetching categories');
         const productsRes = await fetch('/api/categories', { cache: 'no-store' })
+        console.log(`[DEBUG] categories status: ${productsRes.status}`);
         const productsData = await productsRes.json()
         
         if (!cancelled) {
@@ -127,6 +139,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           setCategories(sortedCategories)
           await fetchTableData()
         }
+      } catch (err) {
+        console.error('[DEBUG] Error in OrderPage init:', err);
       } finally {
         if (!cancelled) setLoading(false)
       }
