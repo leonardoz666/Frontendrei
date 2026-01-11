@@ -122,8 +122,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-      <div className="px-6 py-3 border-b border-gray-100 flex items-center space-x-3">
-        <div className="w-16 h-16 relative flex-shrink-0">
+      <div className="py-2 border-b border-gray-100 flex items-center justify-center">
+        <div className="w-48 h-20 relative">
           <Image 
             src="/logo.png" 
             alt="Rei do Pirão" 
@@ -132,7 +132,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             priority
           />
         </div>
-        <span className="text-xl font-bold text-gray-800 tracking-tight">Rei do Pirão</span>
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
