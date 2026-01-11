@@ -123,10 +123,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-      <div className="py-2 border-b border-gray-100 flex items-center justify-center">
-        <div className="w-48 h-20 relative">
+      <div className="py-4 border-b border-gray-100 flex items-center justify-center">
+        <div className="w-56 h-28 relative">
           <Image 
-            src="/logo.png" 
+            src="/logo.png"  
             alt="Rei do Pirão" 
             fill 
             className="object-contain"
