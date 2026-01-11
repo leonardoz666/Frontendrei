@@ -266,6 +266,7 @@ export default function ProdutosPage() {
     setIsDrink(prod.isDrink || false)
     setIsFood(prod.isFood !== undefined ? prod.isFood : true)
     setFavorito(prod.favorito || false)
+    setFile(null)
     setError('')
   }
 
