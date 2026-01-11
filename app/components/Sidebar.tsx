@@ -41,7 +41,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   // Close sidebar on route change (mobile)
   useEffect(() => {
     if (isOpen) onClose()
-  }, [pathname, isOpen, onClose])
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setMounted(true)

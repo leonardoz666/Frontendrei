@@ -312,8 +312,7 @@ export default function IfoodPage() {
                   {order.status === 'PLACED' && (
                     <>
                       <Button 
-                        variant="destructive" 
-                        variantType="outline"
+                        variant="outline"
                         onClick={() => handleStatusChange(order.id, 'CANCELLED')}
                         className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                       >
