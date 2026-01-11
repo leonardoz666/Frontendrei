@@ -13,7 +13,8 @@ import {
   Receipt,
   ClipboardList,
   Printer,
-  ShoppingBag
+  ShoppingBag,
+  Settings
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -93,14 +94,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const menuItems = [
     { href: '/', label: 'Início', icon: LayoutDashboard, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
-    { href: '/admin/produtos', label: 'Produtos', icon: UtensilsCrossed, roles: ['ADMIN', 'DONO'] },
-    { href: '/admin/usuarios', label: 'Usuários', icon: Users, roles: ['ADMIN', 'DONO'] },
-    { href: '/cozinha', label: 'Cozinha', icon: ChefHat, roles: ['GERENTE', 'DONO', 'CAIXA'] },
     { href: '/mesas', label: 'Mesas', icon: Armchair, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
     { href: '/mesas-abertas', label: 'Mesas Abertas', icon: ClipboardList, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
     { href: '/ifood', label: 'iFood', icon: ShoppingBag, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA'] },
+    { href: '/admin', label: 'PAINEL', icon: Settings, roles: ['ADMIN', 'DONO'] },
+    { href: '/cozinha', label: 'Cozinha', icon: ChefHat, roles: ['GERENTE', 'DONO', 'CAIXA'] },
     { href: '/minhas-mesas', label: 'Minhas Mesas', icon: Users, roles: ['GARCOM', 'GERENTE', 'DONO'] },
-    { href: '/admin/impressoras', label: 'Impressoras', icon: Printer, roles: ['DONO'] },
   ]
 
   const filteredItems = menuItems.filter(item => {
