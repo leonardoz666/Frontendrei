@@ -158,10 +158,16 @@ export default function ProdutosPage() {
     }
   }, [categorias, categoriaId, editingId])
 
-  const filteredProdutos = produtos.filter(p => {
+  const filteredProdutos = useMemo(() => {
     const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    return normalize(p.nome).includes(normalize(searchTerm))
-  })
+    const term = normalize(searchTerm)
+    
+    if (!term) return produtos
+
+    return produtos.filter(p => {
+      return normalize(p.nome).includes(term)
+    })
+  }, [produtos, searchTerm])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -243,7 +249,7 @@ export default function ProdutosPage() {
     if (categorias.length > 0) setCategoriaId(categorias[0].id.toString())
   }
 
-  const handleEdit = (prod: Produto) => {
+  const handleEdit = useCallback((prod: Produto) => {
     setEditingId(prod.id)
     setIsAdding(true)
     setNome(prod.nome)
@@ -268,7 +274,7 @@ export default function ProdutosPage() {
     setFavorito(prod.favorito || false)
     setFile(null)
     setError('')
-  }
+  }, [categorias])
 
   const confirmDelete = async () => {
     if (deleteConfirmationId) {

@@ -35,7 +35,7 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
     try {
       if (!product.sabores) return []
       return JSON.parse(product.sabores)
-    } catch (e) {
+    } catch {
       return []
     }
   }
@@ -186,8 +186,6 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
 
       case 'sabores_com_tamanho':
         const sizes = ['Pequeno (P)', 'Grande (G)']
-        const currentSize = selectedOptions.find(o => sizes.includes(o))
-        const currentFlavor = selectedOptions.find(o => !sizes.includes(o))
 
         return (
           <div className="space-y-6">

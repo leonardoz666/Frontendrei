@@ -30,7 +30,7 @@ interface ProductCardProps {
   onDelete: (id: number) => void
 }
 
-export const ProductCard = memo(function ProductCard({ prod, index, onEdit, onDelete }: ProductCardProps) {
+export const ProductCard = memo(function ProductCard({ prod, onEdit, onDelete }: ProductCardProps) {
   return (
     <div 
       className="group relative flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
