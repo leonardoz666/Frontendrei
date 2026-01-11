@@ -89,7 +89,7 @@ export default function PrintersPage() {
     }
   }
 
-  const handleChange = (id: number, field: keyof PrinterConfig, value: any) => {
+  const handleChange = (id: number, field: keyof PrinterConfig, value: string | number | boolean) => {
     setPrinters(prev => prev.map(p => 
       p.id === id ? { ...p, [field]: value } : p
     ))
