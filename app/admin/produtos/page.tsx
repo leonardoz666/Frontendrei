@@ -107,12 +107,34 @@ export default function ProdutosPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
 
+  const checkSector = (catNome: string) => {
+    const nome = catNome.toLowerCase()
+    if (nome.includes('bebida') || nome.includes('drink') || nome.includes('cerveja') || nome.includes('refrigerante') || nome.includes('suco') || nome.includes('água') || nome.includes('vinho') || nome.includes('dose') || nome.includes('bar')) {
+        setIsDrink(true)
+        setIsFood(false)
+    } else if (nome.includes('prato') || nome.includes('entrada') || nome.includes('comida') || nome.includes('lanche') || nome.includes('sobremesa') || nome.includes('porção') || nome.includes('petisco') || nome.includes('hambúrguer') || nome.includes('pizza') || nome.includes('salada') || nome.includes('cozinha')) {
+        setIsFood(true)
+        setIsDrink(false)
+    }
+  }
+
   // Effect to set default category
   useEffect(() => {
     if (categorias.length > 0 && !categoriaId && !editingId) {
-      setCategoriaId(categorias[0].id.toString())
+      const firstCat = categorias[0]
+      setCategoriaId(firstCat.id.toString())
+      checkSector(firstCat.nome)
     }
   }, [categorias, categoriaId, editingId])
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newCatId = e.target.value
+    setCategoriaId(newCatId)
+    const cat = categorias.find(c => c.id.toString() === newCatId)
+    if (cat) {
+      checkSector(cat.nome)
+    }
+  }
 
   const filteredProdutos = produtos.filter(p => {
     const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -552,7 +574,7 @@ export default function ProdutosPage() {
                     <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Categoria</label>
                     <select
                       value={categoriaId}
-                      onChange={e => setCategoriaId(e.target.value)}
+                      onChange={handleCategoryChange}
                       className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                     >
                       {categorias.map(c => (
