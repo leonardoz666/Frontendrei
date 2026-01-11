@@ -97,6 +97,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { href: '/cozinha', label: 'Cozinha', icon: ChefHat, roles: ['GERENTE', 'DONO', 'CAIXA'] },
     { href: '/mesas', label: 'Mesas', icon: Armchair, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
     { href: '/mesas-abertas', label: 'Mesas Abertas', icon: ClipboardList, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
+    { href: '/ifood', label: 'iFood', icon: ShoppingBag, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA'] },
     { href: '/minhas-mesas', label: 'Minhas Mesas', icon: Users, roles: ['GARCOM', 'GERENTE', 'DONO'] },
     { href: '/admin/impressoras', label: 'Impressoras', icon: Printer, roles: ['DONO'] },
   ]
