@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Input } from '../components/ui/Input'
-import { Button } from '../components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { useToast } from '@/contexts/ToastContext'
+import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ChefHat, UtensilsCrossed } from 'lucide-react'
 
 export default function LoginPage() {
@@ -126,12 +127,7 @@ export default function LoginPage() {
                 required
               />
               
-              {error && (
-                <div className="p-3 rounded-md bg-red-50 text-red-500 text-sm flex items-center">
-                  <UtensilsCrossed size={16} className="mr-2" />
-                  {error}
-                </div>
-              )}
+
 
               <Button type="submit" className="w-full" size="lg" isLoading={loading}>
                 Entrar

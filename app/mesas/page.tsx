@@ -2,35 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Loader2, X } from 'lucide-react'
-import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
-
-type MesaStatus = 'LIVRE' | 'OCUPADA' | 'FECHAMENTO'
-
-interface Mesa {
-  id: number
-  numero: number
-  status: MesaStatus
-  comandas: {
-    id: number
-    abertaEm: string
-    usuario?: {
-      nome: string
-    }
-  }[]
-}
+import { useToast } from '@/contexts/ToastContext'
+import { TableCard, Mesa } from '@/components/TableCard'
 
 type User = {
   role: string
 }
 
-const formatTime = (dateString: string) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-}
-
 export default function MesasPage() {
+  const { showToast } = useToast()
   const [mesas, setMesas] = useState<Mesa[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -94,10 +75,11 @@ export default function MesasPage() {
         setShowCloseModal(false) // Close the confirmation modal
         fetchMesas()
       } else {
-        alert('Erro ao fechar mesa')
+        showToast('Erro ao fechar mesa', 'error')
       }
     } catch (error) {
       console.error('Error closing table:', error)
+      showToast('Erro ao fechar mesa', 'error')
     }
   }
 

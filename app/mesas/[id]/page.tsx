@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowRightLeft, X, Check } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { useToast } from '@/contexts/ToastContext'
 
 type Produto = {
   id: number
@@ -58,6 +59,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const router = useRouter()
   const unwrappedParams = use(params)
   const mesaId = Number(unwrappedParams.id)
+  const { showToast } = useToast()
 
   const [categories, setCategories] = useState<Categoria[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
@@ -66,7 +68,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [submitting, setSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null)
   const [tableStatus, setTableStatus] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   
@@ -278,14 +279,14 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       if (res.ok) {
         setCart([])
         setShowConfirmModal(false)
-        setFeedback({ type: 'success', message: 'Pedido enviado com sucesso!' })
+        showToast('Pedido enviado com sucesso!', 'success')
         fetchTableData()
       } else {
-        setFeedback({ type: 'error', message: 'Erro ao enviar pedido' })
+        showToast('Erro ao enviar pedido', 'error')
       }
     } catch (error) {
       console.error(error)
-      setFeedback({ type: 'error', message: 'Erro ao enviar pedido' })
+      showToast('Erro ao enviar pedido', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -655,45 +656,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      {/* Feedback Modal */}
-      {feedback && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col items-center text-center">
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${
-              feedback.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-            }`}>
-              {feedback.type === 'success' ? (
-                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-            </div>
-            
-            <h3 className="text-2xl font-bold text-black mb-2">
-              {feedback.type === 'success' ? 'Sucesso!' : 'Ops!'}
-            </h3>
-            
-            <p className="text-black mb-8 text-lg">{feedback.message}</p>
-            
-            <button
-              onClick={() => {
-                setFeedback(null)
-              }}
-              className={`w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg transition-transform active:scale-95 ${
-                feedback.type === 'success' 
-                  ? 'bg-green-600 hover:bg-green-700 shadow-green-200' 
-                  : 'bg-red-600 hover:bg-red-700 shadow-red-200'
-              }`}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

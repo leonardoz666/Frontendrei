@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Input } from '../../components/ui/Input'
-import { Button } from '../../components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
+import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Plus, Search, Edit, Trash2, User as UserIcon, Shield, X, Save } from 'lucide-react'
 
 interface User {
@@ -45,13 +45,13 @@ export default function AdminUsersPage() {
       }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setError(data.error || 'Erro ao carregar usuários')
+        showToast(data.error || 'Erro ao carregar usuários', 'error')
         return
       }
       const data = await res.json()
       setUsers(data)
     } catch {
-      setError('Erro ao conectar com o servidor')
+      showToast('Erro ao conectar com o servidor', 'error')
     } finally {
       setLoading(false)
     }
@@ -98,20 +98,18 @@ export default function AdminUsersPage() {
       const data = await res.json()
 
       if (res.ok) {
-        if (editingId) {
-          setUsers(users.map(u => u.id === editingId ? data.user : u))
-        } else {
-          setUsers([...users, data.user])
-        }
+        setUsers(editingId 
+          ? users.map(u => u.id === editingId ? data.user : u)
+          : [...users, data.user]
+        )
 
-        setSuccess(editingId ? 'Usuário atualizado!' : 'Usuário criado!')
+        showToast(editingId ? 'Usuário atualizado!' : 'Usuário criado!', 'success')
         resetForm()
-        setTimeout(() => setSuccess(''), 3000)
       } else {
-        setError(data.error || 'Erro ao salvar usuário')
+        showToast(data.error || 'Erro ao salvar usuário', 'error')
       }
     } catch (err) {
-      setError('Erro ao conectar com o servidor')
+      showToast('Erro ao conectar com o servidor', 'error')
     }
   }
 
@@ -122,12 +120,9 @@ export default function AdminUsersPage() {
     setRole('GARCOM')
     setEditingId(null)
     setIsCreating(false)
-    setError('')
   }
 
   const handleEdit = (user: User) => {
-    setSuccess('')
-    setError('')
     setEditingId(user.id)
     setIsCreating(true)
     setNome(user.nome)
@@ -142,11 +137,10 @@ export default function AdminUsersPage() {
     const res = await fetch(`/api/users/${id}`, { method: 'DELETE' })
     if (res.ok) {
       setUsers(users.filter(u => u.id !== id))
-      setSuccess('Usuário excluído com sucesso!')
-      setTimeout(() => setSuccess(''), 3000)
+      showToast('Usuário excluído com sucesso!', 'success')
     } else {
       const data = await res.json()
-      setError(data.error || 'Erro ao excluir usuário')
+      showToast(data.error || 'Erro ao excluir usuário', 'error')
     }
   }
 
@@ -228,13 +222,6 @@ export default function AdminUsersPage() {
           <Plus size={18} className="mr-2" /> Novo Usuário
         </Button>
       </div>
-
-      {success && (
-        <div className="bg-green-50 text-green-700 p-4 rounded-lg border border-green-100 flex items-center">
-          <Shield size={18} className="mr-2" />
-          {success}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {users.map((user) => (

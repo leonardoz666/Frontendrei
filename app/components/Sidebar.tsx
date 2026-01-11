@@ -33,6 +33,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { showToast } = useToast()
   const [user, setUser] = useState<User | null>(null)
   const [showBillModal, setShowBillModal] = useState(false)
   const [splitPeople, setSplitPeople] = useState('1')
@@ -81,13 +82,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       const res = await fetch(`/api/tables/${currentMesaId}/print-partial`, { method: 'POST' })
       if (res.ok) {
         setShowBillModal(false)
-        alert('Conta parcial enviada para a impressora!')
+        showToast('Conta parcial enviada para a impressora!', 'success')
       } else {
-        alert('Erro ao imprimir conta parcial')
+        showToast('Erro ao imprimir conta parcial', 'error')
       }
     } catch (error) {
       console.error('Error printing partial bill:', error)
-      alert('Erro ao conectar com o servidor')
+      showToast('Erro ao conectar com o servidor', 'error')
     }
   }
 

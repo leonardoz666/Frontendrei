@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save, Printer } from 'lucide-react'
 import Link from 'next/link'
+import { useToast } from '@/contexts/ToastContext'
+import Skeleton from '@/components/ui/Skeleton'
 
 type PrinterConfig = {
   id: number
@@ -15,6 +17,7 @@ type PrinterConfig = {
 }
 
 export default function PrintersPage() {
+  const { showToast } = useToast()
   const router = useRouter()
   const [printers, setPrinters] = useState<PrinterConfig[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +43,25 @@ export default function PrintersPage() {
     }
   }
 
+  const [testing, setTesting] = useState<number | null>(null)
+
+  const handleTest = async (printer: PrinterConfig) => {
+    setTesting(printer.id)
+    try {
+      const res = await fetch(`/api/printers/${printer.id}/test`, { method: 'POST' })
+      if (res.ok) {
+        showToast('Teste enviado com sucesso! Verifique a impressora.', 'success')
+      } else {
+        showToast('Falha ao testar impressora. Verifique IP/Porta e conexão.', 'error')
+      }
+    } catch (error) {
+      console.error('Error testing printer:', error)
+      showToast('Erro ao testar impressora.', 'error')
+    } finally {
+      setTesting(null)
+    }
+  }
+
   const handleUpdate = async (printer: PrinterConfig) => {
     setSaving(printer.id)
     try {
@@ -54,14 +76,14 @@ export default function PrintersPage() {
       })
 
       if (res.ok) {
-        alert('Configuração salva com sucesso!')
+        showToast('Configuração salva com sucesso!', 'success')
         fetchPrinters()
       } else {
-        alert('Erro ao salvar configuração.')
+        showToast('Erro ao salvar configuração.', 'error')
       }
     } catch (error) {
       console.error('Error updating printer:', error)
-      alert('Erro ao salvar configuração.')
+      showToast('Erro ao salvar configuração.', 'error')
     } finally {
       setSaving(null)
     }
@@ -73,7 +95,22 @@ export default function PrintersPage() {
     ))
   }
 
-  if (loading) return <div className="p-8 text-center">Carregando...</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-4 mb-8">
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <Skeleton className="w-64 h-8" />
+          </div>
+          <div className="grid gap-6">
+            <Skeleton className="h-64 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -132,7 +169,22 @@ export default function PrintersPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-between">
+                <button
+                  onClick={() => handleTest(printer)}
+                  disabled={testing === printer.id || !printer.enabled}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {testing === printer.id ? (
+                    'Testando...'
+                  ) : (
+                    <>
+                      <Printer size={18} />
+                      Testar
+                    </>
+                  )}
+                </button>
+
                 <button
                   onClick={() => handleUpdate(printer)}
                   disabled={saving === printer.id}

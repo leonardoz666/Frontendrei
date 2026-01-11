@@ -3,7 +3,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ConfirmationModal } from '../../components/ConfirmationModal'
+import { ConfirmationModal } from '@/components/ConfirmationModal'
+import { useToast } from '@/contexts/ToastContext'
+import Skeleton from '@/components/ui/Skeleton'
 import { 
   ArrowLeft, 
   Plus, 
@@ -43,6 +45,7 @@ type Produto = {
 }
 
 export default function ProdutosPage() {
+  const { showToast } = useToast()
   const queryClient = useQueryClient()
   const router = useRouter()
   
@@ -145,6 +148,9 @@ export default function ProdutosPage() {
     }
     
     setFixStatus(`Correção concluída: ${updated} atualizados, ${failed} falhas`)
+    if (updated > 0) showToast(`${updated} produtos corrigidos com sucesso!`, 'success')
+    if (failed > 0) showToast(`${failed} falhas durante a correção.`, 'warning')
+    
     queryClient.invalidateQueries({ queryKey: ['products'] })
     setTimeout(() => setFixStatus(null), 5000)
   }
@@ -233,11 +239,13 @@ export default function ProdutosPage() {
 
       if (!res.ok) throw new Error('Erro ao salvar produto')
 
+      showToast(editingId ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!', 'success')
       resetForm()
       queryClient.invalidateQueries({ queryKey: ['products'] })
     } catch (err) {
       console.error(err)
       setError('Erro ao salvar produto')
+      showToast('Erro ao salvar produto. Tente novamente.', 'error')
     }
   }
 
@@ -290,11 +298,13 @@ export default function ProdutosPage() {
       try {
         const res = await fetch(`/api/products/${deleteConfirmationId}`, { method: 'DELETE' })
         if (!res.ok) throw new Error('Erro ao excluir')
+        
+        showToast('Produto excluído com sucesso!', 'success')
         queryClient.invalidateQueries({ queryKey: ['products'] })
         setDeleteConfirmationId(null)
       } catch (err) {
         console.error(err)
-        alert('Erro ao excluir produto')
+        showToast('Erro ao excluir produto.', 'error')
       }
     }
   }
@@ -385,15 +395,45 @@ export default function ProdutosPage() {
       }
 
       setImportStatus(`Importação concluída: ${added} adicionados, ${updated} atualizados, ${failed} falhas`)
+      if (added > 0 || updated > 0) showToast(`Importação concluída: ${added} novos, ${updated} atualizados.`, 'success')
+      if (failed > 0) showToast(`${failed} itens falharam na importação.`, 'warning')
+
       queryClient.invalidateQueries({ queryKey: ['products'] })
       e.target.value = '' 
     } catch (err) {
       console.error(err)
       setImportStatus('Falha ao importar arquivo')
+      showToast('Falha crítica ao importar arquivo.', 'error')
     }
   }
 
-  if (loadingProd || loadingCat) return <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-500">Carregando...</div>
+  if (loadingProd || loadingCat) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <header className="flex items-center justify-between mb-8">
+          <Skeleton className="w-8 h-8 rounded-full" />
+          <Skeleton className="w-48 h-8" />
+          <div className="w-10" />
+        </header>
+        <div className="flex gap-2 mb-8">
+          <Skeleton className="flex-1 h-10 rounded-xl" />
+          <Skeleton className="w-10 h-10 rounded-xl" />
+          <Skeleton className="w-10 h-10 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl overflow-hidden border border-gray-200">
+              <Skeleton className="aspect-square w-full" />
+              <div className="p-2 space-y-2">
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen pb-32 bg-gray-50 relative">
@@ -466,79 +506,13 @@ export default function ProdutosPage() {
       {/* Product List - UPDATED GRID (Smaller items) */}
       <div className="p-4 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
         {filteredProdutos.map((prod, idx) => (
-          <div 
+          <ProductCard 
             key={prod.id} 
-            style={{ animationDelay: `${idx * 50}ms` }}
-            className="group relative flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-all duration-300 animate-in fade-in zoom-in-50 fill-mode-backwards shadow-sm"
-          >
-            {/* Image Area */}
-            <div 
-              onClick={() => handleEdit(prod)}
-              className="aspect-square w-full bg-gray-100 relative overflow-hidden cursor-pointer"
-            >
-              {prod.foto ? (
-                <img 
-                  src={prod.foto} 
-                  alt={prod.nome} 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
-                  <ImageIcon size={24} strokeWidth={1.5} />
-                </div>
-              )}
-              
-              {/* Type Badge - Smaller */}
-              {(prod.isDrink || prod.isFood) && (
-                <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-md p-1 rounded-md border border-white/10 shadow-lg">
-                  {prod.isDrink ? (
-                    <Wine size={12} className="text-purple-400" />
-                  ) : (
-                    <Utensils size={12} className="text-orange-400" />
-                  )}
-                </div>
-              )}
-
-              {/* Delete Button (Floating) */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDeleteConfirmationId(prod.id)
-                }}
-                className="absolute top-1.5 right-1.5 p-1.5 bg-red-500/80 backdrop-blur-md text-white rounded-md hover:bg-red-500 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 translate-y-0 md:translate-y-2 md:group-hover:translate-y-0 duration-200 shadow-lg"
-              >
-                <Trash2 size={12} />
-              </button>
-
-              {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-            </div>
-
-            {/* Content */}
-            <div 
-              onClick={() => handleEdit(prod)}
-              className="p-2 pt-1.5 relative cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-1">
-                <span className="font-bold text-[10px] sm:text-xs leading-tight text-gray-800 line-clamp-2">{prod.nome}</span>
-              </div>
-              
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {prod.tipoOpcao !== 'padrao' && (
-                  <span className="text-[8px] sm:text-[9px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 leading-none">
-                    {prod.tipoOpcao === 'refrigerante' ? 'Bebida' : 
-                     prod.tipoOpcao === 'tamanho_pg' ? 'P/G' : 
-                     prod.tipoOpcao === 'combinado' ? 'Combinado' : 'Variações'}
-                  </span>
-                )}
-                {prod.isDrink && (
-                   <span className="text-[8px] sm:text-[9px] px-1 py-0.5 rounded bg-purple-50 text-purple-600 border border-purple-100 leading-none">
-                     Drink
-                   </span>
-                )}
-              </div>
-            </div>
-          </div>
+            prod={prod} 
+            index={idx} 
+            onEdit={handleEdit} 
+            onDelete={setDeleteConfirmationId} 
+          />
         ))}
 
         {filteredProdutos.length === 0 && (
