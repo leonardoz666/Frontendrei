@@ -122,13 +122,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-      <div className="p-6 border-b border-gray-100 flex items-center space-x-3">
-        <div className="w-10 h-10 relative flex-shrink-0">
+      <div className="px-6 py-3 border-b border-gray-100 flex items-center space-x-3">
+        <div className="w-16 h-16 relative flex-shrink-0">
           <Image 
             src="/logo.png" 
             alt="Rei do Pirão" 
             fill 
             className="object-contain"
+            priority
           />
         </div>
         <span className="text-xl font-bold text-gray-800 tracking-tight">Rei do Pirão</span>
