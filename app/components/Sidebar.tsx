@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, 
@@ -122,8 +123,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         md:translate-x-0
       `}>
       <div className="p-6 border-b border-gray-100 flex items-center space-x-3">
-        <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
-          <ChefHat size={20} className="text-white" />
+        <div className="w-10 h-10 relative flex-shrink-0">
+          <Image 
+            src="/logo.png" 
+            alt="Rei do Pirão" 
+            fill 
+            className="object-contain"
+          />
         </div>
         <span className="text-xl font-bold text-gray-800 tracking-tight">Rei do Pirão</span>
       </div>
@@ -142,11 +148,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               href={item.href}
               className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                 isActive 
-                  ? 'bg-orange-50 text-orange-600 font-medium' 
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-orange-600 text-white font-medium shadow-md' 
+                  : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
               }`}
             >
-              <Icon size={20} className={isActive ? 'text-orange-600' : 'text-gray-400 group-hover:text-gray-600'} />
+              <Icon size={20} className={isActive ? 'text-white' : 'text-gray-400 group-hover:text-orange-600'} />
               <span>{item.label}</span>
             </Link>
           )
