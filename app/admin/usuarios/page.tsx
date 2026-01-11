@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Plus, Search, Edit, Trash2, User as UserIcon, Shield, X, Save } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/Card'
+import { Plus, Edit, Trash2, Save } from 'lucide-react'
 
 interface User {
   id: number

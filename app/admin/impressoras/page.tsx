@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save, Printer } from 'lucide-react'
 import Link from 'next/link'
@@ -23,11 +23,7 @@ export default function PrintersPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<number | null>(null)
 
-  useEffect(() => {
-    fetchPrinters()
-  }, [])
-
-  const fetchPrinters = async () => {
+  const fetchPrinters = useCallback(async () => {
     try {
       const res = await fetch('/api/printers')
       if (res.ok) {
@@ -41,7 +37,11 @@ export default function PrintersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    fetchPrinters()
+  }, [fetchPrinters])
 
   const [testing, setTesting] = useState<number | null>(null)
 
