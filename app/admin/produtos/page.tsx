@@ -145,7 +145,7 @@ export default function ProdutosPage() {
   const [isFood, setIsFood] = useState(true)
   const [favorito, setFavorito] = useState(false)
 
-  const [error, setError] = useState('')
+  const [, setError] = useState('')
   const [importStatus, setImportStatus] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -251,7 +251,7 @@ export default function ProdutosPage() {
     setCategoriaId(prod.categoriaId ? prod.categoriaId.toString() : (categorias[0]?.id.toString() || ''))
     setAtivo(prod.ativo)
     setFoto(prod.foto)
-    setTipoOpcao(prod.tipoOpcao as any || 'padrao')
+    setTipoOpcao((prod.tipoOpcao as Produto['tipoOpcao']) || 'padrao')
     
     let parsedSabores: string[] = []
     try {
@@ -314,6 +314,7 @@ export default function ProdutosPage() {
       setImportStatus('Lendo arquivo...')
       const text = await file.text()
       const json = JSON.parse(text)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items: any[] = Array.isArray(json) ? json : Array.isArray(json?.items) ? json.items : []
       
       if (!items.length) {
@@ -361,7 +362,11 @@ export default function ProdutosPage() {
           })
 
           if (res.ok) {
-            existing ? updated++ : added++
+            if (existing) {
+              updated++
+            } else {
+              added++
+            }
           } else {
             failed++
           }
@@ -522,8 +527,16 @@ export default function ProdutosPage() {
                 >
                   {foto ? (
                     <>
-                      <img src={foto} alt="Preview" className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity" />
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="relative w-full h-full">
+                        <Image 
+                          src={foto} 
+                          alt="Preview" 
+                          fill
+                          className="object-cover opacity-80 group-hover:opacity-60 transition-opacity" 
+                          unoptimized
+                        />
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                         <Pencil className="text-white drop-shadow-md" size={24} />
                       </div>
                     </>

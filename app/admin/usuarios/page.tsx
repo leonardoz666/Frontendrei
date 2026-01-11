@@ -27,7 +27,7 @@ export default function AdminUsersPage() {
   const [isCreating, setIsCreating] = useState(false)
   
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [, setSuccess] = useState('')
   const router = useRouter()
 
   const fetchUsers = useCallback(async () => {
