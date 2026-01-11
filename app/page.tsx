@@ -80,6 +80,22 @@ export default function Home() {
     }
   }
 
+  // Keyboard support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key >= '0' && e.key <= '9') {
+        handleNumber(parseInt(e.key))
+      } else if (e.key === 'Backspace') {
+        handleBackspace()
+      } else if (e.key === 'Enter') {
+        handleEnter()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [input, tables]) // Dependencies needed for handleEnter logic
+
   const confirmOpen = () => {
     if (targetTable) {
       router.push(`/mesas/${targetTable.id}`)
