@@ -1,8 +1,10 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  // Disable PWA for now to debug routing issues
-  // turbopack: {}, // Removing experimental turbopack config
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Ensure we don't have strict mode issues
+  reactStrictMode: true,
+  // Disable powered by header
+  poweredByHeader: false,
+  
   async rewrites() {
     return [
       {
