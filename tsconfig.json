@@ -27,10 +27,16 @@
         "./*"
       ],
       "@/components/*": [
-        "app/components/*"
+        "./app/components/*"
       ],
       "@/contexts/*": [
-        "app/contexts/*"
+        "./app/contexts/*"
+      ],
+      "@/types": [
+        "./app/types/index"
+      ],
+      "@/types/*": [
+        "./app/types/*"
       ]
     }
   },

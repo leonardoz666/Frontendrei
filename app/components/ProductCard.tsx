@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Image from 'next/image'
 import { ImageIcon, Wine, Utensils, Trash2 } from 'lucide-react'
 
@@ -29,11 +30,10 @@ interface ProductCardProps {
   onDelete: (id: number) => void
 }
 
-export function ProductCard({ prod, index, onEdit, onDelete }: ProductCardProps) {
+export const ProductCard = memo(function ProductCard({ prod, index, onEdit, onDelete }: ProductCardProps) {
   return (
     <div 
-      style={{ animationDelay: `${index * 50}ms` }}
-      className="group relative flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-all duration-300 animate-in fade-in zoom-in-50 fill-mode-backwards shadow-sm"
+      className="group relative flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
     >
       {/* Image Area */}
       <div 
@@ -45,8 +45,10 @@ export function ProductCard({ prod, index, onEdit, onDelete }: ProductCardProps)
             src={prod.foto} 
             alt={prod.nome} 
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-110" 
-            unoptimized
+            sizes="(max-width: 640px) 25vw, (max-width: 768px) 20vw, (max-width: 1024px) 16vw, 12vw"
+            className="object-cover" 
+            loading="lazy"
+            unoptimized={prod.foto.startsWith('data:')} // Only unoptimize base64
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
@@ -54,9 +56,9 @@ export function ProductCard({ prod, index, onEdit, onDelete }: ProductCardProps)
           </div>
         )}
         
-        {/* Type Badge - Smaller */}
+        {/* Type Badge - Smaller - Removed backdrop-blur for performance */}
         {(prod.isDrink || prod.isFood) && (
-          <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-md p-1 rounded-md border border-white/10 shadow-lg">
+          <div className="absolute top-1.5 left-1.5 bg-black/80 p-1 rounded-md border border-white/10 shadow-sm z-10">
             {prod.isDrink ? (
               <Wine size={12} className="text-purple-400" />
             ) : (
@@ -65,19 +67,19 @@ export function ProductCard({ prod, index, onEdit, onDelete }: ProductCardProps)
           </div>
         )}
 
-        {/* Delete Button (Floating) */}
+        {/* Delete Button (Floating) - Removed backdrop-blur */}
         <button
           onClick={(e) => {
             e.stopPropagation()
             onDelete(prod.id)
           }}
-          className="absolute top-1.5 right-1.5 p-1.5 bg-red-500/80 backdrop-blur-md text-white rounded-md hover:bg-red-500 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 translate-y-0 md:translate-y-2 md:group-hover:translate-y-0 duration-200 shadow-lg"
+          className="absolute top-1.5 right-1.5 p-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 translate-y-0 md:translate-y-2 md:group-hover:translate-y-0 duration-200 shadow-sm z-10"
         >
           <Trash2 size={12} />
         </button>
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        {/* Simple overlay instead of gradient */}
+        <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
       </div>
 
       {/* Content */}
@@ -106,4 +108,12 @@ export function ProductCard({ prod, index, onEdit, onDelete }: ProductCardProps)
       </div>
     </div>
   )
-}
+}, (prev, next) => {
+  return prev.prod.id === next.prod.id && 
+         prev.prod.nome === next.prod.nome && 
+         prev.prod.preco === next.prod.preco &&
+         prev.prod.foto === next.prod.foto &&
+         prev.prod.tipoOpcao === next.prod.tipoOpcao &&
+         prev.prod.isDrink === next.prod.isDrink &&
+         prev.prod.isFood === next.prod.isFood
+})

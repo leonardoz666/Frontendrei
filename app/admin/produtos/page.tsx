@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -617,7 +617,7 @@ export default function ProdutosPage() {
                   <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Tipo de Opção</label>
                   <select
                     value={tipoOpcao}
-                    onChange={e => setTipoOpcao(e.target.value as Produto['tipoOpcao'])}
+                    onChange={e => setTipoOpcao(e.target.value as Exclude<Produto['tipoOpcao'], undefined>)}
                     className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                   >
                     <option value="padrao">Padrão (Sem variações)</option>

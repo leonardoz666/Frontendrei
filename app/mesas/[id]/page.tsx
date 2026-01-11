@@ -6,54 +6,9 @@ import Link from 'next/link'
 import { ArrowRightLeft, X, Check } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
-
-type Produto = {
-  id: number
-  nome: string
-  preco: number
-  categoriaId: number
-}
-
-type Categoria = {
-  id: number
-  nome: string
-  setor: string
-  produtos: Produto[]
-}
-
-type CartItem = {
-  produtoId: number
-  nome: string
-  preco: number
-  quantidade: number
-  observacao: string
-  setor: string
-}
-
-type SubmittedItem = {
-  id: number
-  nome: string
-  quantidade: number
-  preco: number
-  observacao: string | null
-  status: string
-  horario: string
-}
-
-type APIPedido = {
-  id: number
-  criadoEm: string
-  itens: {
-    id: number
-    quantidade: number
-    observacao: string | null
-    status: string
-    produto: {
-      nome: string
-      preco: number
-    }
-  }[]
-}
+import { ProductOptionsModal } from '@/components/ProductOptionsModal'
+import { ConfirmationModal } from '@/components/ConfirmationModal'
+import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -70,12 +25,47 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [tableStatus, setTableStatus] = useState<string>('')
   const [selectedCategory] = useState<string>('all')
+  const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null)
+  const [userRole, setUserRole] = useState<string>('')
   
   // Transfer Table State
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [availableTables, setAvailableTables] = useState<{id: number, numero: number, status: string}[]>([])
   const [targetTableId, setTargetTableId] = useState<number | null>(null)
   const [isTransferring, setIsTransferring] = useState(false)
+  
+  // Cancel Item State
+  const [itemToCancel, setItemToCancel] = useState<number | null>(null)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+
+  const handleCancelItem = (itemId: number) => {
+    setItemToCancel(itemId)
+    setShowCancelModal(true)
+  }
+
+  const confirmCancelItem = async () => {
+    if (!itemToCancel) return
+
+    try {
+      const res = await fetch(`/api/orders/items/${itemToCancel}`, {
+        method: 'DELETE'
+      })
+
+      if (res.ok) {
+        showToast('Item cancelado com sucesso', 'success')
+        fetchTableData()
+      } else {
+        const error = await res.json()
+        showToast(error.message || 'Erro ao cancelar item', 'error')
+      }
+    } catch (error) {
+      console.error('Error cancelling item:', error)
+      showToast('Erro ao conectar com o servidor', 'error')
+    } finally {
+      setShowCancelModal(false)
+      setItemToCancel(null)
+    }
+  }
 
   const fetchTableData = useCallback(async () => {
     try {
@@ -138,16 +128,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       })
 
       if (res.ok) {
-        setFeedback({ type: 'success', message: 'Mesa transferida com sucesso!' })
+        showToast('Mesa transferida com sucesso!', 'success')
         setShowTransferModal(false)
         router.push(`/mesas/${targetTableId}`)
       } else {
         const errorText = await res.text()
-        setFeedback({ type: 'error', message: `Erro ao transferir: ${errorText}` })
+        showToast(`Erro ao transferir: ${errorText}`, 'error')
       }
     } catch (error) {
       console.error('Error transferring table:', error)
-      setFeedback({ type: 'error', message: 'Erro ao conectar com o servidor' })
+      showToast('Erro ao conectar com o servidor', 'error')
     } finally {
       setIsTransferring(false)
     }
@@ -167,6 +157,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           router.replace('/login')
           return
         }
+        setUserRole(meData.user.role)
 
         console.log('[DEBUG] Fetching categories');
         const productsRes = await fetch('/api/categories', { cache: 'no-store' })
@@ -221,11 +212,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const addToCart = (produto: Produto & { setor: string }) => {
     if (tableStatus === 'FECHAMENTO') return
 
+    if (produto.tipoOpcao && produto.tipoOpcao !== 'padrao') {
+      setSelectedProduct(produto)
+      return
+    }
+
     setCart(prev => {
-      const existing = prev.find(item => item.produtoId === produto.id)
+      const existing = prev.find(item => item.produtoId === produto.id && item.observacao === '')
       if (existing) {
         return prev.map(item => 
-          item.produtoId === produto.id 
+          item === existing
             ? { ...item, quantidade: item.quantidade + 1 }
             : item
         )
@@ -242,9 +238,44 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     setSearchTerm('') // Clear search after adding
   }
 
-  const updateQuantity = (produtoId: number, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.produtoId === produtoId) {
+  const handleModalConfirm = (quantity: number, observation: string, _options: string[], finalPrice: number) => {
+    if (!selectedProduct) return
+
+    // Find setor from categories since selectedProduct doesn't have it explicitly
+    // Or we can rely on finding it in the flat list if we had it.
+    // But we can just lookup category.
+    const category = categories.find(c => c.id === selectedProduct.categoriaId)
+    const setor = category ? category.setor : 'Geral'
+
+    setCart(prev => {
+      // Check for exact match of ID and Observation
+      const existing = prev.find(item => item.produtoId === selectedProduct.id && item.observacao === observation)
+      
+      if (existing) {
+        return prev.map(item => 
+          item === existing
+            ? { ...item, quantidade: item.quantidade + quantity }
+            : item
+        )
+      }
+
+      return [...prev, {
+        produtoId: selectedProduct.id,
+        nome: selectedProduct.nome,
+        preco: finalPrice,
+        quantidade: quantity,
+        observacao: observation,
+        setor
+      }]
+    })
+    
+    setSelectedProduct(null)
+    setSearchTerm('')
+  }
+
+  const updateQuantity = (index: number, delta: number) => {
+    setCart(prev => prev.map((item, i) => {
+      if (i === index) {
         const newQty = Math.max(0, item.quantidade + delta)
         return { ...item, quantidade: newQty }
       }
@@ -252,9 +283,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }).filter(item => item.quantidade > 0))
   }
 
-  const updateObservation = (produtoId: number, obs: string) => {
-    setCart(prev => prev.map(item => 
-      item.produtoId === produtoId ? { ...item, observacao: obs } : item
+  const updateObservation = (index: number, obs: string) => {
+    setCart(prev => prev.map((item, i) => 
+      i === index ? { ...item, observacao: obs } : item
     ))
   }
 
@@ -384,18 +415,18 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-black flex items-center gap-2">
-              ✅ Comanda <span className="text-sm font-normal text-black">({submittedItems.length})</span>
+              ✅ Comanda <span className="text-sm font-normal text-black">({submittedItems.filter(i => i.status !== 'CANCELADO').length})</span>
             </h2>
             <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
               <span className="font-bold text-black">
-                Total: R$ {submittedItems.reduce((acc, item) => acc + (item.preco * item.quantidade), 0).toFixed(2)}
+                Total: R$ {submittedItems.filter(i => i.status !== 'CANCELADO').reduce((acc, item) => acc + (item.preco * item.quantidade), 0).toFixed(2)}
               </span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
              {submittedItems.map((item, index) => (
-               <div key={`${item.id}-${index}`} className="bg-white p-2.5 rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+               <div key={`${item.id}-${index}`} className={`bg-white p-2.5 rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all ${item.status === 'CANCELADO' ? 'opacity-60 bg-gray-100' : ''}`}>
                  
                  <div>
                    <div className="flex justify-between items-start mb-1.5">
@@ -404,17 +435,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                        item.status === 'PENDENTE' ? 'bg-yellow-100 text-yellow-700' :
                        item.status === 'EM_PREPARO' ? 'bg-blue-100 text-blue-700' :
                        item.status === 'PRONTO' ? 'bg-green-100 text-green-700' :
+                       item.status === 'CANCELADO' ? 'bg-red-100 text-red-700' :
                        'bg-gray-100 text-black'
                      }`}>
                        {item.status === 'EM_PREPARO' ? 'PREPARO' : item.status}
                      </span>
                    </div>
                    
-                   <h3 className="font-bold text-black leading-tight mb-1 text-xs sm:text-sm">
+                   <h3 className={`font-bold text-black leading-tight mb-1 text-xs sm:text-sm ${item.status === 'CANCELADO' ? 'line-through text-gray-500' : ''}`}>
                      <span className="text-yellow-600 mr-1 text-sm sm:text-base">{item.quantidade}x</span>
                      {item.nome}
                    </h3>
-                   
                    {item.observacao && (
                      <div className="text-[10px] text-black bg-gray-50 p-1.5 rounded border border-gray-100 mb-1 italic leading-tight">
                        &quot;{item.observacao}&quot;
@@ -422,8 +453,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                    )}
                  </div>
 
-                 <div className="pt-1.5 border-t border-gray-50 flex justify-end items-center">
-                    <span className="font-bold text-black text-xs sm:text-sm">
+                 <div className="pt-1.5 border-t border-gray-50 flex justify-between items-center">
+                    {item.status !== 'CANCELADO' && ['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
+                      <button 
+                        onClick={() => handleCancelItem(item.id)}
+                        className="text-red-500 hover:text-white hover:bg-red-500 transition-all p-1.5 rounded-lg border border-red-200 hover:border-red-500 shadow-sm"
+                        title="Cancelar Item"
+                      >
+                        <X size={16} strokeWidth={2.5} />
+                      </button>
+                    )}
+                    <span className={`font-bold text-black text-xs sm:text-sm ml-auto ${item.status === 'CANCELADO' ? 'line-through text-gray-400' : ''}`}>
                       R$ {(item.preco * item.quantidade).toFixed(2)}
                     </span>
                  </div>
@@ -446,8 +486,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           </div>
         ) : (
           <div className="space-y-4">
-            {cart.map(item => (
-              <div key={item.produtoId} className="bg-white p-4 rounded-xl shadow-sm border border-orange-200 relative">
+            {cart.map((item, index) => (
+              <div key={`${item.produtoId}-${index}`} className="bg-white p-4 rounded-xl shadow-sm border border-orange-200 relative">
                 {/* Header: Name and Remove */}
                 <div className="flex justify-between items-start mb-1">
                   <div>
@@ -455,7 +495,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                     <span className="text-xs text-gray-500 uppercase font-bold tracking-wide">{item.setor}</span>
                   </div>
                   <button 
-                    onClick={() => updateQuantity(item.produtoId, -item.quantidade)} // Sets to 0, which removes
+                    onClick={() => updateQuantity(index, -item.quantidade)} // Sets to 0, which removes
                     className="text-gray-400 hover:text-red-500 transition-colors p-1"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -473,7 +513,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                     placeholder="Sem cebola, bem passado..."
                     className="w-full text-sm p-3 bg-gray-50 border border-gray-100 rounded-lg focus:outline-none focus:border-orange-500 resize-none h-20 text-black placeholder-gray-400"
                     value={item.observacao}
-                    onChange={(e) => updateObservation(item.produtoId, e.target.value)}
+                    onChange={(e) => updateObservation(index, e.target.value)}
                   />
                 </div>
                 
@@ -481,14 +521,14 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 <div className="flex items-end justify-between">
                   <div className="flex items-center bg-gray-100 rounded-lg p-1">
                     <button 
-                      onClick={() => updateQuantity(item.produtoId, -1)}
+                      onClick={() => updateQuantity(index, -1)}
                       className="w-8 h-8 rounded-md flex items-center justify-center text-black font-bold hover:bg-white hover:shadow-sm transition-all"
                     >
                       -
                     </button>
                     <span className="w-8 text-center font-bold text-black">{item.quantidade}</span>
                     <button 
-                      onClick={() => updateQuantity(item.produtoId, 1)}
+                      onClick={() => updateQuantity(index, 1)}
                       className="w-8 h-8 rounded-md flex items-center justify-center text-black font-bold hover:bg-white hover:shadow-sm transition-all"
                     >
                       +
@@ -520,6 +560,26 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           </button>
         </div>
       )}
+
+      {/* Cancel Item Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={confirmCancelItem}
+        title="Cancelar Item"
+        description="Tem certeza que deseja cancelar este item? O valor será estornado da comanda."
+        confirmText="Sim, Cancelar"
+        cancelText="Não"
+        variant="danger"
+      />
+
+      {/* Product Options Modal */}
+      <ProductOptionsModal
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        product={selectedProduct}
+        onConfirm={handleModalConfirm}
+      />
 
       {/* Transfer Modal */}
       {showTransferModal && createPortal(
