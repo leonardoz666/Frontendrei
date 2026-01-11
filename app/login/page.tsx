@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useToast } from '@/contexts/ToastContext'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { ChefHat, UtensilsCrossed } from 'lucide-react'
+import { ChefHat } from 'lucide-react'
 
 export default function LoginPage() {
   const [login, setLogin] = useState('')

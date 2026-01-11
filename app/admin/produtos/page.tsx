@@ -6,43 +6,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { useToast } from '@/contexts/ToastContext'
 import Skeleton from '@/components/ui/Skeleton'
+import { ProductCard, Produto, Categoria } from '@/components/ProductCard'
 import { 
   ArrowLeft, 
   Plus, 
   Search, 
-  Trash2, 
   Upload, 
   X, 
   Pencil, 
-  ImageIcon, 
-  Wine, 
-  Pizza, 
-  Utensils, 
   Download,
   Wand2
 } from 'lucide-react'
 import { clsx } from 'clsx'
-
-type Categoria = {
-  id: number
-  nome: string
-}
-
-type Produto = {
-  id: number
-  nome: string
-  preco: number
-  ativo: boolean
-  categoriaId: number | null
-  categoria?: Categoria
-  foto?: string
-  tipoOpcao?: 'padrao' | 'tamanho_pg' | 'refrigerante' | 'sabores' | 'sabores_com_tamanho' | 'combinado'
-  sabores?: string // JSON string
-  isDrink?: boolean
-  isFood?: boolean
-  favorito?: boolean
-  ultimoUso?: string
-}
 
 export default function ProdutosPage() {
   const { showToast } = useToast()

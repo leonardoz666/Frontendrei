@@ -9,16 +9,14 @@ import {
   Users, 
   ChefHat, 
   LogOut, 
-  Menu,
-  ShoppingBag,
   Armchair,
   Receipt,
   ClipboardList,
-  Printer,
-  Grid
+  Printer
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useToast } from '@/contexts/ToastContext'
 
 type User = {
   name: string
@@ -42,7 +40,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   // Close sidebar on route change (mobile)
   useEffect(() => {
     if (isOpen) onClose()
-  }, [pathname])
+  }, [pathname, isOpen, onClose])
 
   useEffect(() => {
     setMounted(true)
