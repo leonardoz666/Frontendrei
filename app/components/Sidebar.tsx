@@ -96,10 +96,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { href: '/', label: 'Início', icon: LayoutDashboard, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
     { href: '/mesas', label: 'Mesas', icon: Armchair, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
     { href: '/mesas-abertas', label: 'Mesas Abertas', icon: ClipboardList, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
+    { href: '/minhas-mesas', label: 'Minhas Mesas', icon: Users, roles: ['GARCOM', 'GERENTE', 'DONO'] },
     { href: '/ifood', label: 'iFood', icon: ShoppingBag, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA'] },
     { href: '/admin', label: 'PAINEL', icon: Settings, roles: ['ADMIN', 'DONO'] },
-    { href: '/cozinha', label: 'Cozinha', icon: ChefHat, roles: ['GERENTE', 'DONO', 'CAIXA'] },
-    { href: '/minhas-mesas', label: 'Minhas Mesas', icon: Users, roles: ['GARCOM', 'GERENTE', 'DONO'] },
   ]
 
   const filteredItems = menuItems.filter(item => {
