@@ -69,6 +69,7 @@ export default function LoginPage() {
         setError(data.error || 'Credenciais inválidas')
       }
     } catch (err) {
+      console.error(err)
       setError('Erro ao conectar ao servidor')
     } finally {
       setLoading(false)

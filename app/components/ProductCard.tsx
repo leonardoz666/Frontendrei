@@ -40,10 +40,12 @@ export function ProductCard({ prod, index, onEdit, onDelete }: ProductCardProps)
         className="aspect-square w-full bg-gray-100 relative overflow-hidden cursor-pointer"
       >
         {prod.foto ? (
-          <img 
+          <Image 
             src={prod.foto} 
             alt={prod.nome} 
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-110" 
+            unoptimized
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">

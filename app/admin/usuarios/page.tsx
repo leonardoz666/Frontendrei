@@ -108,7 +108,7 @@ export default function AdminUsersPage() {
       } else {
         showToast(data.error || 'Erro ao salvar usuário', 'error')
       }
-    } catch (err) {
+    } catch {
       showToast('Erro ao conectar com o servidor', 'error')
     }
   }
