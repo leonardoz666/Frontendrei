@@ -69,7 +69,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [searchTerm, setSearchTerm] = useState('')
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [tableStatus, setTableStatus] = useState<string>('')
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedCategory] = useState<string>('all')
   
   // Transfer Table State
   const [showTransferModal, setShowTransferModal] = useState(false)
@@ -120,7 +120,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         .then(res => res.json())
         .then(data => {
           // Filter out current table
-          setAvailableTables(data.filter((t: any) => t.id !== mesaId))
+          setAvailableTables(data.filter((t: { id: number }) => t.id !== mesaId))
         })
         .catch(err => console.error('Error fetching tables:', err))
     }

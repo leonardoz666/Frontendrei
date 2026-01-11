@@ -126,7 +126,11 @@ export default function LoginPage() {
                 required
               />
               
-
+              {error && (
+                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center">
+                  {error}
+                </div>
+              )}
 
               <Button type="submit" className="w-full" size="lg" isLoading={loading}>
                 Entrar

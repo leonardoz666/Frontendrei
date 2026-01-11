@@ -6,7 +6,9 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-interface CardProps extends HTMLAttributes<HTMLDivElement> {}
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  // Add any custom props here if needed in the future
+}
 
 const Card = forwardRef<HTMLDivElement, CardProps>(({ className, ...props }, ref) => (
   <div

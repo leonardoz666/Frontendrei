@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { io } from 'socket.io-client'
 
@@ -35,7 +35,7 @@ export default function KitchenPage() {
   const [orders, setOrders] = useState<OrdemProducao[]>([])
   const router = useRouter()
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       console.log('[DEBUG] Kitchen fetching orders');
       const res = await fetch('/api/kitchen')
@@ -61,7 +61,7 @@ export default function KitchenPage() {
     } catch (err) {
       console.error('[DEBUG] Error fetching orders:', err)
     }
-  }
+  }, [router])
 
   useEffect(() => {
     // Initial Auth Check and Fetch
@@ -109,7 +109,7 @@ export default function KitchenPage() {
     return () => {
       socket.disconnect()
     }
-  }, [router])
+  }, [router, fetchOrders])
 
   const updateStatus = async (id: number, newStatus: string) => {
     await fetch('/api/kitchen', {

@@ -50,17 +50,17 @@ export default function Home() {
     init()
   }, [router])
 
-  const handleNumber = (num: number) => {
+  const handleNumber = useCallback((num: number) => {
     if (input.length < 3) { // Limit to 3 digits usually enough for tables
       setInput(prev => prev + num.toString())
     }
-  }
+  }, [input])
 
-  const handleBackspace = () => {
+  const handleBackspace = useCallback(() => {
     setInput(prev => prev.slice(0, -1))
-  }
+  }, [])
 
-  const handleEnter = () => {
+  const handleEnter = useCallback(() => {
     if (!input) return
 
     const tableNum = parseInt(input)
@@ -78,7 +78,7 @@ export default function Home() {
     } else {
       router.push(`/mesas/${table.id}`)
     }
-  }
+  }, [input, tables, router, showToast])
 
   // Keyboard support
   useEffect(() => {
@@ -94,7 +94,7 @@ export default function Home() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [input, tables]) // Dependencies needed for handleEnter logic
+  }, [handleNumber, handleBackspace, handleEnter])
 
   const confirmOpen = () => {
     if (targetTable) {
