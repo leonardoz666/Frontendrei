@@ -12,7 +12,8 @@ import {
   Armchair,
   Receipt,
   ClipboardList,
-  Printer
+  Printer,
+  ShoppingBag
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
