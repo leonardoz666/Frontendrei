@@ -18,17 +18,28 @@ export default function LoginPage() {
     let cancelled = false
 
     const run = async () => {
+      // Short timeout to avoid blocking if backend is down
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+
       try {
         console.log('[DEBUG] Login check auth/me');
-        const res = await fetch('/api/auth/me')
+        const res = await fetch('/api/auth/me', { 
+            signal: controller.signal,
+            cache: 'no-store' 
+        })
+        clearTimeout(timeoutId);
+        
         console.log(`[DEBUG] Login auth/me status: ${res.status}`);
-        const data = await res.json()
-        if (!cancelled && data.user) {
-          console.log('[DEBUG] User already logged in, redirecting');
-          router.replace('/')
+        if (res.ok) {
+            const data = await res.json()
+            if (!cancelled && data.user) {
+              console.log('[DEBUG] User already logged in, redirecting');
+              router.replace('/')
+            }
         }
       } catch (e) {
-        console.error('[DEBUG] Login check error:', e);
+        console.error('[DEBUG] Login check error or timeout:', e);
       }
     }
 
