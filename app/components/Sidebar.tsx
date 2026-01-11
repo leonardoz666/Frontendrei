@@ -121,11 +121,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-      <div className="p-6 border-b border-gray-100 flex items-center space-x-3">
-        <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
-          <ChefHat size={20} className="text-white" />
-        </div>
-        <span className="text-xl font-bold text-gray-800 tracking-tight">Rei do Pirão</span>
+      <div className="p-6 border-b border-gray-100 flex items-center justify-center">
+        <img src="/logo.png" alt="Rei do Pirão" className="h-12 w-auto object-contain" />
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
