@@ -114,12 +114,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       )}
 
       <aside className={`
-        fixed inset-y-0 left-0 z-[70] w-72 bg-white flex flex-col transition-transform duration-300 ease-in-out shadow-2xl
+        fixed inset-y-0 left-0 z-[70] w-64 bg-white flex flex-col transition-transform duration-300 ease-in-out shadow-2xl
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-      <div className="py-8 flex items-center justify-center">
-        <div className="w-48 h-24 relative hover:scale-105 transition-transform duration-300">
+      <div className="py-6 flex items-center justify-center">
+        <div className="w-40 h-20 relative hover:scale-105 transition-transform duration-300">
           <Image 
             src="/logo.png"  
             alt="Rei do Pirão" 
@@ -130,9 +130,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
       </div>
 
-      <nav className="flex-1 px-6 space-y-2 overflow-y-auto">
-        <div className="mb-6 px-2">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Navegação</p>
+      <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+        <div className="mb-4 px-2">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Menu</p>
         </div>
         {filteredItems.map((item) => {
           const Icon = item.icon
@@ -142,23 +142,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
+              className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group font-medium text-sm ${
                 isActive 
-                  ? 'bg-orange-50 text-orange-600 font-bold shadow-sm ring-1 ring-orange-100' 
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 font-medium'
+                  ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' 
+                  : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
               }`}
             >
-              {isActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-orange-500 rounded-r-full" />
-              )}
               <Icon 
-                size={22} 
-                className={`transition-colors duration-300 ${
-                  isActive ? 'text-orange-600' : 'text-gray-400 group-hover:text-gray-600'
+                size={20} 
+                className={`transition-colors duration-200 ${
+                  isActive ? 'text-white' : 'text-gray-400 group-hover:text-orange-600'
                 }`} 
-                strokeWidth={isActive ? 2.5 : 2}
               />
-              <span className="tracking-wide">{item.label}</span>
+              <span>{item.label}</span>
             </Link>
           )
         })}
@@ -193,8 +189,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               {user?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-gray-900 truncate leading-tight">{user?.name}</p>
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{user?.role}</p>
+              <p className="text-sm font-semibold text-gray-900 truncate leading-tight">{user?.name}</p>
+              <p className="text-xs text-gray-500 uppercase font-medium tracking-wide mt-0.5">{user?.role}</p>
             </div>
           </div>
           
