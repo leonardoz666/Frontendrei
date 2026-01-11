@@ -106,7 +106,7 @@ export default function Home() {
   if (loading) return <div className="flex justify-center items-center h-screen">Carregando...</div>
 
   return (
-    <div className="flex flex-col items-center justify-start pt-6 min-h-[calc(100vh-4rem)]">
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)]">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
         <h1 className="text-2xl font-bold text-center text-gray-800 mb-8">Digite o Número da Mesa</h1>
         
