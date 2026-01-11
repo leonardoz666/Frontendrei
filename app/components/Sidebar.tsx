@@ -122,7 +122,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         md:translate-x-0
       `}>
       <div className="p-6 border-b border-gray-100 flex items-center justify-center">
-        <img src="/logo.png" alt="Rei do Pirão" className="h-12 w-auto object-contain" />
+        <img src="/logo.png" alt="Rei do Pirão" className="h-28 w-auto object-contain" />
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">

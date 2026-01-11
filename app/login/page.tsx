@@ -82,7 +82,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-black/10 z-10" />
         <div className="relative z-20 text-white text-center p-12">
           <div className="mb-8 flex justify-center">
-            <div className="w-48 h-48 bg-white rounded-full flex items-center justify-center p-4 shadow-xl">
+            <div className="w-80 h-80 bg-white rounded-full flex items-center justify-center p-6 shadow-2xl">
               <img src="/logo.png" alt="Rei do Pirão" className="w-full h-full object-contain" />
             </div>
           </div>
