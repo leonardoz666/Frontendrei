@@ -107,7 +107,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)]">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+      <div className="bg-white p-4 md:p-8 rounded-none md:rounded-2xl shadow-none md:shadow-xl w-full max-w-md border-0 md:border border-gray-100 flex flex-col justify-center min-h-[calc(100vh-4rem)] md:min-h-0">
         <h1 className="text-2xl font-bold text-center text-gray-800 mb-8">Digite o Número da Mesa</h1>
         
         {/* Display */}
