@@ -340,14 +340,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-black">Mesa {mesaId}</h1>
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setShowTransferModal(true)}
-            className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-200 transition-colors"
-            title="Trocar de Mesa"
-          >
-            <ArrowRightLeft size={20} />
-            <span className="hidden sm:inline">Trocar Mesa</span>
-          </button>
+          {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
+            <button 
+              onClick={() => setShowTransferModal(true)}
+              className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-200 transition-colors"
+              title="Trocar de Mesa"
+            >
+              <ArrowRightLeft size={20} />
+              <span className="hidden sm:inline">Trocar Mesa</span>
+            </button>
+          )}
           <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
             <span>←</span> Voltar ao Início
           </Link>
