@@ -4,7 +4,7 @@ import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { io } from 'socket.io-client'
-import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, Clock, PlusCircle } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, Clock, PlusCircle, CheckCircle2, Search } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
@@ -23,7 +23,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [submitting, setSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [tableStatus, setTableStatus] = useState<string>('')
-  const [selectedCategory] = useState<string>('all')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null)
   const [userRole, setUserRole] = useState<string>('')
   
@@ -369,15 +369,33 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
-  if (loading) return <div className="p-8 text-center">Carregando cardápio...</div>
+  const grandTotal = useMemo(() => {
+    const cartTotal = cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
+    const submittedTotal = submittedItems
+      .filter(item => item.status !== 'CANCELADO')
+      .reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
+    return cartTotal + submittedTotal
+  }, [cart, submittedItems])
 
-  const totalCart = cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
-  const totalSubmitted = submittedItems.filter(i => i.status !== 'CANCELADO').reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
-  const grandTotal = totalCart + totalSubmitted
+  const submittedGroups = useMemo(() => {
+    const groups: { [key: string]: SubmittedItem & { quantidade: number } } = {}
+    submittedItems.forEach(item => {
+      if (item.status === 'CANCELADO') return
+      const key = `${item.nome}-${item.preco}-${item.observacao || ''}`
+      if (!groups[key]) {
+        groups[key] = { ...item, quantidade: 0 }
+      }
+      groups[key].quantidade += item.quantidade
+    })
+    return Object.values(groups)
+  }, [submittedItems])
+
+  if (loading) {
+    return <div className="p-8 text-center">Carregando cardápio...</div>
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Left Column - Product Menu */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-6">
           {/* Header */}
@@ -409,9 +427,106 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             </div>
           )}
 
-          {/* Product Grid */}
+          {/* Categories */}
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-6">
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={`px-4 py-2 rounded-full font-bold whitespace-nowrap transition-colors ${
+                selectedCategory === 'all'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              Todos
+            </button>
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id.toString())}
+                className={`px-4 py-2 rounded-full font-bold whitespace-nowrap transition-colors ${
+                  selectedCategory === cat.id.toString()
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                {cat.nome}
+              </button>
+            ))}
+          </div>
+
+          {/* Section 1: Comanda (Submitted Items) */}
+          <div className="mb-8">
+             <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-2">
+               <CheckCircle2 className="text-green-500" size={24} /> Comanda
+             </h2>
+             
+             {submittedGroups.length === 0 ? (
+               <div className="p-8 text-center bg-white rounded-xl border border-gray-100 text-gray-400">
+                 Nenhum item lançado nesta mesa.
+               </div>
+             ) : (
+               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                 {/* Submitted Items Grouped */}
+                 {submittedGroups.map((group, idx) => {
+                    // Try to find original product to enable "Add" button
+                    const originalProduct = allProducts.find(p => p.nome === group.nome)
+                    
+                    return (
+                     <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-[120px] relative">
+                       <div className="w-full">
+                         <div className="flex justify-between items-start">
+                           <h3 className="font-bold text-sm text-gray-900 text-left line-clamp-2 leading-tight">{group.nome}</h3>
+                           <span className="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                             {group.quantidade}x
+                           </span>
+                         </div>
+                         {/* We don't have description/setor here easily unless we map back to products */}
+                       </div>
+                       
+                       <div className="flex items-end justify-between w-full mt-2">
+                         <span className="font-bold text-lg text-black">R$ {group.preco.toFixed(2).replace('.', ',')}</span>
+                         {originalProduct && !originalProduct.ativo && (
+                            <span className="text-xs text-red-400">Indisponível</span>
+                         )}
+                         {originalProduct && originalProduct.ativo !== false && (
+                           <button 
+                             onClick={() => addToCart(originalProduct)}
+                             className="text-orange-500 hover:scale-110 transition-transform"
+                             title="Adicionar mais um"
+                           >
+                              <PlusCircle size={24} />
+                           </button>
+                         )}
+                       </div>
+                     </div>
+                    )
+                 })}
+               </div>
+             )}
+          </div>
+
+          <hr className="my-8 border-gray-200" />
+
+          {/* Section 2: Produtos (Menu) */}
+          <div className="mb-8">
+            <h2 className="text-lg font-bold text-black mb-4">Produtos</h2>
+            
+            {/* Search Bar */}
+            <div className="mb-6 relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
+                className="w-full p-4 pl-12 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={tableStatus === 'FECHAMENTO'}
+              />
+            </div>
+
+            {/* Product Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredProducts.map(produto => { // Show first 12 for demo or all? The image shows "Comanda" section with some products. I'll show all filtered products here.
+              {filteredProducts.map(produto => {
                 const isInactive = produto.ativo === false
                 return (
                   <button
@@ -454,7 +569,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2">
             <ListOrdered className="text-orange-500" size={20} />
-            <h2 className="font-bold text-lg text-black">Comanda <span className="text-gray-400 text-sm font-normal">({cart.length + submittedItems.filter(i => i.status !== 'CANCELADO').length})</span></h2>
+            <h2 className="font-bold text-lg text-black">Pedido Atual <span className="text-gray-400 text-sm font-normal">({cart.length + submittedItems.filter(i => i.status !== 'CANCELADO').length})</span></h2>
           </div>
           <div className="bg-gray-200 px-2 py-1 rounded text-xs font-bold text-gray-700">
              Total: R$ {grandTotal.toFixed(2).replace('.', ',')}
@@ -577,6 +692,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           </div>
         </div>
       </div>
+    </div>
 
       {/* Modals */}
       {selectedProduct && (
