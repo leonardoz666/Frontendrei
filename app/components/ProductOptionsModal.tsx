@@ -55,8 +55,9 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
       const newQty = Math.max(0, current + delta)
       
       if (newQty === 0) {
-        const { [opt]: _, ...rest } = prev
-        return rest
+        const newPrev = { ...prev }
+        delete newPrev[opt]
+        return newPrev
       }
       
       return { ...prev, [opt]: newQty }
