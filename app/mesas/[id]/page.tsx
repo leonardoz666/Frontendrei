@@ -4,11 +4,10 @@ import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { io } from 'socket.io-client'
-import { ArrowRightLeft, X, Check, CheckCircle2, ListOrdered } from 'lucide-react'
+import { ArrowRightLeft, X, CheckCircle2, ListOrdered, Search, Trash2, Rocket, Clock, PlusCircle } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
-import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -344,6 +343,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }).filter(item => item.quantidade > 0))
   }
 
+  const removeFromCart = (index: number) => {
+    setCart(prev => prev.filter((_, i) => i !== index))
+  }
+
   const updateObservation = (index: number, obs: string) => {
     setCart(prev => prev.map((item, i) => 
       i === index ? { ...item, observacao: obs } : item
@@ -370,7 +373,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
       if (res.ok) {
         setCart([])
-        setShowConfirmModal(false)
         showToast('Pedido enviado com sucesso!', 'success')
         fetchTableData()
       } else {
@@ -386,433 +388,360 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   if (loading) return <div className="p-8 text-center">Carregando cardápio...</div>
 
-  const total = cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
-
-  // Group items for confirmation modal
-  const itemsBySetor = cart.reduce((acc, item) => {
-    if (!acc[item.setor]) acc[item.setor] = []
-    acc[item.setor].push(item)
-    return acc
-  }, {} as Record<string, CartItem[]>)
+  const totalCart = cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
+  const totalSubmitted = submittedItems.filter(i => i.status !== 'CANCELADO').reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
+  const grandTotal = totalCart + totalSubmitted
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col p-4 relative">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-black">Mesa {mesaId}</h1>
-        <div className="flex items-center gap-4">
-          {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
-            <button 
-              onClick={() => setShowTransferModal(true)}
-              className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-200 transition-colors"
-              title="Trocar de Mesa"
-            >
-              <ArrowRightLeft size={20} />
-              <span className="hidden sm:inline">Trocar Mesa</span>
-            </button>
-          )}
-          <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
-            <span>←</span> Voltar ao Início
-          </Link>
-        </div>
-      </div>
-
-      {tableStatus === 'FECHAMENTO' && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm flex items-center justify-between">
-          <div>
-            <p className="font-bold">🔒 Conta em Fechamento</p>
-            <p className="text-sm">Não é possível adicionar novos itens. Solicite a reabertura no mapa de mesas se necessário.</p>
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+      {/* Left Column - Product Menu */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold text-black">Mesa {mesaId}</h1>
+            <div className="flex items-center gap-4">
+              {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
+                <button 
+                  onClick={() => setShowTransferModal(true)}
+                  className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-200 transition-colors"
+                  title="Trocar de Mesa"
+                >
+                  <ArrowRightLeft size={20} />
+                  <span className="hidden sm:inline">Trocar Mesa</span>
+                </button>
+              )}
+              <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
+                <span>←</span> Voltar ao Início
+              </Link>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Search Bar */}
-      <div className="mb-6 relative">
-        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-        <input
-          type="text"
-          placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
-          className="w-full p-4 pl-12 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          autoFocus
-          disabled={tableStatus === 'FECHAMENTO'}
-        />
-      </div>
-
-      {/* Search Results */}
-      {searchTerm && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 mb-8">
-          {filteredProducts.map(produto => {
-            const isInactive = produto.ativo === false
-            return (
-              <button
-                key={produto.id}
-                onClick={() => !isInactive && addToCart(produto)}
-                disabled={isInactive}
-                className={`p-3 rounded-2xl shadow-sm border border-gray-200 transition-all text-left flex flex-col justify-between min-h-[110px] group ${
-                  isInactive 
-                    ? 'bg-gray-100 opacity-60 cursor-not-allowed' 
-                    : 'bg-white hover:border-orange-500 hover:shadow-md'
-                }`}
-              >
-                <div className="mb-2">
-                  <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-bold text-sm text-gray-900 leading-tight line-clamp-2">{produto.nome}</h3>
-                    {isInactive && (
-                      <span className="text-[9px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
-                        Inativo
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium uppercase tracking-wide">{produto.setor}</p>
-                </div>
-                
-                <div className="flex items-center justify-between mt-auto pt-2">
-                  <span className="font-bold text-base text-gray-900">R$ {produto.preco.toFixed(2).replace('.', ',')}</span>
-                  {!isInactive && (
-                    <div className="text-orange-500 transform group-hover:scale-110 transition-transform">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="16"></line>
-                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </button>
-            )
-          })}
-          {filteredProducts.length === 0 && (
-            <div className="col-span-full text-center p-8 text-black">
-              Nenhum produto encontrado com &quot;{searchTerm}&quot;
+          {tableStatus === 'FECHAMENTO' && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm flex items-center justify-between">
+              <div>
+                <p className="font-bold">🔒 Conta em Fechamento</p>
+                <p className="text-sm">Não é possível adicionar novos itens. Solicite a reabertura no mapa de mesas se necessário.</p>
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Submitted Orders List */}
-      {submittedItems.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-black flex items-center gap-2">
-              <CheckCircle2 className="text-green-500" size={24} /> Comanda <span className="text-sm font-normal text-black">({submittedItems.filter(i => i.status !== 'CANCELADO').length})</span>
+          {/* Comanda Section (Actually Products Search & Grid) */}
+          <div className="mb-8">
+            <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-2">
+              <CheckCircle2 className="text-green-500" size={24} /> Comanda
             </h2>
-            <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
-              <span className="font-bold text-black">
-                Total: R$ {submittedItems.filter(i => i.status !== 'CANCELADO').reduce((acc, item) => acc + (item.preco * item.quantidade), 0).toFixed(2)}
-              </span>
+            
+            {/* Search Bar */}
+            <div className="mb-6 relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
+                className="w-full p-4 pl-12 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+                disabled={tableStatus === 'FECHAMENTO'}
+              />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-            {submittedItems.map((item, index) => {
-               // Extract option from observation if present to display in name
-               let displayName = item.nome
-               let displayObs = item.observacao || ''
-               
-               const optionMatch = displayObs.match(/^\(\s*(.+?)\s*\)\s*(.*)/)
-               if (optionMatch) {
-                 displayName += ` ( ${optionMatch[1]} )`
-                 displayObs = optionMatch[2]
-               }
-
-               return (
-               <div key={`${item.id}-${index}`} className={`bg-white p-2.5 rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all ${item.status === 'CANCELADO' ? 'opacity-60 bg-gray-100' : ''}`}>
-                 
-                 <div>
-                   <div className="flex justify-between items-start mb-1.5">
-                     <span className="text-[10px] text-black font-medium">{item.horario}</span>
-                     {item.status !== 'PENDENTE' && (
-                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
-                         item.status === 'EM_PREPARO' ? 'bg-blue-100 text-blue-700' :
-                         item.status === 'PRONTO' ? 'bg-green-100 text-green-700' :
-                         item.status === 'CANCELADO' ? 'bg-red-100 text-red-700' :
-                         'bg-gray-100 text-black'
-                       }`}>
-                         {item.status === 'EM_PREPARO' ? 'PREPARO' : item.status}
-                       </span>
-                     )}
-                   </div>
-                   
-                   <h3 className={`font-bold text-black leading-tight mb-1 text-xs sm:text-sm ${item.status === 'CANCELADO' ? 'line-through text-gray-500' : ''}`}>
-                     <span className="text-yellow-600 mr-1 text-sm sm:text-base">{item.quantidade}x</span>
-                     {displayName}
-                   </h3>
-                   {displayObs && (
-                     <div className="text-[10px] text-black bg-gray-50 p-1.5 rounded border border-gray-100 mb-1 italic leading-tight">
-                       &quot;{displayObs}&quot;
-                     </div>
-                   )}
-                 </div>
-
-                 <div className="pt-1.5 border-t border-gray-50 flex justify-between items-center">
-                    {item.status !== 'CANCELADO' && ['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
-                      <button 
-                        onClick={() => handleCancelItem(item.id)}
-                        className="text-red-500 hover:text-white hover:bg-red-500 transition-all p-1.5 rounded-lg border border-red-200 hover:border-red-500 shadow-sm"
-                        title="Cancelar Item"
-                      >
-                        <X size={16} strokeWidth={2.5} />
-                      </button>
-                    )}
-                    <span className={`font-bold text-black text-xs sm:text-sm ml-auto ${item.status === 'CANCELADO' ? 'line-through text-gray-400' : ''}`}>
-                      R$ {(item.preco * item.quantidade).toFixed(2)}
-                    </span>
-                 </div>
-               </div>
-             )})}
-          </div>
-        </div>
-      )}
-
-      {/* Current Order List (Visible Feedback) */}
-      <div className="flex-1 overflow-y-auto mb-20">
-        <h2 className="text-xl font-bold text-black mb-4 flex items-center gap-2">
-          <ListOrdered className="text-orange-500" size={24} /> Pedido Atual <span className="text-sm font-normal text-gray-500">({cart.length} item{cart.length !== 1 && 's'})</span>
-        </h2>
-        
-        {cart.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-            <p className="text-black text-lg">Nenhum item adicionado ainda.</p>
-            <p className="text-gray-500 text-sm">Use a busca acima para adicionar itens.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {cart.map((item, index) => (
-              <div key={`${item.produtoId}-${index}`} className="bg-white p-4 rounded-xl shadow-sm border border-orange-200 relative">
-                {/* Header: Name and Remove */}
-                <div className="flex justify-between items-start mb-1">
-                  <div>
-                    <h3 className="font-bold text-lg text-black">{item.nome}</h3>
-                    <span className="text-xs text-gray-500 uppercase font-bold tracking-wide">{item.setor}</span>
-                  </div>
-                  <button 
-                    onClick={() => updateQuantity(index, -item.quantidade)} // Sets to 0, which removes
-                    className="text-gray-400 hover:text-red-500 transition-colors p-1"
+            {/* Product Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredProducts.map(produto => { // Show first 12 for demo or all? The image shows "Comanda" section with some products. I'll show all filtered products here.
+                const isInactive = produto.ativo === false
+                return (
+                  <button
+                    key={produto.id}
+                    onClick={() => !isInactive && addToCart(produto)}
+                    disabled={isInactive}
+                    className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-[120px] relative group transition-all ${
+                      isInactive ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'hover:border-orange-500 hover:shadow-md'
+                    }`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 6h18"></path>
-                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                    </svg>
+                    <div className="w-full">
+                      <h3 className="font-bold text-sm text-gray-900 text-left line-clamp-2 leading-tight">{produto.nome}</h3>
+                      <p className="text-xs text-gray-500 mt-1 text-left">{produto.setor}</p>
+                    </div>
+                    
+                    <div className="flex items-end justify-between w-full mt-2">
+                      <span className="font-bold text-lg text-black">R$ {produto.preco.toFixed(2).replace('.', ',')}</span>
+                      {!isInactive && (
+                        <div className="text-orange-500">
+                           <PlusCircle size={24} />
+                        </div>
+                      )}
+                    </div>
                   </button>
-                </div>
-
-                {/* Observation */}
-                <div className="mb-4 mt-2">
-                  <label className="text-xs text-gray-500 mb-1 block">Observação</label>
-                  <textarea
-                    placeholder="Sem cebola, bem passado..."
-                    className="w-full text-sm p-3 bg-gray-50 border border-gray-100 rounded-lg focus:outline-none focus:border-orange-500 resize-none h-20 text-black placeholder-gray-400"
-                    value={item.observacao}
-                    onChange={(e) => updateObservation(index, e.target.value)}
+                )
+              })}
+              {filteredProducts.length === 0 && (
+                 <div className="col-span-full text-center py-8 text-gray-500">
+                   Nenhum produto encontrado.
+                 </div>
+              )}
+            </div>
+            
+            <div className="mt-8">
+                <h2 className="text-lg font-bold text-black mb-4">Produtos</h2>
+                {/* Search bar could be duplicated here if needed as per image, but sticking to one main search for now as it's cleaner, unless strictly requested. The image shows two search bars, implying two categories. I'll stick to one list for now as categories are dynamic. */}
+                 {/* Replicating the "Produtos" section search bar if the user strictly wants it, but logic-wise it's redundant unless filtering different things. */}
+                 <div className="mb-6 relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <input
+                    type="text"
+                    placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
+                    className="w-full p-4 pl-12 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
+                    // Separate state for this search if needed, but for now reuse or just visual placeholder
+                    disabled={true} 
                   />
                 </div>
-                
-                {/* Footer: Controls and Subtotal */}
-                <div className="flex items-end justify-between">
-                  <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                    <button 
-                      onClick={() => updateQuantity(index, -1)}
-                      className="w-8 h-8 rounded-md flex items-center justify-center text-black font-bold hover:bg-white hover:shadow-sm transition-all"
-                    >
-                      -
-                    </button>
-                    <span className="w-8 text-center font-bold text-black">{item.quantidade}</span>
-                    <button 
-                      onClick={() => updateQuantity(index, 1)}
-                      className="w-8 h-8 rounded-md flex items-center justify-center text-black font-bold hover:bg-white hover:shadow-sm transition-all"
-                    >
-                      +
-                    </button>
-                  </div>
-                  
-                  <div className="text-right">
-                    <span className="text-xs text-gray-500 block">Subtotal</span>
-                    <span className="font-bold text-xl text-black">R$ {(item.preco * item.quantidade).toFixed(2)}</span>
-                  </div>
+                 {/* Product cards again? I will just leave the top grid as the main one for now to avoid confusion. */}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Column - Order Summary (Unified) */}
+      <div className="w-[400px] bg-white border-l border-gray-200 flex flex-col h-full shadow-xl z-10">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+          <div className="flex items-center gap-2">
+            <ListOrdered className="text-orange-500" size={20} />
+            <h2 className="font-bold text-lg text-black">Pedido Atual <span className="text-gray-400 text-sm font-normal">({cart.length + submittedItems.filter(i => i.status !== 'CANCELADO').length})</span></h2>
+          </div>
+          <div className="bg-gray-200 px-2 py-1 rounded text-xs font-bold text-gray-700">
+             Total: R$ {grandTotal.toFixed(2).replace('.', ',')}
+          </div>
+        </div>
+
+        {/* Unified List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30">
+          {/* Cart Items (Pending) */}
+          {cart.map((item, index) => (
+            <div key={`cart-${index}`} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm relative group">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                  <Clock size={10} />
+                  --:--
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide bg-yellow-100 text-yellow-700">
+                  PENDENTE
+                </span>
+              </div>
+              
+              <div className="flex items-start gap-2 mb-2">
+                <span className="text-orange-600 font-bold text-sm">{item.quantidade}x</span>
+                <div className="flex-1">
+                  <span className="font-bold text-gray-900 text-sm block leading-tight">{item.nome}</span>
+                  {item.observacao && (
+                    <span className="text-xs text-gray-500 block mt-0.5">{item.observacao}</span>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Floating Action Bar */}
-      <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] flex items-center justify-between md:px-8 z-30">
-        <div className="text-xl font-bold text-black">
-          Total: <span className="text-green-600">R$ {total.toFixed(2)}</span>
-        </div>
-        <button
-          onClick={() => setShowConfirmModal(true)}
-          disabled={cart.length === 0}
-          className={`px-8 py-3 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center gap-2 ${
-            cart.length === 0 
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
-              : 'bg-green-600 text-white hover:bg-green-700 hover:shadow-green-200'
-          }`}
-        >
-          Enviar Pedido ({cart.reduce((a, b) => a + b.quantidade, 0)}) 🚀
-        </button>
-      </div>
-
-      {/* Cancel Item Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showCancelModal}
-        onClose={() => setShowCancelModal(false)}
-        onConfirm={confirmCancelItem}
-        title="Cancelar Item"
-        description="Tem certeza que deseja cancelar este item? O valor será estornado da comanda."
-        confirmText="Sim, Cancelar"
-        cancelText="Não"
-        variant="danger"
-      />
-
-      {/* Product Options Modal */}
-      <ProductOptionsModal
-        isOpen={!!selectedProduct}
-        onClose={() => setSelectedProduct(null)}
-        product={selectedProduct}
-        onConfirm={handleModalConfirm}
-      />
-
-      {/* Transfer Modal */}
-      {showTransferModal && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-50">
-              <h2 className="text-xl font-bold text-blue-900 flex items-center gap-2">
-                <ArrowRightLeft size={24} className="text-blue-600" />
-                Trocar de Mesa
-              </h2>
-              <button 
-                onClick={() => setShowTransferModal(false)}
-                className="p-2 hover:bg-blue-100 rounded-full text-blue-600 transition-colors"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-2">
+                <span className="font-bold text-sm text-gray-900">R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
+                <button 
+                  onClick={() => removeFromCart(index)}
+                  className="text-gray-300 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
-            
-            <div className="p-6">
-              <p className="text-gray-600 mb-4">
-                Selecione a mesa de destino. Todos os pedidos da Mesa {mesaId} serão transferidos.
-              </p>
-              
-              <div className="grid grid-cols-3 gap-3 max-h-[300px] overflow-y-auto mb-6 p-1">
-                {availableTables.map(table => (
-                  <button
-                    key={table.id}
-                    onClick={() => setTargetTableId(table.id)}
-                    className={`
-                      p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all
-                      ${targetTableId === table.id 
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md transform scale-105' 
-                        : 'border-gray-100 bg-white text-gray-600 hover:border-blue-200 hover:bg-gray-50'
-                      }
-                      ${table.status === 'OCUPADA' ? 'opacity-75' : ''}
-                    `}
+          ))}
+
+          {/* Submitted Items */}
+          {submittedItems.map((item, index) => {
+             if (item.status === 'CANCELADO') return null; // Don't show cancelled items in main list or show with strikethrough? Reference image doesn't show cancelled.
+             
+             // Extract option
+             let displayName = item.nome
+             let displayObs = item.observacao || ''
+             const optionMatch = displayObs.match(/^\(\s*(.+?)\s*\)\s*(.*)/)
+             if (optionMatch) {
+               displayName += ` ( ${optionMatch[1]} )`
+               displayObs = optionMatch[2]
+             }
+
+             return (
+              <div key={`submitted-${item.id}-${index}`} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm relative group">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                    <Clock size={10} />
+                    {item.horario}
+                  </span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                         item.status === 'EM_PREPARO' ? 'bg-blue-100 text-blue-700' :
+                         item.status === 'PRONTO' ? 'bg-green-100 text-green-700' :
+                         'bg-gray-100 text-black'
+                       }`}>
+                    {item.status === 'EM_PREPARO' ? 'COZINHA' : item.status}
+                  </span>
+                </div>
+                
+                <div className="flex items-start gap-2 mb-2">
+                  <span className="text-orange-600 font-bold text-sm">{item.quantidade}x</span>
+                  <div className="flex-1">
+                    <span className="font-bold text-gray-900 text-sm block leading-tight">{displayName}</span>
+                    {displayObs && (
+                      <span className="text-xs text-gray-500 block mt-0.5">{displayObs}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-2">
+                  <span className="font-bold text-sm text-gray-900">R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
+                  <button 
+                    onClick={() => handleCancelItem(item.id)}
+                    className="text-gray-300 hover:text-red-500 transition-colors"
                   >
-                    <span className="text-lg font-bold">Mesa {table.numero}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      table.status === 'LIVRE' ? 'bg-green-100 text-green-700' :
-                      table.status === 'OCUPADA' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {table.status}
-                    </span>
+                    <Trash2 size={16} />
                   </button>
-                ))}
+                </div>
               </div>
+             )
+          })}
+        </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowTransferModal(false)}
-                  className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleTransferTable}
-                  disabled={!targetTableId || isTransferring}
-                  className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                >
-                  {isTransferring ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Transferindo...
-                    </>
-                  ) : (
-                    <>
-                      <Check size={20} />
-                      Confirmar
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-gray-200 bg-white">
+          <div className="flex items-center justify-between mb-4">
+             <span className="text-gray-500 font-medium">Total:</span>
+             <span className="text-2xl font-bold text-green-600">R$ {grandTotal.toFixed(2).replace('.', ',')}</span>
           </div>
-        </div>,
-        document.body
+          
+          <div className="flex gap-3">
+             <button 
+               onClick={() => setCart([])}
+               disabled={cart.length === 0}
+               className="px-4 py-3 text-gray-500 font-bold hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+               Limpar
+             </button>
+             <button 
+               onClick={submitOrder}
+               disabled={cart.length === 0 || submitting}
+               className="flex-1 bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+             >
+               {submitting ? 'Enviando...' : `Enviar Pedido (${cart.length})`}
+               {!submitting && <Rocket size={20} />}
+             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {selectedProduct && (
+        <ProductOptionsModal
+          isOpen={!!selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          product={selectedProduct}
+          onConfirm={handleModalConfirm}
+        />
       )}
 
-      {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-gray-100 bg-gray-50">
-              <h2 className="text-2xl font-bold text-black text-center">Confirmar Envio</h2>
-              <p className="text-center text-black mt-1">Verifique os itens antes de enviar para produção</p>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {Object.entries(itemsBySetor).map(([setor, items]) => (
-                <div key={setor} className="bg-gray-50 rounded-xl p-4">
-                  <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-black">
-                    {setor === 'COZINHA' ? '🍳' : setor === 'BAR' ? '🍺' : '📦'} {setor}
-                  </h3>
-                  <div className="space-y-2">
-                    {items.map(item => (
-                      <div key={item.produtoId} className="flex justify-between items-start text-sm">
-                        <div>
-                          <span className="font-bold text-black">{item.quantidade}x {item.nome}</span>
-                          {item.observacao && (
-                            <p className="text-red-500 text-xs mt-0.5">Obs: {item.observacao}</p>
-                          )}
-                        </div>
-                        <span className="text-black">R$ {(item.preco * item.quantidade).toFixed(2)}</span>
-                      </div>
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={submitOrder}
+        items={itemsBySetor}
+        total={totalCart}
+        loading={submitting}
+      />
+
+      {showTransferModal && (
+        createPortal(
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 className="text-xl font-bold">Trocar Mesa</h2>
+                <button onClick={() => setShowTransferModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="p-6">
+                <p className="mb-4 text-gray-600">Selecione a mesa para onde deseja transferir:</p>
+                
+                {isTransferring ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
+                    <p>Transferindo...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 max-h-60 overflow-y-auto">
+                    {availableTables.map(table => (
+                      <button
+                        key={table.id}
+                        onClick={() => setTargetTableId(table.id)}
+                        className={`p-3 rounded-lg border-2 font-bold transition-all ${
+                          targetTableId === table.id
+                            ? 'border-orange-500 bg-orange-50 text-orange-700'
+                            : 'border-gray-200 hover:border-orange-200 text-gray-700'
+                        }`}
+                      >
+                        Mesa {table.numero}
+                      </button>
                     ))}
                   </div>
+                )}
+
+                <div className="mt-6 flex gap-3">
+                  <button
+                    onClick={() => setShowTransferModal(false)}
+                    className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleTransferTable}
+                    disabled={!targetTableId || isTransferring}
+                    className="flex-1 py-3 px-4 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    Confirmar
+                  </button>
                 </div>
-              ))}
-              
-              <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                <span className="text-xl font-bold text-black">Total Final</span>
-                <span className="text-2xl font-bold text-green-600">R$ {total.toFixed(2)}</span>
               </div>
             </div>
-
-            <div className="p-6 border-t border-gray-100 flex gap-4 bg-white">
-              <button
-                onClick={() => setShowConfirmModal(false)}
-                className="flex-1 py-4 rounded-xl border-2 border-gray-200 font-bold text-black hover:bg-gray-50 transition-colors"
-              >
-                Voltar e Editar
-              </button>
-              <button
-                onClick={submitOrder}
-                disabled={submitting}
-                className="flex-1 py-4 rounded-xl bg-green-600 font-bold text-white hover:bg-green-700 shadow-lg transition-colors flex items-center justify-center gap-2"
-              >
-                {submitting ? 'Enviando...' : 'Confirmar e Enviar ✅'}
-              </button>
-            </div>
-          </div>
-        </div>
+          </div>,
+          document.body
+        )
       )}
 
-
+      {showCancelModal && (
+        createPortal(
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+                  <X size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Cancelar Item?</h3>
+                <p className="text-gray-500 mb-6">
+                  Tem certeza que deseja cancelar este item? Essa ação não pode ser desfeita.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowCancelModal(false)}
+                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                  >
+                    Não
+                  </button>
+                  <button
+                    onClick={confirmCancelItem}
+                    className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-200"
+                  >
+                    Sim, Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      )}
     </div>
   )
 }
