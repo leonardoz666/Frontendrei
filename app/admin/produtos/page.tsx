@@ -145,6 +145,8 @@ export default function ProdutosPage() {
   const [isDrink, setIsDrink] = useState(false)
   const [isFood, setIsFood] = useState(true)
   const [favorito, setFavorito] = useState(false)
+  const [permitirObservacao, setPermitirObservacao] = useState(true)
+  const [permiteGeloLimao, setPermiteGeloLimao] = useState(false)
 
   const [, setError] = useState('')
   const [importStatus, setImportStatus] = useState<string | null>(null)
@@ -214,6 +216,8 @@ export default function ProdutosPage() {
       formData.append('isDrink', String(isDrink))
       formData.append('isFood', String(isFood))
       formData.append('favorito', String(favorito))
+      formData.append('permitirObservacao', String(permitirObservacao))
+      formData.append('permiteGeloLimao', String(permiteGeloLimao))
 
       const res = await fetch(url, {
         method,
@@ -246,6 +250,8 @@ export default function ProdutosPage() {
     setIsDrink(false)
     setIsFood(true)
     setFavorito(false)
+    setPermitirObservacao(true)
+    setPermiteGeloLimao(false)
     setError('')
     if (categorias.length > 0) setCategoriaId(categorias[0].id.toString())
   }
@@ -273,6 +279,8 @@ export default function ProdutosPage() {
     setIsDrink(prod.isDrink || false)
     setIsFood(prod.isFood !== undefined ? prod.isFood : true)
     setFavorito(prod.favorito || false)
+    setPermitirObservacao(prod.permitirObservacao !== undefined ? prod.permitirObservacao : true)
+    setPermiteGeloLimao(prod.permiteGeloLimao || false)
     setFile(null)
     setError('')
   }, [categorias])
@@ -366,6 +374,8 @@ export default function ProdutosPage() {
           formData.append('isDrink', String(!!i.isDrink))
           formData.append('isFood', String(i.isFood !== undefined ? i.isFood : true))
           formData.append('favorito', String(!!i.favorito))
+          formData.append('permitirObservacao', String(i.permitirObservacao !== undefined ? i.permitirObservacao : true))
+          formData.append('permiteGeloLimao', String(!!i.permiteGeloLimao))
 
           const url = existing ? `/api/products/${existing.id}` : '/api/products'
           const method = existing ? 'PUT' : 'POST'
@@ -698,6 +708,40 @@ export default function ProdutosPage() {
                     <div>
                       <span className="text-sm font-bold text-gray-700">É Comida?</span>
                       <p className="text-[10px] text-gray-500 leading-tight">Envia para Cozinha</p>
+                    </div>
+                  </div>
+
+                  {/* Permitir Observação */}
+                  <div 
+                    className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
+                    onClick={() => setPermitirObservacao(!permitirObservacao)}
+                  >
+                    <div className={clsx(
+                      "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                      permitirObservacao ? "bg-blue-600 border-blue-600" : "border-gray-400 bg-white"
+                    )}>
+                      {permitirObservacao && <Check size={14} className="text-white" />}
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-gray-700">Permitir Observação?</span>
+                      <p className="text-[10px] text-gray-500 leading-tight">Exibir campo no pedido</p>
+                    </div>
+                  </div>
+
+                  {/* Permitir Gelo e Limão */}
+                  <div 
+                    className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
+                    onClick={() => setPermiteGeloLimao(!permiteGeloLimao)}
+                  >
+                    <div className={clsx(
+                      "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                      permiteGeloLimao ? "bg-blue-600 border-blue-600" : "border-gray-400 bg-white"
+                    )}>
+                      {permiteGeloLimao && <Check size={14} className="text-white" />}
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-gray-700">Gelo e Limão?</span>
+                      <p className="text-[10px] text-gray-500 leading-tight">Exibir botões de Gelo/Limão</p>
                     </div>
                   </div>
                 </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Check, Minus, Plus } from 'lucide-react'
+import { X, Check, Minus, Plus, Snowflake, Citrus } from 'lucide-react'
 import { Produto } from '@/types'
 
 interface ProductOptionsModalProps {
@@ -20,6 +20,8 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
   const [observation, setObservation] = useState('')
   const [selectedOptions, setSelectedOptions] = useState<string[]>([])
   const [optionQuantities, setOptionQuantities] = useState<Record<string, number>>({})
+  const [wantsGelo, setWantsGelo] = useState(false)
+  const [wantsLimao, setWantsLimao] = useState(false)
   
   // States for specific types
   
@@ -29,6 +31,8 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
       setObservation('')
       setSelectedOptions([])
       setOptionQuantities({})
+      setWantsGelo(false)
+      setWantsLimao(false)
     }
   }, [isOpen, product])
 
@@ -67,11 +71,19 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
 
     if (product.tipoOpcao === 'refrigerante') {
       const items = Object.entries(optionQuantities)
-          .map(([opt, qty]) => ({
-              quantity: qty,
-              observation: observation ? `${observation} [${opt}]` : `[${opt}]`,
-              preco: product.preco
-          }))
+          .map(([opt, qty]) => {
+              let obs = observation
+              if (wantsGelo) obs = obs ? `${obs}, Gelo` : 'Gelo'
+              if (wantsLimao) obs = obs ? `${obs}, Limão` : 'Limão'
+              
+              const finalObs = obs ? `${obs} [${opt}]` : `[${opt}]`
+              
+              return {
+                  quantity: qty,
+                  observation: finalObs,
+                  preco: product.preco
+              }
+          })
       
       onConfirm(0, '', [], 0, items)
       return
@@ -79,7 +91,12 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
 
     // Construct final observation with options
     const optionsText = selectedOptions.length > 0 ? ` [${selectedOptions.join(', ')}]` : ''
-    const finalObs = (observation + optionsText).trim()
+    
+    let obs = observation
+    if (wantsGelo) obs = obs ? `${obs}, Gelo` : 'Gelo'
+    if (wantsLimao) obs = obs ? `${obs}, Limão` : 'Limão'
+    
+    const finalObs = (obs + optionsText).trim()
 
     onConfirm(quantity, finalObs, selectedOptions, product.preco)
   }
@@ -332,13 +349,18 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
   }
 
   const getTags = () => {
-    const isDrink = ['refrigerante', 'sabores'].includes(product.tipoOpcao || '') || product.setor === 'Bebidas' || product.setor === 'Drinks'
+    const isDrink = ['refrigerante', 'sabores'].includes(product.tipoOpcao || '') || product.setor === 'Bebidas' || product.setor === 'Drinks' || product.isDrink
     
     if (isDrink) {
-      return ['#Gelo', '#S/Gelo', '#Limao', '#S/Limao']
+      // Removed Gelo/Limao from text tags since they are now buttons
+      return []
     }
     return ['Sem cebola', 'Sem molho', 'Bem passado', 'Ao ponto', 'Mal passado']
   }
+
+  const isDrink = ['refrigerante', 'sabores'].includes(product.tipoOpcao || '') || product.setor === 'Bebidas' || product.setor === 'Drinks' || product.isDrink
+  
+  const showGeloLimao = product.permiteGeloLimao
 
   const commonTags = getTags()
 
@@ -389,30 +411,63 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
             </div>
           )}
 
-          {/* Observation */}
-          <div className="space-y-3">
-            <label className="font-bold text-gray-700 block">Observação (Opcional)</label>
-            
-            {/* Quick Tags */}
-            <div className="flex flex-wrap gap-2">
-              {commonTags.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => setObservation(prev => prev ? `${prev}, ${tag}` : tag)}
-                  className="px-3 py-1.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-orange-600 border border-transparent hover:border-orange-200 transition-all">
-                  {tag}
-                </button>
-              ))}
-            </div>
+          {/* Special Drink Options (Gelo/Limao) - Controlled by admin setting */}
+          {showGeloLimao && (
+             <div className="grid grid-cols-2 gap-3">
+               <button
+                 onClick={() => setWantsGelo(!wantsGelo)}
+                 className={`p-3 rounded-xl border-2 flex items-center justify-center gap-2 transition-all ${
+                   wantsGelo
+                     ? 'border-blue-400 bg-blue-50 text-blue-700 font-bold'
+                     : 'border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                 }`}
+               >
+                 <Snowflake size={20} className={wantsGelo ? 'fill-blue-400' : ''} />
+                 <span>Com Gelo</span>
+                 {wantsGelo && <Check size={16} className="ml-auto" />}
+               </button>
+               
+               <button
+                 onClick={() => setWantsLimao(!wantsLimao)}
+                 className={`p-3 rounded-xl border-2 flex items-center justify-center gap-2 transition-all ${
+                   wantsLimao
+                     ? 'border-green-500 bg-green-50 text-green-700 font-bold'
+                     : 'border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                 }`}
+               >
+                 <Citrus size={20} className={wantsLimao ? 'fill-green-500' : ''} />
+                 <span>Com Limão</span>
+                 {wantsLimao && <Check size={16} className="ml-auto" />}
+               </button>
+             </div>
+          )}
 
-            <textarea
-              value={observation}
-              onChange={(e) => setObservation(e.target.value)}
-              placeholder="Ex: Tirar a cebola, colocar gelo..."
-              className="w-full p-4 rounded-xl bg-gray-50 border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-all resize-none text-gray-700"
-              rows={3}
-            />
-          </div>
+          {/* Observation */}
+          {(product.permitirObservacao !== false) && (
+            <div className="space-y-3">
+              <label className="font-bold text-gray-700 block">Observação (Opcional)</label>
+              
+              {/* Quick Tags */}
+              <div className="flex flex-wrap gap-2">
+                {commonTags.map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => setObservation(prev => prev ? `${prev}, ${tag}` : tag)}
+                    className="px-3 py-1.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-orange-600 border border-transparent hover:border-orange-200 transition-all">
+                    {tag}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={observation}
+                onChange={(e) => setObservation(e.target.value)}
+                placeholder="Ex: Tirar a cebola, colocar gelo..."
+                className="w-full p-4 rounded-xl bg-gray-50 border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 transition-all resize-none text-gray-700"
+                rows={3}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
