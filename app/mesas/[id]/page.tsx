@@ -332,24 +332,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     setSearchTerm('')
   }
 
-  const updateQuantity = (index: number, delta: number) => {
-    setCart(prev => prev.map((item, i) => {
-      if (i === index) {
-        const newQty = Math.max(0, item.quantidade + delta)
-        return { ...item, quantidade: newQty }
-      }
-      return item
-    }).filter(item => item.quantidade > 0))
-  }
-
   const removeFromCart = (index: number) => {
     setCart(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const updateObservation = (index: number, obs: string) => {
-    setCart(prev => prev.map((item, i) => 
-      i === index ? { ...item, observacao: obs } : item
-    ))
   }
 
   const submitOrder = async () => {
