@@ -4,7 +4,7 @@ import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { io } from 'socket.io-client'
-import { ArrowRightLeft, X, Check } from 'lucide-react'
+import { ArrowRightLeft, X, Check, CheckCircle2, ListOrdered } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
@@ -495,7 +495,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-black flex items-center gap-2">
-              ✅ Comanda <span className="text-sm font-normal text-black">({submittedItems.filter(i => i.status !== 'CANCELADO').length})</span>
+              <CheckCircle2 className="text-green-500" size={24} /> Comanda <span className="text-sm font-normal text-black">({submittedItems.filter(i => i.status !== 'CANCELADO').length})</span>
             </h2>
             <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-200">
               <span className="font-bold text-black">
@@ -522,15 +522,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                  <div>
                    <div className="flex justify-between items-start mb-1.5">
                      <span className="text-[10px] text-black font-medium">{item.horario}</span>
-                     <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
-                       item.status === 'PENDENTE' ? 'bg-yellow-100 text-yellow-700' :
-                       item.status === 'EM_PREPARO' ? 'bg-blue-100 text-blue-700' :
-                       item.status === 'PRONTO' ? 'bg-green-100 text-green-700' :
-                       item.status === 'CANCELADO' ? 'bg-red-100 text-red-700' :
-                       'bg-gray-100 text-black'
-                     }`}>
-                       {item.status === 'EM_PREPARO' ? 'PREPARO' : item.status}
-                     </span>
+                     {item.status !== 'PENDENTE' && (
+                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                         item.status === 'EM_PREPARO' ? 'bg-blue-100 text-blue-700' :
+                         item.status === 'PRONTO' ? 'bg-green-100 text-green-700' :
+                         item.status === 'CANCELADO' ? 'bg-red-100 text-red-700' :
+                         'bg-gray-100 text-black'
+                       }`}>
+                         {item.status === 'EM_PREPARO' ? 'PREPARO' : item.status}
+                       </span>
+                     )}
                    </div>
                    
                    <h3 className={`font-bold text-black leading-tight mb-1 text-xs sm:text-sm ${item.status === 'CANCELADO' ? 'line-through text-gray-500' : ''}`}>
@@ -567,7 +568,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       {/* Current Order List (Visible Feedback) */}
       <div className="flex-1 overflow-y-auto mb-20">
         <h2 className="text-xl font-bold text-black mb-4 flex items-center gap-2">
-          📝 Pedido Atual <span className="text-sm font-normal text-gray-500">({cart.length} item{cart.length !== 1 && 's'})</span>
+          <ListOrdered className="text-orange-500" size={24} /> Pedido Atual <span className="text-sm font-normal text-gray-500">({cart.length} item{cart.length !== 1 && 's'})</span>
         </h2>
         
         {cart.length === 0 ? (
