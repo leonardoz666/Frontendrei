@@ -280,9 +280,16 @@ export default function ProdutosPage() {
     if (deleteConfirmationId) {
       try {
         const res = await fetch(`/api/products/${deleteConfirmationId}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error('Erro ao excluir')
         
-        showToast('Produto excluído com sucesso!', 'success')
+        if (res.status === 200) {
+          const data = await res.json()
+          showToast(data.message || 'Produto desativado (possui histórico).', 'warning')
+        } else if (res.status === 204) {
+          showToast('Produto excluído permanentemente!', 'success')
+        } else {
+          throw new Error('Erro ao excluir')
+        }
+        
         queryClient.invalidateQueries({ queryKey: ['products'] })
         setDeleteConfirmationId(null)
       } catch (err) {

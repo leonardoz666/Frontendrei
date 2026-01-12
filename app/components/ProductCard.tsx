@@ -32,13 +32,20 @@ interface ProductCardProps {
 export const ProductCard = memo(function ProductCard({ prod, onEdit, onDelete }: ProductCardProps) {
   return (
     <div 
-      className="group relative flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
+      className={`group relative flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors shadow-sm ${!prod.ativo ? 'opacity-60 grayscale' : ''}`}
     >
       {/* Image Area */}
       <div 
         onClick={() => onEdit(prod)}
         className="aspect-square w-full bg-gray-100 relative overflow-hidden cursor-pointer"
       >
+        {!prod.ativo && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10">
+            <span className="bg-black/75 text-white text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider">
+              Inativo
+            </span>
+          </div>
+        )}
         {prod.foto ? (
           <Image 
             src={prod.foto} 
