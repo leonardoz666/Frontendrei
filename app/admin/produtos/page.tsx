@@ -14,6 +14,7 @@ import {
   Search, 
   Upload, 
   X, 
+  Check,
   Pencil, 
   Download,
   Wand2
@@ -643,6 +644,23 @@ export default function ProdutosPage() {
 
                 {/* Toggles */}
                 <div className="grid grid-cols-1 gap-2">
+                  {/* Active Status */}
+                  <div 
+                    className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
+                    onClick={() => setAtivo(!ativo)}
+                  >
+                    <div className={clsx(
+                      "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                      ativo ? "bg-green-600 border-green-600" : "border-gray-400 bg-white"
+                    )}>
+                      {ativo && <Check size={14} className="text-white" />}
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-gray-700">Disponível / Ativo?</span>
+                      <p className="text-[10px] text-gray-500 leading-tight">Se desmarcar, o produto some do cardápio</p>
+                    </div>
+                  </div>
+
                   {/* Is Drink */}
                   <div 
                     className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
@@ -685,9 +703,20 @@ export default function ProdutosPage() {
                 </div>
 
                 {/* Sabores List */}
-                {(tipoOpcao === 'sabores' || tipoOpcao === 'sabores_com_tamanho' || tipoOpcao === 'combinado') && (
+                {(tipoOpcao === 'sabores' || tipoOpcao === 'sabores_com_tamanho' || tipoOpcao === 'combinado' || tipoOpcao === 'refrigerante') && (
                   <div className="space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-200">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sabores/Variações</label>
+                    {tipoOpcao === 'refrigerante' && (
+                      <p className="text-[10px] text-gray-500 mb-2">
+                        Se deixar vazio, usará os tamanhos padrão: Lata, KS, 600ml, 1 Litro, 2 Litros.
+                        <br/>Adicione tamanhos personalizados se desejar (ex: 200ml, 3 Litros).
+                      </p>
+                    )}
+                    {tipoOpcao === 'sabores_com_tamanho' && (
+                      <p className="text-[10px] text-gray-500 mb-2">
+                        Adicione os sabores disponíveis para os tamanhos P e G (ex: Camarão, Peixe, Carne).
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <input
                         type="text"

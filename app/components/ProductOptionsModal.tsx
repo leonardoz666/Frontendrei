@@ -121,11 +121,14 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
         )
 
       case 'refrigerante':
-        // Assuming options are sizes like ["Lata", "1L", "600ml"]
-        // And for each size we allow "Normal" or "Zero"
+        // If no sizes provided, use defaults
+        const refriSizes = (Array.isArray(options) && options.length > 0) 
+          ? options 
+          : ['Lata', 'KS', '600ml', '1 Litro', '2 Litros']
+
         return (
           <div className="space-y-6">
-            {Array.isArray(options) && options.map((size: string) => (
+            {refriSizes.map((size: string) => (
               <div key={size} className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                 <h4 className="font-bold text-gray-800 mb-3 uppercase text-sm tracking-wide border-b border-gray-200 pb-2">{size}</h4>
                 <div className="grid grid-cols-2 gap-3">
