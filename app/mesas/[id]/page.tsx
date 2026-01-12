@@ -428,10 +428,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
       {/* Search Bar */}
       <div className="mb-6 relative">
+        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
         <input
           type="text"
-          placeholder="🔍 Buscar produto (ex: Cerveja, Moqueca)..."
-          className="w-full p-4 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
+          placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
+          className="w-full p-4 pl-12 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           autoFocus
