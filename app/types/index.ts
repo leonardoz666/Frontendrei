@@ -8,6 +8,7 @@ export type Produto = {
   isDrink?: boolean
   isFood?: boolean
   setor?: string // Added optional because it was used in handleModalConfirm logic check
+  ativo?: boolean
 }
 
 export type Categoria = {

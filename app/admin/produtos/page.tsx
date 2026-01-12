@@ -31,7 +31,7 @@ export default function ProdutosPage() {
     queryKey: ['products'],
     queryFn: async () => {
       console.log('[DEBUG] fetching products');
-      const res = await fetch('/api/products')
+      const res = await fetch('/api/products', { cache: 'no-store' })
       console.log(`[DEBUG] products status: ${res.status}`);
       if (res.status === 401) {
         router.push('/login')
@@ -49,7 +49,7 @@ export default function ProdutosPage() {
     queryKey: ['categories'],
     queryFn: async () => {
       console.log('[DEBUG] fetching categories');
-      const res = await fetch('/api/categories')
+      const res = await fetch('/api/categories', { cache: 'no-store' })
       console.log(`[DEBUG] categories status: ${res.status}`);
       if (res.status === 401) {
         router.push('/login')
@@ -708,8 +708,8 @@ export default function ProdutosPage() {
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sabores/Variações</label>
                     {tipoOpcao === 'refrigerante' && (
                       <p className="text-[10px] text-gray-500 mb-2">
-                        Se deixar vazio, usará os tamanhos padrão: Lata, KS, 600ml, 1 Litro, 2 Litros.
-                        <br/>Adicione tamanhos personalizados se desejar (ex: 200ml, 3 Litros).
+                        Se deixar vazio, usará os tamanhos padrão: Lata, KS, 1 Litro.
+                        <br/>Adicione tamanhos personalizados se desejar (ex: 600ml, 2 Litros).
                       </p>
                     )}
                     {tipoOpcao === 'sabores_com_tamanho' && (

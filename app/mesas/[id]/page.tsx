@@ -410,29 +410,46 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       {/* Search Results */}
       {searchTerm && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 mb-8">
-          {filteredProducts.map(produto => (
-            <button
-              key={produto.id}
-              onClick={() => addToCart(produto)}
-              className="bg-white p-3 rounded-2xl shadow-sm border border-gray-200 hover:border-orange-500 hover:shadow-md transition-all text-left flex flex-col justify-between min-h-[110px] group"
-            >
-              <div className="mb-2">
-                <h3 className="font-bold text-sm text-gray-900 leading-tight line-clamp-2">{produto.nome}</h3>
-                <p className="text-[10px] text-gray-500 mt-0.5 font-medium uppercase tracking-wide">{produto.setor}</p>
-              </div>
-              
-              <div className="flex items-center justify-between mt-auto pt-2">
-                <span className="font-bold text-base text-gray-900">R$ {produto.preco.toFixed(2).replace('.', ',')}</span>
-                <div className="text-orange-500 transform group-hover:scale-110 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="16"></line>
-                    <line x1="8" y1="12" x2="16" y2="12"></line>
-                  </svg>
+          {filteredProducts.map(produto => {
+            const isInactive = produto.ativo === false
+            return (
+              <button
+                key={produto.id}
+                onClick={() => !isInactive && addToCart(produto)}
+                disabled={isInactive}
+                className={`p-3 rounded-2xl shadow-sm border border-gray-200 transition-all text-left flex flex-col justify-between min-h-[110px] group ${
+                  isInactive 
+                    ? 'bg-gray-100 opacity-60 cursor-not-allowed' 
+                    : 'bg-white hover:border-orange-500 hover:shadow-md'
+                }`}
+              >
+                <div className="mb-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <h3 className="font-bold text-sm text-gray-900 leading-tight line-clamp-2">{produto.nome}</h3>
+                    {isInactive && (
+                      <span className="text-[9px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                        Inativo
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium uppercase tracking-wide">{produto.setor}</p>
                 </div>
-              </div>
-            </button>
-          ))}
+                
+                <div className="flex items-center justify-between mt-auto pt-2">
+                  <span className="font-bold text-base text-gray-900">R$ {produto.preco.toFixed(2).replace('.', ',')}</span>
+                  {!isInactive && (
+                    <div className="text-orange-500 transform group-hover:scale-110 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+            )
+          })}
           {filteredProducts.length === 0 && (
             <div className="col-span-full text-center p-8 text-black">
               Nenhum produto encontrado com &quot;{searchTerm}&quot;

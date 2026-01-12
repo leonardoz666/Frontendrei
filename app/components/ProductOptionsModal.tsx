@@ -124,34 +124,55 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
         // If no sizes provided, use defaults
         const refriSizes = (Array.isArray(options) && options.length > 0) 
           ? options 
-          : ['Lata', 'KS', '600ml', '1 Litro', '2 Litros']
+          : ['Lata', 'KS', '1 Litro']
 
         return (
           <div className="space-y-6">
             {refriSizes.map((size: string) => (
-              <div key={size} className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <h4 className="font-bold text-gray-800 mb-3 uppercase text-sm tracking-wide border-b border-gray-200 pb-2">{size}</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setSelectedOptions([`${size} - Normal`])}
-                    className={`p-3 rounded-lg border text-sm font-bold transition-all ${
-                      selectedOptions.includes(`${size} - Normal`)
-                        ? 'bg-orange-500 text-white border-orange-600 shadow-md'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-orange-300'
-                    }`}
-                  >
-                    Normal
-                  </button>
-                  <button
-                    onClick={() => setSelectedOptions([`${size} - Zero`])}
-                    className={`p-3 rounded-lg border text-sm font-bold transition-all ${
-                      selectedOptions.includes(`${size} - Zero`)
-                        ? 'bg-green-600 text-white border-green-700 shadow-md'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-green-300'
-                    }`}
-                  >
-                    Zero
-                  </button>
+              <div key={size} className="">
+                <h4 className="font-bold text-gray-500 mb-3 uppercase text-xs tracking-wider ml-1">{size}</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Normal Option */}
+                  <div className={`rounded-xl border-2 overflow-hidden transition-all ${
+                    selectedOptions.includes(`${size} - Normal`)
+                      ? 'border-orange-500 bg-orange-50'
+                      : 'border-gray-100 bg-white'
+                  }`}>
+                    <div className="p-3 text-center">
+                      <span className="font-bold text-gray-900 block mb-2">Normal</span>
+                      <button
+                        onClick={() => setSelectedOptions([`${size} - Normal`])}
+                        className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
+                          selectedOptions.includes(`${size} - Normal`)
+                            ? 'bg-orange-500 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {selectedOptions.includes(`${size} - Normal`) ? 'Selecionado' : 'Adicionar'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Zero Option */}
+                  <div className={`rounded-xl border-2 overflow-hidden transition-all ${
+                    selectedOptions.includes(`${size} - Zero`)
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-gray-100 bg-white'
+                  }`}>
+                    <div className="p-3 text-center">
+                      <span className="font-bold text-green-600 block mb-2">Zero</span>
+                      <button
+                        onClick={() => setSelectedOptions([`${size} - Zero`])}
+                        className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
+                          selectedOptions.includes(`${size} - Zero`)
+                            ? 'bg-green-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {selectedOptions.includes(`${size} - Zero`) ? 'Selecionado' : 'Adicionar'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -247,7 +268,16 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
     }
   }
 
-  const commonTags = ['Com gelo', 'Sem gelo', 'Com limão', 'Sem limão', 'Bem passado', 'Mal passado']
+  const getTags = () => {
+    const isDrink = ['refrigerante', 'sabores'].includes(product.tipoOpcao || '') || product.setor === 'Bebidas' || product.setor === 'Drinks'
+    
+    if (isDrink) {
+      return ['#Gelo', '#S/Gelo', '#Limao', '#S/Limao']
+    }
+    return ['Sem cebola', 'Sem molho', 'Bem passado', 'Ao ponto', 'Mal passado']
+  }
+
+  const commonTags = getTags()
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4">
