@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -497,7 +497,6 @@ export default function ProdutosPage() {
           <ProductCard 
             key={prod.id} 
             prod={prod} 
-            index={idx} 
             onEdit={handleEdit} 
             onDelete={setDeleteConfirmationId} 
           />

@@ -25,7 +25,6 @@ export type Produto = {
 
 interface ProductCardProps {
   prod: Produto
-  index: number
   onEdit: (prod: Produto) => void
   onDelete: (id: number) => void
 }
