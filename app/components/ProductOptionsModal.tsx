@@ -358,8 +358,6 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
     return ['Sem cebola', 'Sem molho', 'Bem passado', 'Ao ponto', 'Mal passado']
   }
 
-  const isDrink = ['refrigerante', 'sabores'].includes(product.tipoOpcao || '') || product.setor === 'Bebidas' || product.setor === 'Drinks' || product.isDrink
-  
   const showGeloLimao = product.permiteGeloLimao
 
   const commonTags = getTags()

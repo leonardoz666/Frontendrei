@@ -283,7 +283,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const setor = category ? category.setor : 'Geral'
 
     setCart(prev => {
-      let newCart = [...prev]
+      const newCart = [...prev]
       
       const itemsToAdd = []
       
