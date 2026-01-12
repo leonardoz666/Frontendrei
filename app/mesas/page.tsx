@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Loader2, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { io } from 'socket.io-client'
 import { useToast } from '@/contexts/ToastContext'
 import { TableCard, Mesa } from '@/components/TableCard'
 
@@ -125,9 +126,25 @@ export default function MesasPage() {
 
     init()
     
-    // Poll for updates
-    const interval = setInterval(fetchMesas, 5000)
-    return () => clearInterval(interval)
+    // Socket connection for real-time updates
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000')
+
+    socket.on('connect', () => {
+      console.log('[DEBUG] Socket connected')
+    })
+
+    const handleUpdate = () => {
+      console.log('[DEBUG] Socket update received, fetching mesas...')
+      fetchMesas()
+    }
+
+    socket.on('tables-updated', handleUpdate)
+    socket.on('table:updated', handleUpdate)
+    socket.on('new-kitchen-order', handleUpdate) // New order might change table status
+
+    return () => {
+      socket.disconnect()
+    }
   }, [router])
 
   const handleAddMesa = async (e?: React.FormEvent) => {

@@ -3,6 +3,7 @@
 import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { io } from 'socket.io-client'
 import { ArrowRightLeft, X, Check } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
@@ -190,6 +191,34 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       cancelled = true
     }
   }, [router, fetchTableData])
+
+  // Real-time updates via Socket.io
+  useEffect(() => {
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000')
+
+    socket.on('connect', () => {
+      console.log(`[DEBUG] Socket connected for table ${mesaId}`)
+    })
+
+    const handleTableUpdate = (data?: { mesaId: number }) => {
+      if (!data || Number(data.mesaId) === Number(mesaId)) {
+        console.log(`[DEBUG] Update for table ${mesaId} received`)
+        fetchTableData()
+      }
+    }
+
+    socket.on('table:updated', handleTableUpdate)
+    socket.on('tables-updated', () => fetchTableData())
+    socket.on('kitchen-order-updated', () => fetchTableData())
+    
+    // For new orders, we could filter by mesaId if the event sends it, 
+    // but fetching is safe enough to ensure sync
+    socket.on('new-kitchen-order', () => fetchTableData())
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [mesaId, fetchTableData])
 
   // Flatten products for search
   const allProducts = useMemo(() => {
