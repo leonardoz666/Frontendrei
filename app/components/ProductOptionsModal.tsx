@@ -10,7 +10,8 @@ interface ProductOptionsModalProps {
     quantity: number, 
     observation: string, 
     selectedOptions: string[],
-    finalPrice: number
+    finalPrice: number,
+    extraItems?: Array<{quantity: number, observation: string, preco: number}>
   ) => void
 }
 
@@ -18,6 +19,7 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
   const [quantity, setQuantity] = useState(1)
   const [observation, setObservation] = useState('')
   const [selectedOptions, setSelectedOptions] = useState<string[]>([])
+  const [optionQuantities, setOptionQuantities] = useState<Record<string, number>>({})
   
   // States for specific types
   
@@ -26,6 +28,7 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
       setQuantity(1)
       setObservation('')
       setSelectedOptions([])
+      setOptionQuantities({})
     }
   }, [isOpen, product])
 
@@ -42,10 +45,36 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
 
   const options = parseSabores()
 
+  const updateOptionQuantity = (opt: string, delta: number) => {
+    setOptionQuantities(prev => {
+      const current = prev[opt] || 0
+      const newQty = Math.max(0, current + delta)
+      
+      if (newQty === 0) {
+        const { [opt]: _, ...rest } = prev
+        return rest
+      }
+      
+      return { ...prev, [opt]: newQty }
+    })
+  }
+
   const handleConfirm = () => {
     // Validation
     if (product.tipoOpcao === 'combinado' && selectedOptions.length === 0) {
       // Allow empty? Maybe enforce at least one?
+    }
+
+    if (product.tipoOpcao === 'refrigerante') {
+      const items = Object.entries(optionQuantities)
+          .map(([opt, qty]) => ({
+              quantity: qty,
+              observation: observation ? `${observation} [${opt}]` : `[${opt}]`,
+              preco: product.preco
+          }))
+      
+      onConfirm(0, '', [], 0, items)
+      return
     }
 
     // Construct final observation with options
@@ -134,43 +163,77 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
                 <div className="grid grid-cols-2 gap-4">
                   {/* Normal Option */}
                   <div className={`rounded-xl border-2 overflow-hidden transition-all ${
-                    selectedOptions.includes(`${size} - Normal`)
+                    optionQuantities[`${size} - Normal`]
                       ? 'border-orange-500 bg-orange-50'
                       : 'border-gray-100 bg-white'
                   }`}>
                     <div className="p-3 text-center">
                       <span className="font-bold text-gray-900 block mb-2">Normal</span>
-                      <button
-                        onClick={() => setSelectedOptions([`${size} - Normal`])}
-                        className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
-                          selectedOptions.includes(`${size} - Normal`)
-                            ? 'bg-orange-500 text-white shadow-md'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {selectedOptions.includes(`${size} - Normal`) ? 'Selecionado' : 'Adicionar'}
-                      </button>
+                      
+                      {optionQuantities[`${size} - Normal`] ? (
+                        <div className="flex items-center justify-between bg-white rounded-lg p-1 border border-orange-200">
+                          <button 
+                            onClick={() => updateOptionQuantity(`${size} - Normal`, -1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-orange-600"
+                          >
+                            <Minus size={16} />
+                          </button>
+                          <span className="font-bold text-orange-700 w-6 text-center">
+                            {optionQuantities[`${size} - Normal`]}
+                          </span>
+                          <button 
+                            onClick={() => updateOptionQuantity(`${size} - Normal`, 1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-orange-600"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => updateOptionQuantity(`${size} - Normal`, 1)}
+                          className="w-full py-2 rounded-lg font-bold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+                        >
+                          Adicionar
+                        </button>
+                      )}
                     </div>
                   </div>
 
                   {/* Zero Option */}
                   <div className={`rounded-xl border-2 overflow-hidden transition-all ${
-                    selectedOptions.includes(`${size} - Zero`)
+                    optionQuantities[`${size} - Zero`]
                       ? 'border-green-500 bg-green-50'
                       : 'border-gray-100 bg-white'
                   }`}>
                     <div className="p-3 text-center">
                       <span className="font-bold text-green-600 block mb-2">Zero</span>
-                      <button
-                        onClick={() => setSelectedOptions([`${size} - Zero`])}
-                        className={`w-full py-2 rounded-lg font-bold text-sm transition-all ${
-                          selectedOptions.includes(`${size} - Zero`)
-                            ? 'bg-green-600 text-white shadow-md'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {selectedOptions.includes(`${size} - Zero`) ? 'Selecionado' : 'Adicionar'}
-                      </button>
+                      
+                      {optionQuantities[`${size} - Zero`] ? (
+                        <div className="flex items-center justify-between bg-white rounded-lg p-1 border border-green-200">
+                          <button 
+                            onClick={() => updateOptionQuantity(`${size} - Zero`, -1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-green-600"
+                          >
+                            <Minus size={16} />
+                          </button>
+                          <span className="font-bold text-green-700 w-6 text-center">
+                            {optionQuantities[`${size} - Zero`]}
+                          </span>
+                          <button 
+                            onClick={() => updateOptionQuantity(`${size} - Zero`, 1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-green-600"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => updateOptionQuantity(`${size} - Zero`, 1)}
+                          className="w-full py-2 rounded-lg font-bold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+                        >
+                          Adicionar
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -279,6 +342,12 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
 
   const commonTags = getTags()
 
+  const totalQuantity = product.tipoOpcao === 'refrigerante'
+    ? Object.values(optionQuantities).reduce((a, b) => a + b, 0)
+    : quantity
+
+  const totalPrice = totalQuantity * product.preco
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4">
       <div className="bg-white w-full max-w-md sm:rounded-2xl rounded-t-2xl max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
@@ -291,8 +360,7 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
           </div>
           <button 
             onClick={onClose}
-            className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 text-gray-500 transition-colors"
-          >
+            className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 text-gray-500 transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -301,25 +369,25 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {renderContent()}
 
-          {/* Quantity */}
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-between">
-            <span className="font-bold text-gray-700">Quantidade</span>
-            <div className="flex items-center gap-4 bg-white rounded-lg p-1 border border-gray-200">
-              <button 
-                onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                className="w-10 h-10 rounded-md flex items-center justify-center hover:bg-gray-50 text-gray-600 transition-colors"
-              >
-                <Minus size={20} />
-              </button>
-              <span className="font-bold text-xl w-8 text-center">{quantity}</span>
-              <button 
-                onClick={() => setQuantity(q => q + 1)}
-                className="w-10 h-10 rounded-md flex items-center justify-center bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors"
-              >
-                <Plus size={20} />
-              </button>
+          {/* Quantity - Hide for refrigerante since it has per-item quantity */}
+          {product.tipoOpcao !== 'refrigerante' && (
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-between">
+              <span className="font-bold text-gray-700">Quantidade</span>
+              <div className="flex items-center gap-4 bg-white rounded-lg p-1 border border-gray-200">
+                <button 
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  className="w-10 h-10 rounded-md flex items-center justify-center hover:bg-gray-50 text-gray-600 transition-colors">
+                  <Minus size={20} />
+                </button>
+                <span className="font-bold text-xl w-8 text-center">{quantity}</span>
+                <button 
+                  onClick={() => setQuantity(q => q + 1)}
+                  className="w-10 h-10 rounded-md flex items-center justify-center bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors">
+                  <Plus size={20} />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Observation */}
           <div className="space-y-3">
@@ -331,8 +399,7 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
                 <button
                   key={tag}
                   onClick={() => setObservation(prev => prev ? `${prev}, ${tag}` : tag)}
-                  className="px-3 py-1.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-orange-600 border border-transparent hover:border-orange-200 transition-all"
-                >
+                  className="px-3 py-1.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-orange-600 border border-transparent hover:border-orange-200 transition-all">
                   {tag}
                 </button>
               ))}
@@ -354,16 +421,15 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
             onClick={handleConfirm}
             disabled={
               (product.tipoOpcao === 'combinado' && selectedOptions.length === 0) ||
-              (product.tipoOpcao === 'refrigerante' && selectedOptions.length === 0) ||
+              (product.tipoOpcao === 'refrigerante' && Object.keys(optionQuantities).length === 0) ||
               (product.tipoOpcao === 'sabores' && selectedOptions.length === 0) ||
               (product.tipoOpcao === 'tamanho_pg' && selectedOptions.length === 0) ||
               (product.tipoOpcao === 'sabores_com_tamanho' && selectedOptions.length < 2)
             }
-            className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-orange-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
+            className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-orange-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             <span>Adicionar ao Pedido</span>
             <span className="bg-white/20 px-2 py-0.5 rounded text-sm">
-              R$ {(product.preco * quantity).toFixed(2).replace('.', ',')}
+              R$ {totalPrice.toFixed(2).replace('.', ',')}
             </span>
           </button>
         </div>

@@ -267,7 +267,13 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     setSearchTerm('') // Clear search after adding
   }
 
-  const handleModalConfirm = (quantity: number, observation: string, _options: string[], finalPrice: number) => {
+  const handleModalConfirm = (
+    quantity: number, 
+    observation: string, 
+    _options: string[], 
+    finalPrice: number,
+    extraItems?: Array<{quantity: number, observation: string, preco: number}>
+  ) => {
     if (!selectedProduct) return
 
     // Find setor from categories since selectedProduct doesn't have it explicitly
@@ -277,25 +283,51 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const setor = category ? category.setor : 'Geral'
 
     setCart(prev => {
-      // Check for exact match of ID and Observation
-      const existing = prev.find(item => item.produtoId === selectedProduct.id && item.observacao === observation)
+      let newCart = [...prev]
       
-      if (existing) {
-        return prev.map(item => 
-          item === existing
-            ? { ...item, quantidade: item.quantidade + quantity }
-            : item
-        )
+      const itemsToAdd = []
+      
+      // If quantity > 0, add the main item (legacy behavior or for single items)
+      if (quantity > 0) {
+        itemsToAdd.push({
+          produtoId: selectedProduct.id,
+          nome: selectedProduct.nome,
+          preco: finalPrice,
+          quantidade: quantity,
+          observacao: observation,
+          setor
+        })
       }
 
-      return [...prev, {
-        produtoId: selectedProduct.id,
-        nome: selectedProduct.nome,
-        preco: finalPrice,
-        quantidade: quantity,
-        observacao: observation,
-        setor
-      }]
+      // Add extra items if any
+      if (extraItems && extraItems.length > 0) {
+        extraItems.forEach(item => {
+          itemsToAdd.push({
+            produtoId: selectedProduct.id,
+            nome: selectedProduct.nome,
+            preco: item.preco,
+            quantidade: item.quantity,
+            observacao: item.observation,
+            setor
+          })
+        })
+      }
+
+      // Merge with existing cart logic
+      itemsToAdd.forEach(newItem => {
+        const existingIndex = newCart.findIndex(item => item.produtoId === newItem.produtoId && item.observacao === newItem.observacao)
+        
+        if (existingIndex >= 0) {
+          newCart[existingIndex] = {
+            ...newCart[existingIndex],
+            quantidade: newCart[existingIndex].quantidade + newItem.quantidade
+          }
+        } else {
+          newCart.push(newItem)
+        }
+      })
+
+      return newCart
     })
     
     setSelectedProduct(null)
