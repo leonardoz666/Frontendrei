@@ -493,7 +493,7 @@ export default function ProdutosPage() {
 
       {/* Product List - UPDATED GRID (Smaller items) */}
       <div className="p-4 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
-        {filteredProdutos.map((prod, idx) => (
+        {filteredProdutos.map((prod) => (
           <ProductCard 
             key={prod.id} 
             prod={prod} 
