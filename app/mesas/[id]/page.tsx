@@ -4,7 +4,7 @@ import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { io } from 'socket.io-client'
-import { ArrowRightLeft, X, CheckCircle2, ListOrdered, Search, Trash2, Rocket, Clock, PlusCircle } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, Clock, PlusCircle } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
@@ -409,27 +409,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             </div>
           )}
 
-          {/* Comanda Section (Actually Products Search & Grid) */}
-          <div className="mb-8">
-            <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-2">
-              <CheckCircle2 className="text-green-500" size={24} /> Comanda
-            </h2>
-            
-            {/* Search Bar */}
-            <div className="mb-6 relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
-                className="w-full p-4 pl-12 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                autoFocus
-                disabled={tableStatus === 'FECHAMENTO'}
-              />
-            </div>
-
-            {/* Product Grid */}
+          {/* Product Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProducts.map(produto => { // Show first 12 for demo or all? The image shows "Comanda" section with some products. I'll show all filtered products here.
                 const isInactive = produto.ativo === false
@@ -465,23 +445,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               )}
             </div>
             
-            <div className="mt-8">
-                <h2 className="text-lg font-bold text-black mb-4">Produtos</h2>
-                {/* Search bar could be duplicated here if needed as per image, but sticking to one main search for now as it's cleaner, unless strictly requested. The image shows two search bars, implying two categories. I'll stick to one list for now as categories are dynamic. */}
-                 {/* Replicating the "Produtos" section search bar if the user strictly wants it, but logic-wise it's redundant unless filtering different things. */}
-                 <div className="mb-6 relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <input
-                    type="text"
-                    placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
-                    className="w-full p-4 pl-12 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
-                    // Separate state for this search if needed, but for now reuse or just visual placeholder
-                    disabled={true} 
-                  />
-                </div>
-                 {/* Product cards again? I will just leave the top grid as the main one for now to avoid confusion. */}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -491,7 +454,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2">
             <ListOrdered className="text-orange-500" size={20} />
-            <h2 className="font-bold text-lg text-black">Pedido Atual <span className="text-gray-400 text-sm font-normal">({cart.length + submittedItems.filter(i => i.status !== 'CANCELADO').length})</span></h2>
+            <h2 className="font-bold text-lg text-black">Comanda <span className="text-gray-400 text-sm font-normal">({cart.length + submittedItems.filter(i => i.status !== 'CANCELADO').length})</span></h2>
           </div>
           <div className="bg-gray-200 px-2 py-1 rounded text-xs font-bold text-gray-700">
              Total: R$ {grandTotal.toFixed(2).replace('.', ',')}
