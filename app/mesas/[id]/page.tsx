@@ -639,19 +639,22 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       </div>
 
       {/* Floating Action Bar */}
-      {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] flex items-center justify-between md:px-8 z-30">
-          <div className="text-xl font-bold text-black">
-            Total: <span className="text-green-600">R$ {total.toFixed(2)}</span>
-          </div>
-          <button
-            onClick={() => setShowConfirmModal(true)}
-            className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold text-lg hover:bg-green-700 shadow-lg hover:shadow-green-200 transition-all flex items-center gap-2"
-          >
-            Enviar Pedido ({cart.reduce((a, b) => a + b.quantidade, 0)}) 🚀
-          </button>
+      <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] flex items-center justify-between md:px-8 z-30">
+        <div className="text-xl font-bold text-black">
+          Total: <span className="text-green-600">R$ {total.toFixed(2)}</span>
         </div>
-      )}
+        <button
+          onClick={() => setShowConfirmModal(true)}
+          disabled={cart.length === 0}
+          className={`px-8 py-3 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center gap-2 ${
+            cart.length === 0 
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
+              : 'bg-green-600 text-white hover:bg-green-700 hover:shadow-green-200'
+          }`}
+        >
+          Enviar Pedido ({cart.reduce((a, b) => a + b.quantidade, 0)}) 🚀
+        </button>
+      </div>
 
       {/* Cancel Item Confirmation Modal */}
       <ConfirmationModal
