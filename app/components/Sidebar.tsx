@@ -118,15 +118,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-      <div className="py-6 flex items-center justify-center px-4">
-        <div className="w-full h-40 relative">
-          <Image 
-            src="/logo.png"  
-            alt="Rei do Pirão" 
-            fill 
-            className="object-contain drop-shadow-sm"
-            priority
-          />
+      <div className="py-6 flex items-center justify-center border-b border-gray-100 mb-2">
+        <div className="flex items-center gap-3">
+          <div className="bg-orange-600 p-2 rounded-lg shadow-sm">
+            <UtensilsCrossed className="text-white" size={24} />
+          </div>
+          <span className="text-xl font-bold text-gray-800 tracking-tight">Rei do Pirão</span>
         </div>
       </div>
 
@@ -258,4 +255,5 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       </aside>
     </>
   )
+}
 }
