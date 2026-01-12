@@ -118,22 +118,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-      <div className="py-6 flex items-center justify-center">
-        <div className="w-40 h-20 relative hover:scale-105 transition-transform duration-300">
+      <div className="pt-8 pb-4 flex items-center justify-center">
+        <div className="w-56 h-28 relative">
           <Image 
             src="/logo.png"  
             alt="Rei do Pirão" 
             fill 
-            className="object-contain drop-shadow-sm"
+            className="object-contain"
             priority
           />
         </div>
       </div>
 
       <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
-        <div className="mb-4 px-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Menu</p>
-        </div>
         {filteredItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href

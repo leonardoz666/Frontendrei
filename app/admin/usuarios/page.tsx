@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react'
+import { useToast } from '@/contexts/ToastContext'
 
 interface User {
   id: number
@@ -15,6 +16,7 @@ interface User {
 }
 
 export default function AdminUsersPage() {
+  const { showToast } = useToast()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   
@@ -55,7 +57,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, [router, showToast])
 
   useEffect(() => {
     const run = async () => {

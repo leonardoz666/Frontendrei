@@ -20,6 +20,8 @@ export type Produto = {
   isDrink?: boolean
   isFood?: boolean
   favorito?: boolean
+  permitirObservacao?: boolean
+  permiteGeloLimao?: boolean
   ultimoUso?: string
 }
 
