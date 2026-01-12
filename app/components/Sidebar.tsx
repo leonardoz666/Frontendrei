@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard,
@@ -11,7 +10,8 @@ import {
   Receipt,
   ClipboardList,
   ShoppingBag,
-  Settings
+  Settings,
+  UtensilsCrossed
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'

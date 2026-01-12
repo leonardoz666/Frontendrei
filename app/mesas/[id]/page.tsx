@@ -22,7 +22,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [tableStatus, setTableStatus] = useState<string>('')
   const [selectedCategory] = useState<string>('all')
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null)
@@ -642,14 +641,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         />
       )}
 
-      <ConfirmationModal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        onConfirm={submitOrder}
-        items={itemsBySetor}
-        total={totalCart}
-        loading={submitting}
-      />
+
 
       {showTransferModal && (
         createPortal(
