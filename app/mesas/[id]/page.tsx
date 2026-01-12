@@ -480,7 +480,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                              {group.quantidade}x
                            </span>
                          </div>
-                         {/* We don't have description/setor here easily unless we map back to products */}
+                         {originalProduct && (
+                           <p className="text-xs text-gray-500 mt-1 text-left">{originalProduct.setor}</p>
+                         )}
                        </div>
                        
                        <div className="flex items-end justify-between w-full mt-2">
@@ -569,7 +571,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2">
             <ListOrdered className="text-orange-500" size={20} />
-            <h2 className="font-bold text-lg text-black">Pedido Atual <span className="text-gray-400 text-sm font-normal">({cart.length + submittedItems.filter(i => i.status !== 'CANCELADO').length})</span></h2>
+            <h2 className="font-bold text-lg text-black">Pedido Atual <span className="text-gray-400 text-sm font-normal">({cart.length})</span></h2>
           </div>
           <div className="bg-gray-200 px-2 py-1 rounded text-xs font-bold text-gray-700">
              Total: R$ {grandTotal.toFixed(2).replace('.', ',')}
@@ -634,7 +636,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                     {item.horario}
                   </span>
                   <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
-                         item.status === 'EM_PREPARO' ? 'bg-blue-100 text-blue-700' :
+                         item.status === 'EM_PREPARO' ? 'bg-green-100 text-green-700' :
                          item.status === 'PRONTO' ? 'bg-green-100 text-green-700' :
                          'bg-gray-100 text-black'
                        }`}>
