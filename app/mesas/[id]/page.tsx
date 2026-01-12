@@ -272,8 +272,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     observation: string, 
     _options: string[], 
     finalPrice: number,
-    extraItems?: Array<{quantity: number, observation: string, preco: number, nameSuffix?: string}>,
-    productNameSuffix?: string
+    extraItems?: Array<{quantity: number, observation: string, preco: number}>
   ) => {
     if (!selectedProduct) return
 
@@ -292,7 +291,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       if (quantity > 0) {
         itemsToAdd.push({
           produtoId: selectedProduct.id,
-          nome: selectedProduct.nome + (productNameSuffix || ''),
+          nome: selectedProduct.nome,
           preco: finalPrice,
           quantidade: quantity,
           observacao: observation,
@@ -305,7 +304,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         extraItems.forEach(item => {
           itemsToAdd.push({
             produtoId: selectedProduct.id,
-            nome: selectedProduct.nome + (item.nameSuffix || ''),
+            nome: selectedProduct.nome,
             preco: item.preco,
             quantidade: item.quantity,
             observacao: item.observation,
@@ -506,7 +505,18 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-             {submittedItems.map((item, index) => (
+            {submittedItems.map((item, index) => {
+               // Extract option from observation if present to display in name
+               let displayName = item.nome
+               let displayObs = item.observacao || ''
+               
+               const optionMatch = displayObs.match(/^\(\s*(.+?)\s*\)\s*(.*)/)
+               if (optionMatch) {
+                 displayName += ` ( ${optionMatch[1]} )`
+                 displayObs = optionMatch[2]
+               }
+
+               return (
                <div key={`${item.id}-${index}`} className={`bg-white p-2.5 rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all ${item.status === 'CANCELADO' ? 'opacity-60 bg-gray-100' : ''}`}>
                  
                  <div>
@@ -525,11 +535,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                    
                    <h3 className={`font-bold text-black leading-tight mb-1 text-xs sm:text-sm ${item.status === 'CANCELADO' ? 'line-through text-gray-500' : ''}`}>
                      <span className="text-yellow-600 mr-1 text-sm sm:text-base">{item.quantidade}x</span>
-                     {item.nome}
+                     {displayName}
                    </h3>
-                   {item.observacao && (
+                   {displayObs && (
                      <div className="text-[10px] text-black bg-gray-50 p-1.5 rounded border border-gray-100 mb-1 italic leading-tight">
-                       &quot;{item.observacao}&quot;
+                       &quot;{displayObs}&quot;
                      </div>
                    )}
                  </div>
@@ -549,7 +559,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                     </span>
                  </div>
                </div>
-             ))}
+             )})}
           </div>
         </div>
       )}

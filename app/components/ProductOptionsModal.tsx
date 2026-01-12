@@ -11,8 +11,7 @@ interface ProductOptionsModalProps {
     observation: string, 
     selectedOptions: string[],
     finalPrice: number,
-    extraItems?: Array<{quantity: number, observation: string, preco: number, nameSuffix?: string}>,
-    productNameSuffix?: string
+    extraItems?: Array<{quantity: number, observation: string, preco: number}>
   ) => void
 }
 
@@ -78,11 +77,12 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
               if (wantsGelo) obs = obs ? `${obs}, Gelo` : 'Gelo'
               if (wantsLimao) obs = obs ? `${obs}, Limão` : 'Limão'
               
+              const finalObs = obs ? `( ${opt} ) ${obs}` : `( ${opt} )`
+
               return {
                   quantity: qty,
-                  observation: obs,
-                  preco: product.preco,
-                  nameSuffix: ` ( ${opt} )`
+                  observation: finalObs,
+                  preco: product.preco
               }
           })
       
@@ -91,13 +91,15 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
     }
 
     // Construct final observation with options
-    const optionsText = selectedOptions.length > 0 ? ` ( ${selectedOptions.join(', ')} )` : ''
+    const optionsText = selectedOptions.length > 0 ? `( ${selectedOptions.join(', ')} ) ` : ''
     
     let obs = observation
     if (wantsGelo) obs = obs ? `${obs}, Gelo` : 'Gelo'
     if (wantsLimao) obs = obs ? `${obs}, Limão` : 'Limão'
     
-    onConfirm(quantity, obs, selectedOptions, product.preco, undefined, optionsText)
+    const finalObs = (optionsText + obs).trim()
+    
+    onConfirm(quantity, finalObs, selectedOptions, product.preco)
   }
 
   const toggleOption = (opt: string) => {
