@@ -118,13 +118,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0
       `}>
-      <div className="pt-8 pb-4 flex items-center justify-center">
-        <div className="w-56 h-28 relative">
+      <div className="py-6 flex items-center justify-center px-4">
+        <div className="w-full h-40 relative">
           <Image 
             src="/logo.png"  
             alt="Rei do Pirão" 
             fill 
-            className="object-contain"
+            className="object-contain drop-shadow-sm"
             priority
           />
         </div>
