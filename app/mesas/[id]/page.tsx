@@ -272,7 +272,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     observation: string, 
     _options: string[], 
     finalPrice: number,
-    extraItems?: Array<{quantity: number, observation: string, preco: number}>
+    extraItems?: Array<{quantity: number, observation: string, preco: number, nameSuffix?: string}>,
+    productNameSuffix?: string
   ) => {
     if (!selectedProduct) return
 
@@ -291,7 +292,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       if (quantity > 0) {
         itemsToAdd.push({
           produtoId: selectedProduct.id,
-          nome: selectedProduct.nome,
+          nome: selectedProduct.nome + (productNameSuffix || ''),
           preco: finalPrice,
           quantidade: quantity,
           observacao: observation,
@@ -304,7 +305,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         extraItems.forEach(item => {
           itemsToAdd.push({
             produtoId: selectedProduct.id,
-            nome: selectedProduct.nome,
+            nome: selectedProduct.nome + (item.nameSuffix || ''),
             preco: item.preco,
             quantidade: item.quantity,
             observacao: item.observation,
