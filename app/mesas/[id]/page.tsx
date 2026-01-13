@@ -28,6 +28,15 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null)
   const [userRole, setUserRole] = useState<string>('')
+  const [isMobile, setIsMobile] = useState(false)
+  const [showReviewModal, setShowReviewModal] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Transfer Table State
   const [showTransferModal, setShowTransferModal] = useState(false)
@@ -204,12 +213,22 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     const term = normalize(searchTerm)
 
-    return allProducts.filter(p => {
+    let result = allProducts.filter(p => {
       const matchesSearch = normalize(p.nome).includes(term)
       const matchesCategory = selectedCategory === 'all' || p.categoriaId.toString() === selectedCategory
       return matchesSearch && matchesCategory
     })
-  }, [allProducts, searchTerm, selectedCategory])
+
+    // Se usuário não está pesquisando e está na categoria 'Todos', limitar a 10 (Prioridade Favoritos)
+    if (!term && selectedCategory === 'all') {
+      if (isMobile) return []
+      return result
+        .sort((a, b) => (Number(b.favorito) - Number(a.favorito)))
+        .slice(0, 10)
+    }
+
+    return result
+  }, [allProducts, searchTerm, selectedCategory, isMobile])
 
   const addToCart = (produto: Produto & { setor: string }) => {
     if (tableStatus === 'FECHAMENTO') return
@@ -558,8 +577,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             </section>
           </div>
 
-          {/* Right Side - Pedido Atual */}
-          <aside className="w-full lg:w-[380px] bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-[600px] lg:h-auto">
+          {/* Right Side - Pedido Atual (Hidden on Mobile) */}
+          <aside className="hidden lg:flex lg:w-[380px] bg-white rounded-xl border border-gray-200 shadow-sm flex-col h-auto">
             {/* Header */}
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl">
               <div className="flex items-center gap-2">
@@ -650,7 +669,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               Limpar
             </button>
             <button
-              onClick={submitOrder}
+              onClick={() => isMobile ? setShowReviewModal(true) : submitOrder()}
               disabled={cart.length === 0 || submitting}
               className="bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
@@ -729,11 +748,78 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         )
       )}
 
+      {/* Mobile Review Modal */}
+      {showReviewModal && (
+        createPortal(
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-200">
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="text-orange-500" size={24} />
+                  <h2 className="text-xl font-bold text-gray-900">Revisar Pedido ({cart.length})</h2>
+                </div>
+                <button onClick={() => setShowReviewModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                  <X size={24} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-y-auto flex-1 space-y-3">
+                {cart.length === 0 ? (
+                  <p className="text-center text-gray-500 py-10">Carrinho vazio.</p>
+                ) : (
+                  cart.map((item, index) => (
+                    <div key={index} className="flex justify-between items-start bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      <div className="flex gap-3">
+                        <span className="font-bold text-orange-600 px-2 py-1 bg-white rounded border border-gray-200 h-fit text-sm">
+                          {item.quantidade}x
+                        </span>
+                        <div>
+                          <p className="font-bold text-gray-900">{item.nome}</p>
+                          {item.observacao && <p className="text-xs text-gray-500">{item.observacao}</p>}
+                          <p className="text-sm font-bold text-gray-700 mt-1">
+                            R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeFromCart(index)}
+                        className="text-gray-400 hover:text-red-500 p-2"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-4 bg-gray-50 border-t border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-gray-600 font-medium">Total do Pedido</span>
+                  <span className="text-2xl font-bold text-green-600">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowReviewModal(false)
+                    submitOrder()
+                  }}
+                  className="w-full py-4 bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-200 flex items-center justify-center gap-2 text-lg active:scale-[0.98] transition-all"
+                >
+                  <Rocket size={24} />
+                  Confirmar Envio
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      )}
+
       {/* Payment Modal */}
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         total={submittedItems.filter(i => i.status !== 'CANCELADO').reduce((acc, i) => acc + (i.preco * i.quantidade), 0)}
+        items={submittedItems.filter(i => i.status !== 'CANCELADO')}
         mesaId={mesaId}
         mesaNumero={mesaNumero}
         onSuccess={() => {

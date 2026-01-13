@@ -1,359 +1,265 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { 
-  ShoppingBag, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  Truck, 
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  MapPin,
-  Phone
-} from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { ShoppingBag, RefreshCw, Check, X, Clock, MapPin, Phone, Receipt } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 
-// Mock types matching iFood structure loosely
+type IfoodItem = {
+  name: string
+  quantity: number
+  price: number
+  options?: string[]
+}
+
 type IfoodOrder = {
   id: string
   displayId: string
+  createdAt: string
   customer: {
     name: string
     phone: string
-    address?: string
   }
-  items: {
-    name: string
-    quantity: number
-    price: number
-    options?: string[]
-  }[]
+  delivery: {
+    address: string
+  }
+  items: IfoodItem[]
   total: number
-  status: 'PLACED' | 'CONFIRMED' | 'DISPATCHED' | 'CONCLUDED' | 'CANCELLED'
-  createdAt: string
-  notes?: string
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
 }
 
-// Mock data generator
-const generateMockOrders = (): IfoodOrder[] => [
-  {
-    id: 'ord-001',
-    displayId: '#1234',
-    customer: {
-      name: 'João Silva',
-      phone: '(71) 99999-1111',
-      address: 'Rua das Flores, 123 - Centro'
-    },
-    items: [
-      { name: 'Pirão de Carne do Sol', quantity: 1, price: 45.90, options: ['Sem cebola'] },
-      { name: 'Coca-Cola 2L', quantity: 1, price: 12.00 }
-    ],
-    total: 57.90,
-    status: 'PLACED',
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 min ago
-    notes: 'Campainha não funciona, ligar quando chegar.'
-  },
-  {
-    id: 'ord-002',
-    displayId: '#1235',
-    customer: {
-      name: 'Maria Oliveira',
-      phone: '(71) 98888-2222',
-      address: 'Av. Oceânica, 500 - Barra'
-    },
-    items: [
-      { name: 'Moqueca de Camarão', quantity: 1, price: 89.90 }
-    ],
-    total: 89.90,
-    status: 'CONFIRMED',
-    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString() // 25 min ago
-  },
-  {
-    id: 'ord-003',
-    displayId: '#1236',
-    customer: {
-      name: 'Pedro Santos',
-      phone: '(71) 97777-3333'
-    },
-    items: [
-      { name: 'Pirão de Frango', quantity: 2, price: 35.90 }
-    ],
-    total: 71.80,
-    status: 'DISPATCHED',
-    createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString() // 45 min ago
-  }
-]
-
 export default function IfoodPage() {
-  const { showToast } = useToast()
+  const [isConnected, setIsConnected] = useState(false)
   const [orders, setOrders] = useState<IfoodOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'PLACED' | 'CONFIRMED' | 'DISPATCHED' | 'HISTORY'>('PLACED')
-  const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
+  const [polling, setPolling] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Custom Toast (simple alert replacement)
+  const showToast = (msg: string, type: 'success' | 'error') => {
+    // Simple implementation or verify if ToastContext is available globally
+    console.log(msg)
+    // We can use native notification
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(msg)
+    }
+  }
 
   useEffect(() => {
-    // Simulate API fetch
-    setTimeout(() => {
-      setOrders(generateMockOrders())
-      setLoading(false)
-    }, 1000)
+    setIsClient(true)
+    const stored = localStorage.getItem('ifood_connected')
+    if (stored === 'true') {
+      setIsConnected(true)
+      startPolling()
+    }
+
+    // Request notification permission
+    if ("Notification" in window) {
+      Notification.requestPermission()
+    }
+
+    audioRef.current = new Audio('/sounds/new-order.mp3')
   }, [])
 
-  const handleStatusChange = (orderId: string, newStatus: IfoodOrder['status']) => {
-    setOrders(prev => prev.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ))
-    
-    const messages = {
-      'CONFIRMED': 'Pedido confirmado com sucesso!',
-      'DISPATCHED': 'Pedido despachado para entrega!',
-      'CANCELLED': 'Pedido cancelado.',
-      'CONCLUDED': 'Pedido finalizado.'
+  const startPolling = () => {
+    setPolling(true)
+    // Simulate incoming orders every 30-60 seconds
+    const interval = setInterval(() => {
+      if (Math.random() > 0.7) { // 30% chance per tick
+        simulateNewOrder()
+      }
+    }, 15000)
+
+    return () => clearInterval(interval)
+  }
+
+  const simulateNewOrder = () => {
+    const newOrder: IfoodOrder = {
+      id: Math.random().toString(36).substr(2, 9),
+      displayId: `#${Math.floor(Math.random() * 9999)}`,
+      createdAt: new Date().toISOString(),
+      customer: {
+        name: ['João Silva', 'Maria Oliveira', 'Pedro Santos', 'Ana Costa'][Math.floor(Math.random() * 4)],
+        phone: '(11) 99999-9999'
+      },
+      delivery: {
+        address: 'Rua das Flores, 123 - Centro'
+      },
+      items: [
+        { name: 'X-Tudo', quantity: 1, price: 25.0, options: ['Sem cebola'] },
+        { name: 'Coca-Cola Lata', quantity: 1, price: 6.0 }
+      ],
+      total: 31.0,
+      status: 'PENDING'
     }
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    showToast((messages as any)[newStatus] || 'Status atualizado', newStatus === 'CANCELLED' ? 'error' : 'success')
+
+    setOrders(prev => {
+      // Play sound if new order
+      audioRef.current?.play().catch(() => { })
+      return [newOrder, ...prev]
+    })
   }
 
-  const getFilteredOrders = () => {
-    if (activeTab === 'HISTORY') {
-      return orders.filter(o => ['CONCLUDED', 'CANCELLED'].includes(o.status))
+  const handleConnect = () => {
+    setIsConnected(true)
+    localStorage.setItem('ifood_connected', 'true')
+    startPolling()
+  }
+
+  const handleDisconnect = () => {
+    setIsConnected(false)
+    setPolling(false)
+    localStorage.removeItem('ifood_connected')
+  }
+
+  const handleAccept = async (order: IfoodOrder) => {
+    // 1. Create order in system (Mesa 99 for delivery)
+    // In a real scenario, we would map products. Here we mock success.
+
+    // Simulate API call to create order
+    try {
+      // Here we could call /api/orders with mock items
+      // For now, just update UI
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'ACCEPTED' } : o))
+      showToast(`Pedido ${order.displayId} aceito e enviado para cozinha!`, 'success')
+
+      // Try to print (simulated by triggering backend logic if we implemented order creation)
+    } catch (e) {
+      showToast('Erro ao aceitar pedido', 'error')
     }
-    return orders.filter(o => o.status === activeTab)
   }
 
-  const toggleExpand = (id: string) => {
-    setExpandedOrder(expandedOrder === id ? null : id)
+  const handleReject = (orderId: string) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'REJECTED' } : o))
   }
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
-  }
-
-  const formatTime = (isoString: string) => {
-    const date = new Date(isoString)
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-gray-500 gap-2">
-        <ShoppingBag className="animate-bounce text-red-500" /> Carregando pedidos...
-      </div>
-    )
-  }
+  if (!isClient) return null
 
   return (
-    <div className="p-6 max-w-7xl mx-auto min-h-screen bg-gray-50">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <div className="bg-red-500 p-3 rounded-xl shadow-lg shadow-red-200">
-            <ShoppingBag className="text-white w-8 h-8" />
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-[#EA1D2C] text-white p-6 shadow-md">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <ShoppingBag size={32} />
+            <h1 className="text-2xl font-bold">Gestor de Pedidos iFood</h1>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Gestor de Pedidos iFood</h1>
-            <p className="text-sm text-gray-500">Gerencie seus pedidos de delivery em tempo real</p>
+            {!isConnected ? (
+              <button
+                onClick={handleConnect}
+                className="bg-white text-[#EA1D2C] px-6 py-2 rounded-full font-bold hover:bg-gray-100 transition-colors"
+              >
+                Conectar Loja
+              </button>
+            ) : (
+              <button
+                onClick={handleDisconnect}
+                className="bg-red-800 text-white px-6 py-2 rounded-full font-bold hover:bg-red-900 transition-colors flex items-center gap-2"
+              >
+                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                Conectado (Polling)
+              </button>
+            )}
           </div>
         </div>
-        
-        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100">
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-sm font-medium text-green-600">Conectado</span>
-        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {[
-          { id: 'PLACED', label: 'Novos', icon: AlertCircle, count: orders.filter(o => o.status === 'PLACED').length },
-          { id: 'CONFIRMED', label: 'Em Preparo', icon: Clock, count: orders.filter(o => o.status === 'CONFIRMED').length },
-          { id: 'DISPATCHED', label: 'Saiu para Entrega', icon: Truck, count: orders.filter(o => o.status === 'DISPATCHED').length },
-          { id: 'HISTORY', label: 'Histórico', icon: CheckCircle, count: orders.filter(o => ['CONCLUDED', 'CANCELLED'].includes(o.status)).length },
-        ].map(tab => {
-          const Icon = tab.icon
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const isActive = activeTab === tab.id as any
-          
-          return (
-            <button
-              key={tab.id}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`
-                flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 whitespace-nowrap
-                ${isActive 
-                  ? 'bg-red-500 text-white shadow-md shadow-red-200 scale-105' 
-                  : 'bg-white text-gray-600 hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-100'}
-              `}
-            >
-              <Icon size={18} />
-              {tab.label}
-              {tab.count > 0 && (
-                <span className={`
-                  ml-2 text-xs px-2 py-0.5 rounded-full 
-                  ${isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'}
-                `}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Orders List */}
-      <div className="grid gap-4">
-        {getFilteredOrders().length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
-            <ShoppingBag className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-            <h3 className="text-lg font-medium text-gray-900">Nenhum pedido nesta aba</h3>
-            <p className="text-gray-500">Aguardando novos pedidos...</p>
+      <main className="max-w-7xl mx-auto w-full p-6 flex-1">
+        {!isConnected ? (
+          <div className="text-center py-20">
+            <ShoppingBag size={80} className="text-gray-300 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-600">Loja Desconectada</h2>
+            <p className="text-gray-500 mt-2">Clique em conectar para começar a receber pedidos.</p>
           </div>
         ) : (
-          getFilteredOrders().map(order => (
-            <Card key={order.id} className={`border-l-4 ${
-              order.status === 'PLACED' ? 'border-l-red-500' :
-              order.status === 'CONFIRMED' ? 'border-l-orange-500' :
-              order.status === 'DISPATCHED' ? 'border-l-blue-500' :
-              order.status === 'CONCLUDED' ? 'border-l-green-500' : 'border-l-gray-500'
-            }`}>
-              <div className="p-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-red-50 px-3 py-2 rounded-lg text-center min-w-[80px]">
-                      <span className="block text-xs text-red-600 font-bold uppercase">Pedido</span>
-                      <span className="block text-xl font-black text-gray-800">{order.displayId}</span>
-                    </div>
+          <div className="space-y-6">
+            {orders.length === 0 && (
+              <div className="text-center py-20 flex flex-col items-center">
+                <RefreshCw size={40} className="text-[#EA1D2C] animate-spin mb-4" />
+                <p className="text-gray-500 text-xl">Aguardando novos pedidos...</p>
+              </div>
+            )}
+
+            {orders.map(order => (
+              <div key={order.id} className={`bg-white rounded-xl shadow-lg border-l-8 overflow-hidden transition-all ${order.status === 'PENDING' ? 'border-yellow-400' :
+                  order.status === 'ACCEPTED' ? 'border-green-500' : 'border-red-500 opacity-60'
+                }`}>
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900">{order.customer.name}</h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                        <span className="flex items-center gap-1"><Clock size={14} /> {formatTime(order.createdAt)}</span>
-                        <span className="flex items-center gap-1"><ShoppingBag size={14} /> {order.items.length} itens</span>
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-2xl font-bold text-gray-900">{order.displayId}</h3>
+                        <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded text-gray-600">
+                          {new Date(order.createdAt).toLocaleTimeString()}
+                        </span>
                       </div>
+                      <p className="text-lg font-medium text-gray-800">{order.customer.name}</p>
+                      <div className="flex items-center gap-4 text-sm text-gray-500 mt-2">
+                        <span className="flex items-center gap-1"><Phone size={14} /> {order.customer.phone}</span>
+                        <span className="flex items-center gap-1"><MapPin size={14} /> {order.delivery.address}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500 mb-1">Total do Pedido</p>
+                      <p className="text-3xl font-bold text-gray-900">R$ {order.total.toFixed(2).replace('.', ',')}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl font-bold text-gray-900">{formatCurrency(order.total)}</span>
-                    <button 
-                      onClick={() => toggleExpand(order.id)}
-                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      {expandedOrder === order.id ? <ChevronUp /> : <ChevronDown />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Expanded Details */}
-                {expandedOrder === order.id && (
-                  <div className="border-t pt-4 mt-4 animate-in slide-in-from-top-2 duration-200">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                          <ShoppingBag size={16} /> Itens do Pedido
-                        </h4>
-                        <ul className="space-y-3">
-                          {order.items.map((item, idx) => (
-                            <li key={idx} className="flex justify-between items-start text-sm">
-                              <div className="flex gap-3">
-                                <span className="font-bold text-gray-900 w-6">{item.quantity}x</span>
-                                <div>
-                                  <span className="text-gray-800">{item.name}</span>
-                                  {item.options && (
-                                    <p className="text-xs text-gray-500 mt-0.5">{item.options.join(', ')}</p>
-                                  )}
-                                </div>
-                              </div>
-                              <span className="font-medium text-gray-600">{formatCurrency(item.price * item.quantity)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        {order.notes && (
-                          <div className="mt-4 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-                            <p className="text-sm text-yellow-800 font-medium flex gap-2">
-                              <AlertCircle size={16} /> Observações:
-                            </p>
-                            <p className="text-sm text-yellow-700 mt-1 pl-6">{order.notes}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                          <MapPin size={16} /> Dados de Entrega
-                        </h4>
-                        <div className="bg-gray-50 p-4 rounded-xl space-y-3 text-sm">
-                          <div className="flex items-start gap-3">
-                            <MapPin size={16} className="text-gray-400 mt-0.5" />
-                            <div>
-                              <p className="text-gray-900 font-medium">Endereço de Entrega</p>
-                              <p className="text-gray-600">{order.customer.address || 'Retirada no balcão'}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <Phone size={16} className="text-gray-400" />
-                            <div>
-                              <p className="text-gray-900 font-medium">Telefone</p>
-                              <p className="text-gray-600">{order.customer.phone}</p>
-                            </div>
+                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                    {order.items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-start py-2 border-b border-gray-200 last:border-0">
+                        <div className="flex gap-3">
+                          <span className="font-bold text-gray-900">{item.quantity}x</span>
+                          <div>
+                            <p className="text-gray-800 font-medium">{item.name}</p>
+                            {item.options && item.options.map(opt => (
+                              <p key={opt} className="text-sm text-gray-500">• {opt}</p>
+                            ))}
                           </div>
                         </div>
+                        <span className="text-gray-600">R$ {item.price.toFixed(2).replace('.', ',')}</span>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                )}
 
-                {/* Actions */}
-                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-                  {order.status === 'PLACED' && (
-                    <>
-                      <Button 
-                        variant="outline"
-                        onClick={() => handleStatusChange(order.id, 'CANCELLED')}
-                        className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  {order.status === 'PENDING' && (
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => handleReject(order.id)}
+                        className="flex-1 py-4 border-2 border-red-100 text-red-600 font-bold rounded-xl hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
                       >
-                        <XCircle size={18} className="mr-2" />
-                        Rejeitar Pedido
-                      </Button>
-                      <Button 
-                        onClick={() => handleStatusChange(order.id, 'CONFIRMED')}
-                        className="bg-green-600 hover:bg-green-700 text-white border-none shadow-md shadow-green-100"
+                        <X size={20} />
+                        Rejeitar
+                      </button>
+                      <button
+                        onClick={() => handleAccept(order)}
+                        className="flex-[2] py-4 bg-[#EA1D2C] text-white font-bold rounded-xl hover:bg-[#d01522] transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-200"
                       >
-                        <CheckCircle size={18} className="mr-2" />
-                        Aceitar e Confirmar
-                      </Button>
-                    </>
-                  )}
-                  
-                  {order.status === 'CONFIRMED' && (
-                    <Button 
-                      onClick={() => handleStatusChange(order.id, 'DISPATCHED')}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <Truck size={18} className="mr-2" />
-                      Despachar Entrega
-                    </Button>
+                        <Check size={20} />
+                        Aceitar e Imprimir
+                      </button>
+                    </div>
                   )}
 
-                  {order.status === 'DISPATCHED' && (
-                    <Button 
-                      onClick={() => handleStatusChange(order.id, 'CONCLUDED')}
-                      className="bg-gray-800 hover:bg-gray-900 text-white"
-                    >
-                      <CheckCircle size={18} className="mr-2" />
-                      Finalizar Pedido
-                    </Button>
+                  {order.status === 'ACCEPTED' && (
+                    <div className="bg-green-50 text-green-700 p-4 rounded-xl flex items-center gap-2 font-bold">
+                      <Check size={24} />
+                      Pedido aceito e enviado para produção!
+                    </div>
+                  )}
+
+                  {order.status === 'REJECTED' && (
+                    <div className="bg-red-50 text-red-700 p-4 rounded-xl flex items-center gap-2 font-bold">
+                      <X size={24} />
+                      Pedido rejeitado.
+                    </div>
                   )}
                 </div>
               </div>
-            </Card>
-          ))
+            ))}
+          </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }
