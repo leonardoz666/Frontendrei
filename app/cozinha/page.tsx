@@ -150,6 +150,7 @@ export default function KitchenPage() {
       const res = await fetch(`/api/kitchen/reprint/${id}`, { method: 'POST' })
       if (!res.ok) throw new Error('Failed')
     } catch (e) {
+      console.error(e)
       alert('Erro ao enviar comando de reimpressão')
     } finally {
       setReprinting(null)
@@ -187,12 +188,12 @@ export default function KitchenPage() {
 
     return (
       <div className={`p-5 rounded-2xl shadow-lg border-l-4 mb-4 transition-all ${order.status === 'RECEBIDO'
-          ? timeStatus === 'critical'
-            ? 'bg-red-50 border-red-500 animate-pulse'
-            : timeStatus === 'warning'
-              ? 'bg-yellow-50 border-yellow-500'
-              : 'bg-white border-yellow-400'
-          : 'bg-blue-50 border-blue-500'
+        ? timeStatus === 'critical'
+          ? 'bg-red-50 border-red-500 animate-pulse'
+          : timeStatus === 'warning'
+            ? 'bg-yellow-50 border-yellow-500'
+            : 'bg-white border-yellow-400'
+        : 'bg-blue-50 border-blue-500'
         }`}>
         {/* Header with time */}
         <div className="flex justify-between items-start mb-4">
@@ -214,10 +215,10 @@ export default function KitchenPage() {
 
             {/* Elapsed Time Display */}
             <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${timeStatus === 'critical'
-                ? 'bg-red-100 text-red-700'
-                : timeStatus === 'warning'
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-gray-100 text-gray-600'
+              ? 'bg-red-100 text-red-700'
+              : timeStatus === 'warning'
+                ? 'bg-yellow-100 text-yellow-700'
+                : 'bg-gray-100 text-gray-600'
               }`}>
               {timeStatus === 'critical' && <AlertTriangle size={18} className="animate-bounce" />}
               <Clock size={18} />

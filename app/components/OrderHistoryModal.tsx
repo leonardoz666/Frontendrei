@@ -33,25 +33,25 @@ export function OrderHistoryModal({ isOpen, onClose, mesaId, mesaNumero }: Order
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
+        const fetchHistory = async () => {
+            setLoading(true)
+            try {
+                const res = await fetch(`/api/tables/${mesaId}/history`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setOrders(data)
+                }
+            } catch (error) {
+                console.error('Error fetching history:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
         if (isOpen) {
             fetchHistory()
         }
     }, [isOpen, mesaId])
-
-    const fetchHistory = async () => {
-        setLoading(true)
-        try {
-            const res = await fetch(`/api/tables/${mesaId}/history`)
-            if (res.ok) {
-                const data = await res.json()
-                setOrders(data)
-            }
-        } catch (error) {
-            console.error('Error fetching history:', error)
-        } finally {
-            setLoading(false)
-        }
-    }
 
     const getStatusIcon = (status: string) => {
         switch (status) {
