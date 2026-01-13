@@ -4,10 +4,12 @@ import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { io } from 'socket.io-client'
-import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, Clock, PlusCircle, CheckCircle2, Search, Moon } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, Clock, PlusCircle, CheckCircle2, Search, History, CreditCard } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
+import { PaymentModal } from '@/components/PaymentModal'
+import { OrderHistoryModal } from '@/components/OrderHistoryModal'
 import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +35,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [targetTableId, setTargetTableId] = useState<number | null>(null)
   const [isTransferring, setIsTransferring] = useState(false)
 
+  // Payment and History Modals
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [mesaNumero, setMesaNumero] = useState(mesaId)
+
   const fetchTableData = useCallback(async () => {
     try {
       console.log(`[DEBUG] Fetching table data for mesaId: ${mesaId}`);
@@ -42,6 +49,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         const data = await res.json()
         console.log(`[DEBUG] fetchTableData success:`, data);
         setTableStatus(data.status)
+        setMesaNumero(data.numero || mesaId)
         if (data.comandas && data.comandas.length > 0) {
           const comanda = data.comandas[0]
           const items: SubmittedItem[] = []
@@ -364,7 +372,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">Mesa {mesaId}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Mesa {mesaNumero}</h1>
           {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
             <button
               onClick={() => setShowTransferModal(true)}
@@ -376,9 +384,33 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             </button>
           )}
         </div>
-        <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
-          ← Voltar ao Início
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* History Button */}
+          <button
+            onClick={() => setShowHistoryModal(true)}
+            className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-gray-200 transition-colors"
+            title="Ver Histórico"
+          >
+            <History size={18} />
+            <span className="hidden sm:inline">Histórico</span>
+          </button>
+
+          {/* Payment Button - Only for authorized roles */}
+          {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && submittedItems.length > 0 && (
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
+              title="Fechar Conta"
+            >
+              <CreditCard size={18} />
+              <span className="hidden sm:inline">Fechar Conta</span>
+            </button>
+          )}
+
+          <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
+            ← Voltar ao Início
+          </Link>
+        </div>
       </header>
 
       {tableStatus === 'FECHAMENTO' && (
@@ -597,11 +629,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 })
               )}
             </div>
-
-            {/* Dark Mode Toggle */}
-            <button className="absolute bottom-24 right-6 lg:bottom-6 lg:right-6 w-10 h-10 bg-gray-800 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-700 transition-colors z-10">
-              <Moon size={18} />
-            </button>
           </aside>
         </div>
       </main>
@@ -701,6 +728,27 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           document.body
         )
       )}
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        total={submittedItems.filter(i => i.status !== 'CANCELADO').reduce((acc, i) => acc + (i.preco * i.quantidade), 0)}
+        mesaId={mesaId}
+        mesaNumero={mesaNumero}
+        onSuccess={() => {
+          showToast('Pagamento registrado com sucesso!', 'success')
+          router.push('/mesas')
+        }}
+      />
+
+      {/* Order History Modal */}
+      <OrderHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        mesaId={mesaId}
+        mesaNumero={mesaNumero}
+      />
 
     </div>
   )
