@@ -8,16 +8,15 @@ import Sidebar from './Sidebar'
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isLoginPage = pathname === '/login'
-  const isOrderPage = /^\/mesas\/\d+$/.test(pathname || '')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {!isLoginPage && !isOrderPage && (
+      {!isLoginPage && (
         <>
           {/* Mobile Header */}
           <div className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30">
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg"
             >
@@ -30,8 +29,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
         </>
       )}
-      
-      <main className={`flex-1 ${!isLoginPage && !isOrderPage ? 'md:ml-64' : ''}`}>
+
+      <main className={`flex-1 ${!isLoginPage ? 'md:ml-64' : ''}`}>
         {children}
       </main>
     </div>

@@ -4,7 +4,7 @@ import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { io } from 'socket.io-client'
-import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, Clock, PlusCircle, CheckCircle2, Search } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, Clock, PlusCircle, CheckCircle2, Search, Moon } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
@@ -26,45 +26,12 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null)
   const [userRole, setUserRole] = useState<string>('')
-  
+
   // Transfer Table State
   const [showTransferModal, setShowTransferModal] = useState(false)
-  const [availableTables, setAvailableTables] = useState<{id: number, numero: number, status: string}[]>([])
+  const [availableTables, setAvailableTables] = useState<{ id: number, numero: number, status: string }[]>([])
   const [targetTableId, setTargetTableId] = useState<number | null>(null)
   const [isTransferring, setIsTransferring] = useState(false)
-  
-  // Cancel Item State
-  const [itemToCancel, setItemToCancel] = useState<number | null>(null)
-  const [showCancelModal, setShowCancelModal] = useState(false)
-
-  const handleCancelItem = (itemId: number) => {
-    setItemToCancel(itemId)
-    setShowCancelModal(true)
-  }
-
-  const confirmCancelItem = async () => {
-    if (!itemToCancel) return
-
-    try {
-      const res = await fetch(`/api/orders/items/${itemToCancel}`, {
-        method: 'DELETE'
-      })
-
-      if (res.ok) {
-        showToast('Item cancelado com sucesso', 'success')
-        fetchTableData()
-      } else {
-        const error = await res.json()
-        showToast(error.message || 'Erro ao cancelar item', 'error')
-      }
-    } catch (error) {
-      console.error('Error cancelling item:', error)
-      showToast('Erro ao conectar com o servidor', 'error')
-    } finally {
-      setShowCancelModal(false)
-      setItemToCancel(null)
-    }
-  }
 
   const fetchTableData = useCallback(async () => {
     try {
@@ -117,7 +84,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   const handleTransferTable = async () => {
     if (!targetTableId) return
-    
+
     setIsTransferring(true)
     try {
       const res = await fetch(`/api/tables/${mesaId}/transfer`, {
@@ -162,16 +129,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         const productsRes = await fetch('/api/categories', { cache: 'no-store' })
         console.log(`[DEBUG] categories status: ${productsRes.status}`);
         const productsData = await productsRes.json()
-        
+
         if (!cancelled) {
           const order = ['Entradas', 'Pratos Principais', 'Bebidas', 'Drinks']
           const sortedCategories = productsData.sort((a: Categoria, b: Categoria) => {
             const indexA = order.findIndex(o => a.nome.toLowerCase() === o.toLowerCase())
             const indexB = order.findIndex(o => b.nome.toLowerCase() === o.toLowerCase())
-            
+
             const valA = indexA === -1 ? 999 : indexA
             const valB = indexB === -1 ? 999 : indexB
-            
+
             return valA - valB || a.nome.localeCompare(b.nome)
           })
           setCategories(sortedCategories)
@@ -208,7 +175,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     socket.on('table:updated', handleTableUpdate)
     socket.on('tables-updated', () => fetchTableData())
     socket.on('kitchen-order-updated', () => fetchTableData())
-    
+
     // For new orders, we could filter by mesaId if the event sends it, 
     // but fetching is safe enough to ensure sync
     socket.on('new-kitchen-order', () => fetchTableData())
@@ -220,8 +187,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   // Flatten products for search
   const allProducts = useMemo(() => {
-    return categories.flatMap(cat => 
-      cat.produtos.map(prod => ({ ...prod, setor: cat.setor}))
+    return categories.flatMap(cat =>
+      cat.produtos.map(prod => ({ ...prod, setor: cat.setor }))
     )
   }, [categories])
 
@@ -247,17 +214,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     setCart(prev => {
       const existing = prev.find(item => item.produtoId === produto.id && item.observacao === '')
       if (existing) {
-        return prev.map(item => 
+        return prev.map(item =>
           item === existing
             ? { ...item, quantidade: item.quantidade + 1 }
             : item
         )
       }
-      return [...prev, { 
-        produtoId: produto.id, 
-        nome: produto.nome, 
-        preco: produto.preco, 
-        quantidade: 1, 
+      return [...prev, {
+        produtoId: produto.id,
+        nome: produto.nome,
+        preco: produto.preco,
+        quantidade: 1,
         observacao: '',
         setor: produto.setor
       }]
@@ -266,11 +233,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   }
 
   const handleModalConfirm = (
-    quantity: number, 
-    observation: string, 
-    _options: string[], 
+    quantity: number,
+    observation: string,
+    _options: string[],
     finalPrice: number,
-    extraItems?: Array<{quantity: number, observation: string, preco: number}>
+    extraItems?: Array<{ quantity: number, observation: string, preco: number }>
   ) => {
     if (!selectedProduct) return
 
@@ -282,9 +249,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
     setCart(prev => {
       const newCart = [...prev]
-      
+
       const itemsToAdd = []
-      
+
       // If quantity > 0, add the main item (legacy behavior or for single items)
       if (quantity > 0) {
         itemsToAdd.push({
@@ -314,7 +281,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       // Merge with existing cart logic
       itemsToAdd.forEach(newItem => {
         const existingIndex = newCart.findIndex(item => item.produtoId === newItem.produtoId && item.observacao === newItem.observacao)
-        
+
         if (existingIndex >= 0) {
           newCart[existingIndex] = {
             ...newCart[existingIndex],
@@ -327,7 +294,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
       return newCart
     })
-    
+
     setSelectedProduct(null)
     setSearchTerm('')
   }
@@ -369,13 +336,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
-  const grandTotal = useMemo(() => {
-    const cartTotal = cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
-    const submittedTotal = submittedItems
-      .filter(item => item.status !== 'CANCELADO')
-      .reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
-    return cartTotal + submittedTotal
-  }, [cart, submittedItems])
+  const cartTotal = useMemo(() => {
+    return cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
+  }, [cart])
 
   const submittedGroups = useMemo(() => {
     const groups: { [key: string]: SubmittedItem & { quantidade: number } } = {}
@@ -390,311 +353,286 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     return Object.values(groups)
   }, [submittedItems])
 
+
+
   if (loading) {
     return <div className="p-8 text-center">Carregando cardápio...</div>
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-black">Mesa {mesaId}</h1>
-            <div className="flex items-center gap-4">
-              {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
-                <button 
-                  onClick={() => setShowTransferModal(true)}
-                  className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-200 transition-colors"
-                  title="Trocar de Mesa"
-                >
-                  <ArrowRightLeft size={20} />
-                  <span className="hidden sm:inline">Trocar Mesa</span>
-                </button>
-              )}
-              <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
-                <span>←</span> Voltar ao Início
-              </Link>
-            </div>
-          </div>
-
-          {tableStatus === 'FECHAMENTO' && (
-            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm flex items-center justify-between">
-              <div>
-                <p className="font-bold">🔒 Conta em Fechamento</p>
-                <p className="text-sm">Não é possível adicionar novos itens. Solicite a reabertura no mapa de mesas se necessário.</p>
-              </div>
-            </div>
-          )}
-
-          {/* Categories */}
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-6">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-20">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold text-gray-900">Mesa {mesaId}</h1>
+          {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
             <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-4 py-2 rounded-full font-bold whitespace-nowrap transition-colors ${
-                selectedCategory === 'all'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
+              onClick={() => setShowTransferModal(true)}
+              className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-200 transition-colors"
+              title="Trocar de Mesa"
             >
-              Todos
+              <ArrowRightLeft size={18} />
+              <span className="hidden sm:inline">Trocar Mesa</span>
             </button>
-            {categories.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id.toString())}
-                className={`px-4 py-2 rounded-full font-bold whitespace-nowrap transition-colors ${
-                  selectedCategory === cat.id.toString()
+          )}
+        </div>
+        <Link href="/" className="text-orange-500 font-medium hover:underline flex items-center gap-1">
+          ← Voltar ao Início
+        </Link>
+      </header>
+
+      {tableStatus === 'FECHAMENTO' && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mx-6 mt-4 rounded shadow-sm flex items-center justify-between">
+          <div>
+            <p className="font-bold">🔒 Conta em Fechamento</p>
+            <p className="text-sm">Não é possível adicionar novos itens. Solicite a reabertura no mapa de mesas se necessário.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content - Two Columns */}
+      <main className="flex-1 overflow-hidden">
+        <div className="h-full flex flex-col lg:flex-row p-6 gap-6">
+
+          {/* Left Side - Comanda + Produtos */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+
+            {/* Comanda Section */}
+            <section className="mb-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <CheckCircle2 className="text-green-500" size={24} />
+                Comanda
+              </h2>
+
+              {submittedGroups.length === 0 ? (
+                <div className="p-8 text-center bg-white rounded-xl border border-gray-200 text-gray-400">
+                  Nenhum item lançado nesta mesa.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {submittedGroups.map((group, idx) => {
+                    const originalProduct = allProducts.find(p => p.nome === group.nome)
+
+                    return (
+                      <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between min-h-[100px]">
+                        <div>
+                          <h3 className="font-bold text-sm text-gray-900 line-clamp-2 leading-tight">{group.nome}</h3>
+                          {group.observacao && (
+                            <p className="text-xs text-gray-500 mt-1">{group.observacao}</p>
+                          )}
+                        </div>
+
+                        <div className="flex items-end justify-between mt-3">
+                          <span className="font-bold text-base text-gray-900">R$ {group.preco.toFixed(2).replace('.', ',')}</span>
+                          {originalProduct && originalProduct.ativo !== false ? (
+                            <button
+                              onClick={() => addToCart(originalProduct)}
+                              className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center hover:bg-orange-200 transition-colors"
+                              title="Adicionar mais um"
+                            >
+                              <PlusCircle size={20} />
+                            </button>
+                          ) : (
+                            <span className="text-xs text-red-400">Indisponível</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* Produtos Section */}
+            <section className="flex-1 overflow-hidden flex flex-col">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Produtos</h2>
+
+              {/* Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
+                  className="w-full p-3 pl-12 rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 bg-white placeholder-gray-400"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={tableStatus === 'FECHAMENTO'}
+                />
+              </div>
+
+              {/* Categories Filter */}
+              <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
+                <button
+                  onClick={() => setSelectedCategory('all')}
+                  className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-colors text-sm ${selectedCategory === 'all'
                     ? 'bg-orange-500 text-white'
                     : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                }`}
-              >
-                {cat.nome}
-              </button>
-            ))}
-          </div>
-
-          {/* Section 1: Comanda (Submitted Items) */}
-          <div className="mb-8">
-             <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-2">
-               <CheckCircle2 className="text-green-500" size={24} /> Comanda
-             </h2>
-             
-             {submittedGroups.length === 0 ? (
-               <div className="p-8 text-center bg-white rounded-xl border border-gray-100 text-gray-400">
-                 Nenhum item lançado nesta mesa.
-               </div>
-             ) : (
-               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                 {/* Submitted Items Grouped */}
-                 {submittedGroups.map((group, idx) => {
-                    // Try to find original product to enable "Add" button
-                    const originalProduct = allProducts.find(p => p.nome === group.nome)
-                    
-                    return (
-                     <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-[120px] relative">
-                       <div className="w-full">
-                         <div className="flex justify-between items-start">
-                           <h3 className="font-bold text-sm text-gray-900 text-left line-clamp-2 leading-tight">{group.nome}</h3>
-                           <span className="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                             {group.quantidade}x
-                           </span>
-                         </div>
-                         {originalProduct && (
-                           <p className="text-xs text-gray-500 mt-1 text-left">{originalProduct.setor}</p>
-                         )}
-                       </div>
-                       
-                       <div className="flex items-end justify-between w-full mt-2">
-                         <span className="font-bold text-lg text-black">R$ {group.preco.toFixed(2).replace('.', ',')}</span>
-                         {originalProduct && !originalProduct.ativo && (
-                            <span className="text-xs text-red-400">Indisponível</span>
-                         )}
-                         {originalProduct && originalProduct.ativo !== false && (
-                           <button 
-                             onClick={() => addToCart(originalProduct)}
-                             className="text-orange-500 hover:scale-110 transition-transform"
-                             title="Adicionar mais um"
-                           >
-                              <PlusCircle size={24} />
-                           </button>
-                         )}
-                       </div>
-                     </div>
-                    )
-                 })}
-               </div>
-             )}
-          </div>
-
-          <hr className="my-8 border-gray-200" />
-
-          {/* Section 2: Produtos (Menu) */}
-          <div className="mb-8">
-            <h2 className="text-lg font-bold text-black mb-4">Produtos</h2>
-            
-            {/* Search Bar */}
-            <div className="mb-6 relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Buscar produto (ex: Cerveja, Moqueca)..."
-                className="w-full p-4 pl-12 text-lg rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-black bg-white placeholder-gray-400"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={tableStatus === 'FECHAMENTO'}
-              />
-            </div>
-
-            {/* Product Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredProducts.map(produto => {
-                const isInactive = produto.ativo === false
-                return (
-                  <button
-                    key={produto.id}
-                    onClick={() => !isInactive && addToCart(produto)}
-                    disabled={isInactive}
-                    className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between h-[120px] relative group transition-all ${
-                      isInactive ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'hover:border-orange-500 hover:shadow-md'
                     }`}
+                >
+                  Todos
+                </button>
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id.toString())}
+                    className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-colors text-sm ${selectedCategory === cat.id.toString()
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                      }`}
                   >
-                    <div className="w-full">
-                      <h3 className="font-bold text-sm text-gray-900 text-left line-clamp-2 leading-tight">{produto.nome}</h3>
-                      <p className="text-xs text-gray-500 mt-1 text-left">{produto.setor}</p>
-                    </div>
-                    
-                    <div className="flex items-end justify-between w-full mt-2">
-                      <span className="font-bold text-lg text-black">R$ {produto.preco.toFixed(2).replace('.', ',')}</span>
-                      {!isInactive && (
-                        <div className="text-orange-500">
-                           <PlusCircle size={24} />
-                        </div>
-                      )}
-                    </div>
+                    {cat.nome}
                   </button>
-                )
-              })}
-              {filteredProducts.length === 0 && (
-                 <div className="col-span-full text-center py-8 text-gray-500">
-                   Nenhum produto encontrado.
-                 </div>
-              )}
-            </div>
-            
-        </div>
-      </div>
-
-      {/* Right Column - Order Summary (Unified) */}
-      <div className="w-[400px] bg-white border-l border-gray-200 flex flex-col h-full shadow-xl z-10">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-          <div className="flex items-center gap-2">
-            <ListOrdered className="text-orange-500" size={20} />
-            <h2 className="font-bold text-lg text-black">Pedido Atual <span className="text-gray-400 text-sm font-normal">({cart.length})</span></h2>
-          </div>
-          <div className="bg-gray-200 px-2 py-1 rounded text-xs font-bold text-gray-700">
-             Total: R$ {grandTotal.toFixed(2).replace('.', ',')}
-          </div>
-        </div>
-
-        {/* Unified List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30">
-          {/* Cart Items (Pending) */}
-          {cart.map((item, index) => (
-            <div key={`cart-${index}`} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm relative group">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
-                  <Clock size={10} />
-                  --:--
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide bg-yellow-100 text-yellow-700">
-                  PENDENTE
-                </span>
+                ))}
               </div>
-              
-              <div className="flex items-start gap-2 mb-2">
-                <span className="text-orange-600 font-bold text-sm">{item.quantidade}x</span>
-                <div className="flex-1">
-                  <span className="font-bold text-gray-900 text-sm block leading-tight">{item.nome}</span>
-                  {item.observacao && (
-                    <span className="text-xs text-gray-500 block mt-0.5">{item.observacao}</span>
+
+              {/* Product Grid */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 pb-4">
+                  {filteredProducts.map(produto => {
+                    const isInactive = produto.ativo === false
+                    return (
+                      <button
+                        key={produto.id}
+                        onClick={() => !isInactive && addToCart(produto)}
+                        disabled={isInactive || tableStatus === 'FECHAMENTO'}
+                        className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between min-h-[100px] text-left transition-all ${isInactive || tableStatus === 'FECHAMENTO'
+                          ? 'opacity-60 cursor-not-allowed bg-gray-50'
+                          : 'hover:border-orange-500 hover:shadow-md'
+                          }`}
+                      >
+                        <div>
+                          <h3 className="font-bold text-sm text-gray-900 line-clamp-2 leading-tight">{produto.nome}</h3>
+                          <p className="text-xs text-gray-500 mt-1">{produto.setor}</p>
+                        </div>
+
+                        <div className="flex items-end justify-between mt-3">
+                          <span className="font-bold text-base text-gray-900">R$ {produto.preco.toFixed(2).replace('.', ',')}</span>
+                          {!isInactive && tableStatus !== 'FECHAMENTO' && (
+                            <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center">
+                              <PlusCircle size={20} />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-gray-500">
+                      Nenhum produto encontrado.
+                    </div>
                   )}
                 </div>
               </div>
+            </section>
+          </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-2">
-                <span className="font-bold text-sm text-gray-900">R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
-                <button 
-                  onClick={() => removeFromCart(index)}
-                  className="text-gray-300 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
+          {/* Right Side - Pedido Atual */}
+          <aside className="w-full lg:w-[380px] bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-[600px] lg:h-auto">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl">
+              <div className="flex items-center gap-2">
+                <ListOrdered className="text-orange-500" size={20} />
+                <h2 className="font-bold text-lg text-gray-900">
+                  Pedido Atual <span className="text-gray-400 text-sm font-normal">({cart.length})</span>
+                </h2>
+              </div>
+              <div className="bg-gray-200 px-2 py-1 rounded text-xs font-bold text-gray-700">
+                Total: R$ {cartTotal.toFixed(2).replace('.', ',')}
               </div>
             </div>
-          ))}
 
-          {/* Submitted Items */}
-          {submittedItems.map((item, index) => {
-             if (item.status === 'CANCELADO') return null; // Don't show cancelled items in main list or show with strikethrough? Reference image doesn't show cancelled.
-             
-             // Extract option
-             let displayName = item.nome
-             let displayObs = item.observacao || ''
-             const optionMatch = displayObs.match(/^\(\s*(.+?)\s*\)\s*(.*)/)
-             if (optionMatch) {
-               displayName += ` ( ${optionMatch[1]} )`
-               displayObs = optionMatch[2]
-             }
+            {/* Items List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {cart.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  Selecione produtos do cardápio para adicionar ao pedido.
+                </div>
+              ) : (
+                cart.map((item, index) => {
+                  // Extract option from observation for display
+                  let displayName = item.nome
+                  let displayObs = item.observacao || ''
+                  const optionMatch = displayObs.match(/^\(\s*(.+?)\s*\)\s*(.*)/)
+                  if (optionMatch) {
+                    displayName += ` ( ${optionMatch[1]} )`
+                    displayObs = optionMatch[2]
+                  }
 
-             return (
-              <div key={`submitted-${item.id}-${index}`} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm relative group">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
-                    <Clock size={10} />
-                    {item.horario}
-                  </span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
-                         item.status === 'EM_PREPARO' ? 'bg-green-100 text-green-700' :
-                         item.status === 'PRONTO' ? 'bg-green-100 text-green-700' :
-                         'bg-gray-100 text-black'
-                       }`}>
-                    {item.status === 'EM_PREPARO' ? 'COZINHA' : item.status}
-                  </span>
-                </div>
-                
-                <div className="flex items-start gap-2 mb-2">
-                  <span className="text-orange-600 font-bold text-sm">{item.quantidade}x</span>
-                  <div className="flex-1">
-                    <span className="font-bold text-gray-900 text-sm block leading-tight">{displayName}</span>
-                    {displayObs && (
-                      <span className="text-xs text-gray-500 block mt-0.5">{displayObs}</span>
-                    )}
-                  </div>
-                </div>
+                  return (
+                    <div key={`cart-${index}`} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm relative">
+                      {/* Top row - pending status */}
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                          <Clock size={10} />
+                          --:--
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide bg-yellow-100 text-yellow-700">
+                          PENDENTE
+                        </span>
+                      </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-2">
-                  <span className="font-bold text-sm text-gray-900">R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
-                  <button 
-                    onClick={() => handleCancelItem(item.id)}
-                    className="text-gray-300 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-             )
-          })}
+                      {/* Content */}
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="text-orange-600 font-bold text-sm">{item.quantidade}x</span>
+                        <div className="flex-1">
+                          <span className="font-bold text-gray-900 text-sm block leading-tight">{displayName}</span>
+                          {displayObs && (
+                            <span className="text-xs text-gray-500 block mt-0.5">{displayObs}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bottom row - price and action */}
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-2">
+                        <span className="font-bold text-sm text-gray-900">R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
+                        <button
+                          onClick={() => removeFromCart(index)}
+                          className="text-gray-300 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Dark Mode Toggle */}
+            <button className="absolute bottom-24 right-6 lg:bottom-6 lg:right-6 w-10 h-10 bg-gray-800 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-700 transition-colors z-10">
+              <Moon size={18} />
+            </button>
+          </aside>
         </div>
+      </main>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-gray-200 bg-white">
-          <div className="flex items-center justify-between mb-4">
-             <span className="text-gray-500 font-medium">Total:</span>
-             <span className="text-2xl font-bold text-green-600">R$ {grandTotal.toFixed(2).replace('.', ',')}</span>
+      {/* Footer - Fixed Bottom Bar */}
+      <footer className="bg-white border-t border-gray-200 px-6 py-4 sticky bottom-0 z-20">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 font-medium">Total:</span>
+            <span className="text-2xl font-bold text-green-600">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
           </div>
-          
-          <div className="flex gap-3">
-             <button 
-               onClick={() => setCart([])}
-               disabled={cart.length === 0}
-               className="px-4 py-3 text-gray-500 font-bold hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-             >
-               Limpar
-             </button>
-             <button 
-               onClick={submitOrder}
-               disabled={cart.length === 0 || submitting}
-               className="flex-1 bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-             >
-               {submitting ? 'Enviando...' : `Enviar Pedido (${cart.length})`}
-               {!submitting && <Rocket size={20} />}
-             </button>
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setCart([])}
+              disabled={cart.length === 0}
+              className="px-4 py-3 text-gray-500 font-bold hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Limpar
+            </button>
+            <button
+              onClick={submitOrder}
+              disabled={cart.length === 0 || submitting}
+              className="bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            >
+              {submitting ? 'Enviando...' : `Enviar Pedido (${cart.length})`}
+              {!submitting && <Rocket size={20} />}
+            </button>
           </div>
         </div>
-      </div>
-    </div>
+      </footer>
 
       {/* Modals */}
       {selectedProduct && (
@@ -706,26 +644,24 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         />
       )}
 
-
-
       {showTransferModal && (
         createPortal(
           <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
               <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-xl font-bold">Trocar Mesa</h2>
+                <h2 className="text-xl font-bold text-gray-900">Trocar Mesa</h2>
                 <button onClick={() => setShowTransferModal(false)} className="text-gray-400 hover:text-gray-600">
                   <X size={24} />
                 </button>
               </div>
-              
+
               <div className="p-6">
                 <p className="mb-4 text-gray-600">Selecione a mesa para onde deseja transferir:</p>
-                
+
                 {isTransferring ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
-                    <p>Transferindo...</p>
+                    <p className="text-gray-600">Transferindo...</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-3 max-h-60 overflow-y-auto">
@@ -733,11 +669,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                       <button
                         key={table.id}
                         onClick={() => setTargetTableId(table.id)}
-                        className={`p-3 rounded-lg border-2 font-bold transition-all ${
-                          targetTableId === table.id
-                            ? 'border-orange-500 bg-orange-50 text-orange-700'
-                            : 'border-gray-200 hover:border-orange-200 text-gray-700'
-                        }`}
+                        className={`p-3 rounded-lg border-2 font-bold transition-all ${targetTableId === table.id
+                          ? 'border-orange-500 bg-orange-50 text-orange-700'
+                          : 'border-gray-200 hover:border-orange-200 text-gray-700'
+                          }`}
                       >
                         Mesa {table.numero}
                       </button>
@@ -767,38 +702,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         )
       )}
 
-      {showCancelModal && (
-        createPortal(
-          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-              <div className="p-6 text-center">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
-                  <X size={32} />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Cancelar Item?</h3>
-                <p className="text-gray-500 mb-6">
-                  Tem certeza que deseja cancelar este item? Essa ação não pode ser desfeita.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowCancelModal(false)}
-                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
-                  >
-                    Não
-                  </button>
-                  <button
-                    onClick={confirmCancelItem}
-                    className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-200"
-                  >
-                    Sim, Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )
-      )}
     </div>
   )
 }
