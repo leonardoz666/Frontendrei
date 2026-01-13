@@ -213,7 +213,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     const term = normalize(searchTerm)
 
-    let result = allProducts.filter(p => {
+    const result = allProducts.filter(p => {
       const matchesSearch = normalize(p.nome).includes(term)
       const matchesCategory = selectedCategory === 'all' || p.categoriaId.toString() === selectedCategory
       return matchesSearch && matchesCategory

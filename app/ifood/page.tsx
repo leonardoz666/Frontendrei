@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ShoppingBag, RefreshCw, Check, X, Clock, MapPin, Phone, Receipt } from 'lucide-react'
-import { useToast } from '@/contexts/ToastContext'
+import { ShoppingBag, RefreshCw, Check, X, MapPin, Phone } from 'lucide-react'
 
 type IfoodItem = {
   name: string
@@ -30,13 +29,11 @@ type IfoodOrder = {
 export default function IfoodPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [orders, setOrders] = useState<IfoodOrder[]>([])
-  const [polling, setPolling] = useState(false)
   const [isClient, setIsClient] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Custom Toast (simple alert replacement)
-  const showToast = (msg: string, type: 'success' | 'error') => {
-    // Simple implementation or verify if ToastContext is available globally
+  const showToast = (msg: string) => {
     console.log(msg)
     // We can use native notification
     if ("Notification" in window && Notification.permission === "granted") {
@@ -46,23 +43,51 @@ export default function IfoodPage() {
 
   useEffect(() => {
     setIsClient(true)
-    const stored = localStorage.getItem('ifood_connected')
-    if (stored === 'true') {
-      setIsConnected(true)
-      startPolling()
-    }
+    audioRef.current = new Audio('/sounds/new-order.mp3')
 
     // Request notification permission
     if ("Notification" in window) {
       Notification.requestPermission()
     }
 
-    audioRef.current = new Audio('/sounds/new-order.mp3')
+    // Check initial connection
+    if (localStorage.getItem('ifood_connected') === 'true') {
+      setIsConnected(true)
+    }
   }, [])
 
-  const startPolling = () => {
-    setPolling(true)
-    // Simulate incoming orders every 30-60 seconds
+  // Polling Effect
+  useEffect(() => {
+    if (!isConnected) return
+
+    const simulateNewOrder = () => {
+      const newOrder: IfoodOrder = {
+        id: Math.random().toString(36).substr(2, 9),
+        displayId: `#${Math.floor(Math.random() * 9999)}`,
+        createdAt: new Date().toISOString(),
+        customer: {
+          name: ['João Silva', 'Maria Oliveira', 'Pedro Santos', 'Ana Costa'][Math.floor(Math.random() * 4)],
+          phone: '(11) 99999-9999'
+        },
+        delivery: {
+          address: 'Rua das Flores, 123 - Centro'
+        },
+        items: [
+          { name: 'X-Tudo', quantity: 1, price: 25.0, options: ['Sem cebola'] },
+          { name: 'Coca-Cola Lata', quantity: 1, price: 6.0 }
+        ],
+        total: 31.0,
+        status: 'PENDING'
+      }
+
+      setOrders(prev => {
+        // Play sound if new order
+        audioRef.current?.play().catch(() => { })
+        return [newOrder, ...prev]
+      })
+    }
+
+    // Simulate incoming orders every 15 seconds
     const interval = setInterval(() => {
       if (Math.random() > 0.7) { // 30% chance per tick
         simulateNewOrder()
@@ -70,61 +95,25 @@ export default function IfoodPage() {
     }, 15000)
 
     return () => clearInterval(interval)
-  }
-
-  const simulateNewOrder = () => {
-    const newOrder: IfoodOrder = {
-      id: Math.random().toString(36).substr(2, 9),
-      displayId: `#${Math.floor(Math.random() * 9999)}`,
-      createdAt: new Date().toISOString(),
-      customer: {
-        name: ['João Silva', 'Maria Oliveira', 'Pedro Santos', 'Ana Costa'][Math.floor(Math.random() * 4)],
-        phone: '(11) 99999-9999'
-      },
-      delivery: {
-        address: 'Rua das Flores, 123 - Centro'
-      },
-      items: [
-        { name: 'X-Tudo', quantity: 1, price: 25.0, options: ['Sem cebola'] },
-        { name: 'Coca-Cola Lata', quantity: 1, price: 6.0 }
-      ],
-      total: 31.0,
-      status: 'PENDING'
-    }
-
-    setOrders(prev => {
-      // Play sound if new order
-      audioRef.current?.play().catch(() => { })
-      return [newOrder, ...prev]
-    })
-  }
+  }, [isConnected])
 
   const handleConnect = () => {
     setIsConnected(true)
     localStorage.setItem('ifood_connected', 'true')
-    startPolling()
   }
 
   const handleDisconnect = () => {
     setIsConnected(false)
-    setPolling(false)
     localStorage.removeItem('ifood_connected')
   }
 
   const handleAccept = async (order: IfoodOrder) => {
-    // 1. Create order in system (Mesa 99 for delivery)
-    // In a real scenario, we would map products. Here we mock success.
-
-    // Simulate API call to create order
     try {
-      // Here we could call /api/orders with mock items
-      // For now, just update UI
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'ACCEPTED' } : o))
-      showToast(`Pedido ${order.displayId} aceito e enviado para cozinha!`, 'success')
-
-      // Try to print (simulated by triggering backend logic if we implemented order creation)
+      showToast(`Pedido ${order.displayId} aceito e enviado para cozinha!`)
     } catch (e) {
-      showToast('Erro ao aceitar pedido', 'error')
+      console.error(e)
+      showToast('Erro ao aceitar pedido')
     }
   }
 
