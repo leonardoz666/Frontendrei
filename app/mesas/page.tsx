@@ -140,7 +140,6 @@ export default function MesasPage() {
 
     socket.on('tables-updated', handleUpdate)
     socket.on('table:updated', handleUpdate)
-    socket.on('new-kitchen-order', handleUpdate) // New order might change table status
 
     return () => {
       socket.disconnect()

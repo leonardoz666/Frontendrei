@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import Image from 'next/image'
 import { ImageIcon, Wine, Utensils, Trash2 } from 'lucide-react'
 
@@ -32,6 +32,8 @@ interface ProductCardProps {
 }
 
 export const ProductCard = memo(function ProductCard({ prod, onEdit, onDelete }: ProductCardProps) {
+  const [imageError, setImageError] = useState(false)
+
   return (
     <div 
       className={`group relative flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors shadow-sm ${!prod.ativo ? 'opacity-60 grayscale' : ''}`}
@@ -48,7 +50,7 @@ export const ProductCard = memo(function ProductCard({ prod, onEdit, onDelete }:
             </span>
           </div>
         )}
-        {prod.foto ? (
+        {prod.foto && !imageError ? (
           <Image 
             src={prod.foto} 
             alt={prod.nome} 
@@ -56,7 +58,8 @@ export const ProductCard = memo(function ProductCard({ prod, onEdit, onDelete }:
             sizes="(max-width: 640px) 25vw, (max-width: 768px) 20vw, (max-width: 1024px) 16vw, 12vw"
             className="object-cover" 
             loading="lazy"
-            unoptimized={prod.foto.startsWith('data:')} // Only unoptimize base64
+            unoptimized={prod.foto.startsWith('/uploads') || prod.foto.startsWith('data:')}
+            onError={() => setImageError(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">

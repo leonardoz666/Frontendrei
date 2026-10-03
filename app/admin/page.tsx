@@ -5,19 +5,11 @@ import {
   UtensilsCrossed, 
   Users, 
   Tags, 
-  Printer,
-  ChefHat
+  Printer
 } from 'lucide-react'
 
 export default function AdminDashboard() {
   const adminLinks = [
-    {
-      href: '/cozinha',
-      label: 'Cozinha',
-      description: 'Visualizar pedidos da cozinha',
-      icon: ChefHat,
-      color: 'bg-red-500'
-    },
     {
       href: '/admin/produtos',
       label: 'Produtos',

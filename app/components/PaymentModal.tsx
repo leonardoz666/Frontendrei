@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { X, CreditCard, Smartphone, Banknote, Calculator, Check, Loader2, Users, Receipt } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, CreditCard, Smartphone, Banknote, Calculator, Check, Loader2, Users, Receipt, AlertCircle } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { useToast } from '@/contexts/ToastContext'
 
 type PaymentMethod = 'DINHEIRO' | 'PIX' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO'
 
@@ -24,26 +25,25 @@ interface PaymentModalProps {
 }
 
 export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuccess, items = [] }: PaymentModalProps) {
+    const { showToast } = useToast()
     const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null)
     const [amountPaid, setAmountPaid] = useState('')
     const [splitCount, setSplitCount] = useState(1)
     const [processing, setProcessing] = useState(false)
+    const [pagoParcialInfo, setPagoParcialInfo] = useState<{ saldoRestante: number; pagoAteAgora: number } | null>(null)
 
-    // Split Mode: 'PEOPLE' | 'ITEMS'
     const [splitMode, setSplitMode] = useState<'PEOPLE' | 'ITEMS'>('PEOPLE')
-    // Selected items for 'ITEMS' mode. Stores item ID.
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string | number>>(new Set())
 
-    // Calculate totals based on mode
     const calculateTotals = () => {
+        const rawFullTotal = total
+        const serviceFeeFull = rawFullTotal * 0.10
+        const fullFinalTotal = rawFullTotal + serviceFeeFull
+
         if (splitMode === 'PEOPLE') {
-            const rawTotal = total
-            const serviceFee = rawTotal * 0.10
-            const finalTotal = rawTotal + serviceFee
-            const perPerson = finalTotal / splitCount
-            return { rawTotal, serviceFee, finalTotal, perPerson }
+            const perPerson = fullFinalTotal / splitCount
+            return { rawTotal: rawFullTotal, serviceFee: serviceFeeFull, finalTotal: fullFinalTotal, perPerson }
         } else {
-            // ITEMS mode
             let itemsTotal = 0
             items.forEach(item => {
                 if (selectedItemIds.has(item.id)) {
@@ -52,40 +52,13 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
             })
             const serviceFee = itemsTotal * 0.10
             const finalTotal = itemsTotal + serviceFee
-            return { rawTotal: itemsTotal, serviceFee, finalTotal, perPerson: finalTotal }
+            return { rawTotal: itemsTotal, serviceFee, finalTotal, perPerson: finalTotal, fullFinalTotal }
         }
     }
 
-    const { rawTotal, serviceFee, finalTotal, perPerson } = calculateTotals()
-
-    // For cash change calculation
-    // If Mode is People -> Payment is usually the full amount or per person?
-    // Usually "Close Bill" implies paying everything. 
-    // BUT the user wants "Divisão de Conta".
-    // If I select items, I am paying ONLY those items?
-    // The current backend endpoint CLOSES the table and expects the FULL amount.
-    // If we send partial amount, backend might complain or close incorrectly.
-    // Current backend logic: total is updated to 'valor'.
-
-    // IMPORTANT: Since backend closes the table, we should only allow "Confirm Payment" if it's the FULL amount
-    // OR if we assume this is just a calculator and the final payment is manual.
-    // OR if we treat this as "Partial Payment" (requires backend change).
-
-    // For now, to satisfy the requirement "Dividir conta", we will treat this as a CALCULATOR.
-    // The user calculates what each person pays, charges them externally, and then uses the "Full Payment" to close in the system.
-    // However, the button says "Confirmar Pagamento".
-
-    // Let's assume for now we always send the FULL TOTAL to backend to close the table,
-    // and this modal is helping the waiter charge 5 people separately before clicking "Confirm".
-    // But that's confusing UI.
-
-    // Wait, if I select items, the "Total" display changes. If I click confirm, it sends THAT amount.
-    // If I send partial amount to backend, the table closes with partial value. The revenue will be wrong.
-
-    // Workaround: We will maintain the UI as requested.
-    // If Payment is partial (Mode ITEMS and selected < all, OR Mode PEOPLE), 
-    // we should warn "Isso fechará a mesa com o valor parcial" or ideally implement partial payment.
-    // Given constraints, I will add a visual "Calculadora" aspect.
+    const totals = calculateTotals()
+    const { rawTotal, serviceFee, finalTotal, perPerson } = totals
+    const fullFinalTotal = ('fullFinalTotal' in totals) ? totals.fullFinalTotal : (total * 1.1)
 
     const change = amountPaid ? parseFloat(amountPaid) - (splitMode === 'PEOPLE' ? perPerson : finalTotal) : 0
 
@@ -99,13 +72,7 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
     const handleConfirmPayment = async () => {
         if (!selectedMethod) return
 
-        // If performing partial calculation (Items or Person), we warn or just proceed?
-        // Let's proceed. The backend records "Valor Pago".
-
         const valueToPay = splitMode === 'PEOPLE' && splitCount > 1 ? perPerson : finalTotal
-
-        // Warn if full amount is not covered? 
-        // For simplicity in this iteration, we allow closing.
 
         setProcessing(true)
         try {
@@ -115,18 +82,33 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                 body: JSON.stringify({
                     tipo: selectedMethod,
                     valor: valueToPay,
-                    // Note: If this is partial, table closes with partial value. 
-                    // Ideally we should process N payments.
                     troco: selectedMethod === 'DINHEIRO' ? Math.max(0, change) : 0
                 })
             })
 
+            const data = await res.json().catch(() => ({}))
+
             if (res.ok) {
-                onSuccess()
-                onClose()
+                if (data.fechado) {
+                    showToast('Conta fechada com sucesso!', 'success')
+                    onSuccess()
+                    onClose()
+                } else {
+                    showToast(`Pagamento de R$ ${valueToPay.toFixed(2)} registrado! Restam R$ ${(data.saldoRestante || 0).toFixed(2)}`, 'success')
+                    setPagoParcialInfo({
+                        saldoRestante: data.saldoRestante || 0,
+                        pagoAteAgora: data.pagoAteAgora || valueToPay
+                    })
+                    setSelectedItemIds(new Set())
+                    setAmountPaid('')
+                    setSelectedMethod(null)
+                }
+            } else {
+                showToast(data.error || 'Erro ao processar pagamento. Verifique o valor.', 'error')
             }
         } catch (error) {
             console.error('Error processing payment:', error)
+            showToast('Erro de conexão. Tente novamente.', 'error')
         } finally {
             setProcessing(false)
         }
@@ -142,6 +124,17 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
     }
 
     const quickAmounts = [10, 20, 50, 100, 200]
+
+    useEffect(() => {
+        if (isOpen) {
+            setPagoParcialInfo(null)
+            setSelectedMethod(null)
+            setAmountPaid('')
+            setSelectedItemIds(new Set())
+            setSplitCount(1)
+            setSplitMode('PEOPLE')
+        }
+    }, [isOpen])
 
     if (!isOpen) return null
 
@@ -242,6 +235,29 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                                         Selecione itens para calcular o valor parcial.
                                     </p>
                                 )}
+                            </div>
+                        )}
+
+                        {pagoParcialInfo && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+                                <AlertCircle size={22} className="text-blue-600 shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="font-bold text-blue-800 mb-1">Pagamento Parcial Registrado</p>
+                                    <div className="space-y-1 text-sm text-blue-700">
+                                        <div className="flex justify-between">
+                                            <span>Total da Conta:</span>
+                                            <span className="font-bold">R$ {fullFinalTotal.toFixed(2).replace('.', ',')}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Pago até agora:</span>
+                                            <span className="font-bold text-green-700">R$ {pagoParcialInfo.pagoAteAgora.toFixed(2).replace('.', ',')}</span>
+                                        </div>
+                                        <div className="flex justify-between border-t border-blue-200 pt-1 mt-1">
+                                            <span className="font-semibold">Saldo Restante:</span>
+                                            <span className="font-bold text-red-700">R$ {pagoParcialInfo.saldoRestante.toFixed(2).replace('.', ',')}</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -368,7 +384,13 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                         ) : (
                             <>
                                 <Check size={20} />
-                                {splitMode === 'ITEMS' && selectedItemIds.size < items.length ? 'Pagar Parcial' : 'Fechar Conta'}
+                                {pagoParcialInfo
+                                    ? 'Continuar Pagamento'
+                                    : (splitMode === 'ITEMS' && selectedItemIds.size < items.length
+                                        ? 'Pagar Itens Selecionados'
+                                        : (splitMode === 'PEOPLE' && splitCount > 1
+                                            ? 'Pagar Por Pessoa'
+                                            : 'Fechar Conta'))}
                             </>
                         )}
                     </button>

@@ -9,7 +9,6 @@ import {
   Armchair,
   Receipt,
   ClipboardList,
-  ShoppingBag,
   Settings,
   UtensilsCrossed
 } from 'lucide-react'
@@ -95,8 +94,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { href: '/mesas', label: 'Mesas', icon: Armchair, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
     { href: '/mesas-abertas', label: 'Mesas Abertas', icon: ClipboardList, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
     { href: '/minhas-mesas', label: 'Minhas Mesas', icon: Users, roles: ['GARCOM', 'GERENTE', 'DONO'] },
-    { href: '/cozinha', label: 'Cozinha (KDS)', icon: UtensilsCrossed, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'] },
-    { href: '/ifood', label: 'iFood', icon: ShoppingBag, roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA'] },
     { href: '/admin', label: 'PAINEL', icon: Settings, roles: ['ADMIN', 'DONO'] },
   ]
 
