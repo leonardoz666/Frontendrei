@@ -96,6 +96,9 @@ export type NavIconName =
   | 'Settings'
   | 'UserCog'
   | 'Printer'
+  | 'Target'
+  | 'Warehouse'
+  | 'ListTree'
 
 export type NavShortcut = 'F7' | 'F8'
 
@@ -193,25 +196,40 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ['ADMIN', 'DONO', 'GERENTE'],
       },
       {
-        href: '/cadastros/clientes',
-        label: 'Clientes',
-        icon: 'Contact',
+        href: '/admin/centros-custo',
+        label: 'Centros de Custo',
+        icon: 'Target',
         permission: 'cadastros.visualizar',
-        disabled: true,
       },
       {
-        href: '/cadastros/formas-pagamento',
-        label: 'Formas de Pagamento',
-        icon: 'Wallet',
+        href: '/admin/contas-bancarias',
+        label: 'Contas Bancárias',
+        icon: 'Landmark',
         permission: 'cadastros.visualizar',
-        disabled: true,
       },
       {
-        href: '/cadastros/fornecedores',
+        href: '/admin/plano-contas',
+        label: 'Plano de Contas',
+        icon: 'ListTree',
+        permission: 'cadastros.visualizar',
+      },
+      {
+        href: '/admin/fornecedores',
         label: 'Fornecedores',
         icon: 'Truck',
         permission: 'cadastros.visualizar',
-        disabled: true,
+      },
+      {
+        href: '/admin/estoques',
+        label: 'Estoques',
+        icon: 'Warehouse',
+        permission: 'cadastros.visualizar',
+      },
+      {
+        href: '/admin/formas-pagamento',
+        label: 'Formas de Pagamento',
+        icon: 'Wallet',
+        permission: 'cadastros.visualizar',
       },
     ],
   },

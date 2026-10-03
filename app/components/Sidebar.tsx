@@ -19,6 +19,7 @@ import {
   History,
   Landmark,
   LayoutDashboard,
+  ListTree,
   LogOut,
   Package,
   PackageSearch,
@@ -31,12 +32,14 @@ import {
   Shield,
   Sparkles,
   Tags,
+  Target,
   Truck,
   UserCheck,
   UserCog,
   Users,
   UtensilsCrossed,
   Wallet,
+  Warehouse,
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -57,8 +60,7 @@ import {
 /** Nome de ícone (dado) -> componente lucide. O `Record` garante que nenhum nome fique sem ícone. */
 const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   LayoutDashboard,
-  ChartColumn,
-  Armchair,
+  ChartColumn,  Armchair,
   ClipboardList,
   Users,
   Tags,
@@ -85,6 +87,12 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   Settings,
   UserCog,
   Printer,
+  // Ícones exigidos pela árvore de navegação. Sem eles o `NAV_ICONS` resolveria
+  // para `undefined` e a Sidebar quebraria em runtime (o `tsc` não acusa, porque
+  // a árvore declara o nome como string).
+  Target,
+  Warehouse,
+  ListTree,
 }
 
 interface SidebarProps {

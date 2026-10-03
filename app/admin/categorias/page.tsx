@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { MoreVertical } from 'lucide-react'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
