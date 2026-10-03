@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
+import { Pagination } from '@/components/ui/Pagination'
 import { useToast } from '@/contexts/ToastContext'
 import Skeleton from '@/components/ui/Skeleton'
 import { ProductCard, Produto, Categoria } from '@/components/ProductCard'
+import { fetchList } from '@/app/lib/api'
+import { usePagedQuery, type SortOrder } from '@/app/lib/pagination'
 import { 
   ArrowLeft, 
   Plus, 
@@ -26,57 +29,90 @@ export default function ProdutosPage() {
   const queryClient = useQueryClient()
   const router = useRouter()
   
-  // Queries
-  const { data: produtos = [], isLoading: loadingProd } = useQuery<Produto[]>({
-    queryKey: ['products'],
-    queryFn: async () => {
-      console.log('[DEBUG] fetching products');
-      const res = await fetch('/api/products', { cache: 'no-store' })
-      console.log(`[DEBUG] products status: ${res.status}`);
-      if (res.status === 401) {
-        router.push('/login')
-        throw new Error('Unauthorized')
-      }
-      if (!res.ok) {
-        console.error(`[DEBUG] products fetch failed: ${res.status}`);
-        throw new Error('Erro ao buscar produtos')
-      }
-      return res.json()
-    }
+  // Paginação/busca/ordenação no SERVIDOR (DT-2). Antes a tela baixava a base
+  // inteira e filtrava no cliente, o que não escala para o cardápio real.
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sort, setSort] = useState<string | null>(null)
+  const [order, setOrder] = useState<SortOrder | null>(null)
+
+  const {
+    data: paginaProdutos,
+    isLoading: loadingProd,
+    refetch: refetchProdutos,
+  } = usePagedQuery<Produto>({
+    resource: '/products',
+    page,
+    pageSize,
+    search: searchTerm,
+    sort,
+    order,
   })
+
+  const produtos = paginaProdutos?.data ?? []
+  const meta = paginaProdutos?.meta ?? { page, pageSize, total: 0, totalPages: 0 }
+  const totalProdutos = meta.total
 
   const { data: categorias = [], isLoading: loadingCat } = useQuery<Categoria[]>({
     queryKey: ['categories'],
     queryFn: async () => {
-      console.log('[DEBUG] fetching categories');
-      const res = await fetch('/api/categories', { cache: 'no-store' })
-      console.log(`[DEBUG] categories status: ${res.status}`);
-      if (res.status === 401) {
-        router.push('/login')
-        throw new Error('Unauthorized')
-      }
-      if (!res.ok) {
-        console.error(`[DEBUG] categories fetch failed: ${res.status}`);
-        throw new Error('Erro ao buscar categorias')
-      }
-      return res.json()
+      // Lista completa de categorias: alimenta os selects do formulário e a
+      // importação, então precisa de TODAS, não de uma página.
+      return fetchList<Categoria>('/categories?page=1&pageSize=100')
     }
   })
 
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<number | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
   const [fixStatus, setFixStatus] = useState<string | null>(null)
-  
-  const handleFixSectors = async () => {
-    if (!confirm('Deseja corrigir automaticamente os setores (Cozinha/Bar) de todos os produtos baseados na categoria?')) return
+  const [confirmarFixSetores, setConfirmarFixSetores] = useState(false)
 
-    setFixStatus('Iniciando correção...')
+  /**
+   * Ação em LOTE sobre TODO o cardápio.
+   *
+   * Importante: com a listagem paginada, `produtos` contém só a página visível.
+   * Iterar sobre ela silenciosamente corrigiria 25 itens e daria a impressão de
+   * ter corrigido tudo — por isso a função busca a base completa de propósito
+   * (pageSize=100 em laço) antes de aplicar. É uma operação de manutenção, não
+   * uma ação por linha, então pagar o custo da leitura total aqui é correto.
+   */
+  const handleFixSectors = async () => {
+    setConfirmarFixSetores(false)
+    setFixStatus('Carregando todos os produtos...')
+
+    let todos: Produto[]
+    try {
+      todos = []
+      let pagina = 1
+      let total = Infinity
+      while (todos.length < total && pagina <= 50) {
+        const resposta = await fetch(`/api/products?page=${pagina}&pageSize=100&ativo=all`, {
+          cache: 'no-store',
+        })
+        if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`)
+        const corpo = (await resposta.json()) as {
+          data?: Produto[]
+          meta?: { total: number }
+        }
+        const lote = corpo.data ?? []
+        todos = todos.concat(lote)
+        total = corpo.meta?.total ?? lote.length
+        if (lote.length === 0) break
+        pagina += 1
+      }
+    } catch {
+      setFixStatus(null)
+      showToast('Falha ao carregar os produtos para a correção.', 'error')
+      return
+    }
+
+    setFixStatus(`Corrigindo setores de ${todos.length} produtos...`)
     let updated = 0
     let failed = 0
 
-    for (const p of produtos) {
+    for (const p of todos) {
         if (!p.categoria) continue
         
         let shouldBeDrink = false
@@ -129,6 +165,7 @@ export default function ProdutosPage() {
     if (failed > 0) showToast(`${failed} falhas durante a correção.`, 'warning')
     
     queryClient.invalidateQueries({ queryKey: ['products'] })
+    void refetchProdutos()
     setTimeout(() => setFixStatus(null), 5000)
   }
 
@@ -161,16 +198,9 @@ export default function ProdutosPage() {
     }
   }, [categorias, categoriaId, editingId])
 
-  const filteredProdutos = useMemo(() => {
-    const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    const term = normalize(searchTerm)
-    
-    if (!term) return produtos
-
-    return produtos.filter(p => {
-      return normalize(p.nome).includes(term)
-    })
-  }, [produtos, searchTerm])
+  // A busca agora é feita no SERVIDOR (dentro de `usePagedQuery`), com debounce de
+  // 300ms. O filtro client-side que existia aqui foi removido de propósito: ele
+  // só enxergava a página carregada e esconderia produtos das outras páginas.
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -229,6 +259,7 @@ export default function ProdutosPage() {
       showToast(editingId ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!', 'success')
       resetForm()
       queryClient.invalidateQueries({ queryKey: ['products'] })
+    void refetchProdutos()
     } catch (err) {
       console.error(err)
       setError('Erro ao salvar produto')
@@ -300,6 +331,7 @@ export default function ProdutosPage() {
         }
         
         queryClient.invalidateQueries({ queryKey: ['products'] })
+    void refetchProdutos()
         setDeleteConfirmationId(null)
       } catch (err) {
         console.error(err)
@@ -405,6 +437,7 @@ export default function ProdutosPage() {
       if (failed > 0) showToast(`${failed} itens falharam na importação.`, 'warning')
 
       queryClient.invalidateQueries({ queryKey: ['products'] })
+    void refetchProdutos()
       e.target.value = '' 
     } catch (err) {
       console.error(err)
@@ -459,8 +492,11 @@ export default function ProdutosPage() {
             <input
               type="text"
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Buscar..."
+              onChange={e => {
+                setSearchTerm(e.target.value)
+                setPage(1)
+              }}
+              placeholder="Buscar por nome..."
               className="w-full bg-gray-100 border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-gray-900 focus:ring-2 focus:ring-blue-600 outline-none text-sm placeholder:text-gray-500"
             />
           </div>
@@ -471,8 +507,8 @@ export default function ProdutosPage() {
             <Plus size={20} />
           </button>
           <button
-            onClick={handleFixSectors}
-            title="Auto-corrigir setores (Cozinha/Bar)"
+            onClick={() => setConfirmarFixSetores(true)}
+            title="Auto-corrigir setores (Cozinha/Bar) de TODO o cardápio"
             className="bg-white text-gray-700 font-bold p-2.5 rounded-xl flex items-center justify-center border border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform"
           >
             <Wand2 size={18} />
@@ -509,25 +545,105 @@ export default function ProdutosPage() {
         </div>
       )}
 
-      {/* Product List - UPDATED GRID (Smaller items) */}
-      <div className="p-4 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
-        {filteredProdutos.map((prod) => (
-          <ProductCard 
-            key={prod.id} 
-            prod={prod} 
-            onEdit={handleEdit} 
-            onDelete={setDeleteConfirmationId} 
-          />
-        ))}
-
-        {filteredProdutos.length === 0 && (
-          <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-500 gap-3">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-              <Search size={20} />
-            </div>
-            <p className="text-sm">Nenhum produto encontrado</p>
+      {/* Listagem: grade de cards, não DataTable.
+          Decisão: o cardápio é um catálogo VISUAL (foto do prato é o que o
+          operador reconhece), e o DataTable do padrão RF-UI-01 é uma tabela —
+          usá-lo aqui destruiria a informação da imagem. O que o padrão exige e
+          que foi adotado: paginação/busca/ordenação no servidor, contagem no
+          rodapé e seletor de itens por página. */}
+      <div className="p-4">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <label htmlFor="produtos-pagesize" className="whitespace-nowrap">
+              Exibir
+            </label>
+            <select
+              id="produtos-pagesize"
+              value={pageSize}
+              onChange={(evento) => {
+                setPageSize(Number(evento.target.value))
+                setPage(1)
+              }}
+              className="h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-800 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+            >
+              {[10, 25, 50, 100].map((valor) => (
+                <option key={valor} value={valor}>
+                  {valor}
+                </option>
+              ))}
+            </select>
+            <span className="whitespace-nowrap">resultados por página</span>
           </div>
-        )}
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="produtos-sort" className="sr-only">
+              Ordenar
+            </label>
+            <select
+              id="produtos-sort"
+              value={sort ? `${sort}:${order ?? 'asc'}` : ''}
+              onChange={(evento) => {
+                const valor = evento.target.value
+                if (!valor) {
+                  setSort(null)
+                  setOrder(null)
+                } else {
+                  const [campo, direcao] = valor.split(':')
+                  setSort(campo)
+                  setOrder(direcao as SortOrder)
+                }
+                setPage(1)
+              }}
+              className="h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-800 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="">Ordenar por…</option>
+              <option value="nome:asc">Nome (A–Z)</option>
+              <option value="nome:desc">Nome (Z–A)</option>
+              <option value="id:desc">Mais recentes primeiro</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+          {loadingProd &&
+            Array.from({ length: Math.min(pageSize, 20) }).map((_, indice) => (
+              <div key={`skeleton-${indice}`} className="flex flex-col gap-2">
+                <Skeleton className="aspect-square w-full" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            ))}
+
+          {!loadingProd &&
+            produtos.map((prod) => (
+              <ProductCard
+                key={prod.id}
+                prod={prod}
+                onEdit={handleEdit}
+                onDelete={setDeleteConfirmationId}
+              />
+            ))}
+
+          {!loadingProd && produtos.length === 0 && (
+            <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-500 gap-3">
+              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                <Search size={20} />
+              </div>
+              <p className="text-sm">
+                {searchTerm
+                  ? `Nenhum produto corresponde a "${searchTerm}"`
+                  : 'Nenhum produto cadastrado'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <Pagination
+          meta={meta}
+          onPageChange={setPage}
+          disabled={loadingProd}
+          itemLabel="produtos"
+          className="mt-4 rounded-xl border border-gray-200 bg-white"
+        />
       </div>
 
       {/* Modal Add/Edit Product */}
@@ -829,6 +945,19 @@ export default function ProdutosPage() {
         description="Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita."
         confirmText="Excluir"
         variant="danger"
+      />
+
+      {/* Aviso explícito: é operação de LOTE sobre o cardápio inteiro, não sobre a
+          página visível. Sem dizer isso, o operador poderia achar que corrigiu
+          apenas o que está na tela (ou pior, achar que corrigiu tudo quando não). */}
+      <ConfirmationModal
+        isOpen={confirmarFixSetores}
+        onClose={() => setConfirmarFixSetores(false)}
+        onConfirm={handleFixSectors}
+        title="Corrigir setores de produção?"
+        description={`Isto vai reprocessar TODO o cardápio (${totalProdutos} produtos), não apenas a página atual, e ajustar Cozinha/Bar de cada item com base no nome da categoria. Produtos de categorias não reconhecidas ficam como estão.`}
+        confirmText="Corrigir tudo"
+        variant="warning"
       />
     </div>
   )
