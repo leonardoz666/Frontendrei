@@ -1,206 +1,312 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
+import { Button } from '@/app/components/ui/Button'
+import { ConfirmationModal } from '@/app/components/ConfirmationModal'
+import { useToast } from '@/contexts/ToastContext'
+import { apiFetch } from '@/app/lib/api'
+import { usePagedQuery, type SortOrder } from '@/app/lib/pagination'
 
 type Categoria = {
   id: number
   nome: string
   setor: string
+  _count?: { produtos: number }
+  produtos?: Array<{ id: number }>
 }
 
+const SETORES = ['COZINHA', 'BAR', 'SOBREMESA'] as const
+
+const SETOR_BADGE: Record<string, string> = {
+  COZINHA: 'bg-orange-100 text-orange-800',
+  BAR: 'bg-blue-100 text-blue-800',
+  SOBREMESA: 'bg-purple-100 text-purple-800',
+}
+
+/**
+ * Migração para o padrão DataTable (RF-UI-01).
+ *
+ * O que mudou em relação à versão anterior:
+ * - paginação, busca e ordenação passaram a ser do SERVIDOR (antes a tela baixava
+ *   todas as categorias e filtrava no cliente);
+ * - a exclusão passou a usar o ConfirmationModal do projeto, no lugar do
+ *   `confirm()` nativo do browser;
+ * - formatação de erro e chamadas padronizadas por `lib/api.ts`.
+ */
 export default function CategoriasPage() {
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [loading, setLoading] = useState(true)
-  const [editingId, setEditingId] = useState<number | null>(null)
-  
-  // Form states
-  const [nome, setNome] = useState('')
-  const [setor, setSetor] = useState('COZINHA')
-  const [error, setError] = useState('')
-
   const router = useRouter()
+  const { showToast } = useToast()
 
-  const fetchCategorias = useCallback(async () => {
-    try {
-      const res = await fetch('/api/categories')
-      if (res.status === 401) {
-        router.push('/login')
-        return
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<string | null>(null)
+  const [order, setOrder] = useState<SortOrder | null>(null)
+
+  const [editing, setEditing] = useState<Categoria | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [nome, setNome] = useState('')
+  const [setor, setSetor] = useState<string>('COZINHA')
+  const [salvando, setSalvando] = useState(false)
+  const [paraExcluir, setParaExcluir] = useState<Categoria | null>(null)
+  const [excluindo, setExcluindo] = useState(false)
+
+  const { data, isLoading, isError, error, refetch } = usePagedQuery<Categoria>({
+    resource: '/categories',
+    page,
+    pageSize,
+    search,
+    sort,
+    order,
+  })
+
+  /**
+   * Envolve a chamada para centralizar toast + redirecionamento em 401, que é o
+   * padrão que as telas migradas devem seguir. O check de status é por forma
+   * (`status === 401`) para não acoplar a tela a um `instanceof` de classe.
+   */
+  const chamar = useCallback(
+    async <T,>(fn: () => Promise<T>, mensagemErro: string): Promise<T | null> => {
+      try {
+        return await fn()
+      } catch (err) {
+        const status = (err as { status?: number } | null)?.status
+        if (status === 401) {
+          router.push('/login')
+          return null
+        }
+        showToast(err instanceof Error ? err.message : mensagemErro, 'error')
+        return null
       }
-      if (!res.ok) throw new Error('Erro ao buscar categorias')
-      const data = await res.json()
-      setCategorias(data)
-    } catch (err) {
-      console.error(err)
-      setError('Falha ao carregar categorias')
-    } finally {
-      setLoading(false)
-    }
-  }, [router])
+    },
+    [router, showToast]
+  )
 
-  useEffect(() => {
-    fetchCategorias()
-  }, [fetchCategorias])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
-    try {
-      const url = editingId ? `/api/categories/${editingId}` : '/api/categories'
-      const method = editingId ? 'PUT' : 'POST'
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, setor })
-      })
-
-      if (!res.ok) throw new Error('Erro ao salvar categoria')
-
-      // Reset form
-      setNome('')
-      setSetor('COZINHA')
-      setEditingId(null)
-      fetchCategorias()
-    } catch (err) {
-      console.error(err)
-      setError('Erro ao salvar categoria')
-    }
-  }
-
-  const handleEdit = (cat: Categoria) => {
-    setEditingId(cat.id)
-    setNome(cat.nome)
-    setSetor(cat.setor)
-    setError('')
-  }
-
-  const handleCancel = () => {
-    setEditingId(null)
+  const abrirNova = () => {
+    setEditing(null)
     setNome('')
     setSetor('COZINHA')
-    setError('')
+    setShowForm(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir esta categoria?')) return
+  const abrirEdicao = (categoria: Categoria) => {
+    setEditing(categoria)
+    setNome(categoria.nome)
+    setSetor(categoria.setor)
+    setShowForm(true)
+  }
 
-    try {
-      const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Erro ao excluir')
-      fetchCategorias()
-    } catch (err) {
-      console.error(err)
-      setError('Erro ao excluir categoria')
+  const salvar = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setSalvando(true)
+    const editando = editing
+
+    const resultado = await chamar(
+      () =>
+        apiFetch(editando ? `/categories/${editando.id}` : '/categories', {
+          method: editando ? 'PUT' : 'POST',
+          body: { nome, setor },
+        }),
+      'Erro ao salvar categoria'
+    )
+
+    setSalvando(false)
+    if (resultado === null) return
+
+    showToast(editando ? 'Categoria atualizada' : 'Categoria criada', 'success')
+    setShowForm(false)
+    setEditing(null)
+    setNome('')
+    setSetor('COZINHA')
+    void refetch()
+  }
+
+  const confirmarExclusao = async () => {
+    if (!paraExcluir) return
+    setExcluindo(true)
+
+    const resultado = await chamar(
+      () => apiFetch(`/categories/${paraExcluir.id}`, { method: 'DELETE' }),
+      'Erro ao excluir categoria'
+    )
+
+    setExcluindo(false)
+    if (resultado === null) return
+
+    showToast('Categoria excluída', 'success')
+    setParaExcluir(null)
+    // Se apagou a última linha da página, recuar evita cair numa página vazia.
+    if (data && data.data.length === 1 && page > 1) {
+      setPage((atual) => atual - 1)
+    } else {
+      void refetch()
     }
   }
 
-  if (loading) return <div className="p-8">Carregando...</div>
+  const columns: Array<DataTableColumn<Categoria>> = [
+    {
+      key: 'nome',
+      header: 'Categoria',
+      sortKey: 'nome',
+      render: (categoria) => <span className="font-medium text-gray-900">{categoria.nome}</span>,
+    },
+    {
+      key: 'setor',
+      header: 'Setor',
+      render: (categoria) => (
+        <span
+          className={`rounded px-2 py-1 text-xs font-semibold ${
+            SETOR_BADGE[categoria.setor] ?? 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          {categoria.setor}
+        </span>
+      ),
+    },
+    {
+      key: 'produtos',
+      header: 'Produtos ativos',
+      align: 'center',
+      hideOnMobile: true,
+      render: (categoria) => (
+        <span className="text-gray-600">
+          {categoria._count?.produtos ?? categoria.produtos?.length ?? 0}
+        </span>
+      ),
+    },
+  ]
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8 text-black">Gerenciar Categorias</h1>
+    <div className="mx-auto max-w-5xl p-8">
+      <h1 className="mb-6 text-3xl font-bold text-black">Gerenciar Categorias</h1>
 
-      {/* Form */}
-      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-        <h2 className="text-xl font-semibold mb-4 text-black">
-          {editingId ? 'Editar Categoria' : 'Nova Categoria'}
-        </h2>
-        
-        <form onSubmit={handleSubmit} className="flex gap-4 items-end flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-black mb-1">Nome</label>
-            <input
-              type="text"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-orange-500 outline-none text-black"
-              required
-            />
-          </div>
-          
-          <div className="w-40">
-            <label className="block text-sm font-medium text-black mb-1">Setor</label>
-            <select
-              value={setor}
-              onChange={(e) => setSetor(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-orange-500 outline-none text-black"
-            >
-              <option value="COZINHA">Cozinha</option>
-              <option value="BAR">Bar</option>
-            </select>
-          </div>
+      {isError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {(error as Error)?.message ?? 'Falha ao carregar categorias'}
+        </div>
+      )}
 
-          <div className="flex gap-2">
+      <DataTable<Categoria>
+        ariaLabel="Listagem de categorias"
+        columns={columns}
+        data={data?.data ?? []}
+        getRowId={(categoria) => categoria.id}
+        meta={data?.meta ?? { page, pageSize, total: 0, totalPages: 0 }}
+        loading={isLoading}
+        itemLabel="categorias"
+        storageKey="admin-categorias"
+        emptyMessage="Nenhuma categoria encontrada"
+        emptyHint={search ? `Nada corresponde a "${search}".` : 'Crie a primeira categoria abaixo.'}
+        onPageChange={setPage}
+        onPageSizeChange={(novo) => {
+          setPageSize(novo)
+          setPage(1)
+        }}
+        onSearch={(texto) => {
+          setSearch(texto)
+          setPage(1)
+        }}
+        onSort={(campo, direcao) => {
+          setSort(campo)
+          setOrder(direcao)
+          setPage(1)
+        }}
+        rowActions={{
+          onEdit: abrirEdicao,
+          onDelete: setParaExcluir,
+          extra: () => (
             <button
-              type="submit"
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+              type="button"
+              title="Mais ações"
+              aria-label="Mais ações"
+              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100"
             >
-              {editingId ? 'Salvar' : 'Adicionar'}
+              <MoreVertical className="h-4 w-4" />
             </button>
-            {editingId && (
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
-              >
-                Cancelar
-              </button>
-            )}
-          </div>
-        </form>
-        {error && <p className="text-red-500 mt-2 text-sm">{error}</p>}
-      </div>
+          ),
+        }}
+        createAction={{ label: 'Nova categoria', onClick: abrirNova }}
+      />
 
-      {/* List */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="p-4 border-b font-medium text-black">Nome</th>
-              <th className="p-4 border-b font-medium text-black">Setor</th>
-              <th className="p-4 border-b font-medium text-black text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {categorias.map((cat) => (
-              <tr key={cat.id} className="hover:bg-gray-50 border-b last:border-0">
-                <td className="p-4 text-black">{cat.nome}</td>
-                <td className="p-4">
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                    cat.setor === 'COZINHA' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {cat.setor}
-                  </span>
-                </td>
-                <td className="p-4 text-right space-x-2">
-                  <button
-                    onClick={() => handleEdit(cat)}
-                    className="text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(cat.id)}
-                    className="text-red-600 hover:text-red-800 font-medium"
-                  >
-                    Excluir
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {categorias.length === 0 && (
-              <tr>
-                <td colSpan={3} className="p-8 text-center text-black">
-                  Nenhuma categoria cadastrada.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {showForm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-6 py-4">
+              <h2 className="text-lg font-bold text-black">
+                {editing ? 'Editar categoria' : 'Nova categoria'}
+              </h2>
+            </div>
+
+            <form onSubmit={salvar} className="space-y-4 px-6 py-5">
+              <div>
+                <label htmlFor="categoria-nome" className="mb-1 block text-sm font-medium text-black">
+                  Nome
+                </label>
+                <input
+                  id="categoria-nome"
+                  type="text"
+                  value={nome}
+                  onChange={(event) => setNome(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 p-2 text-black focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label htmlFor="categoria-setor" className="mb-1 block text-sm font-medium text-black">
+                  Setor de produção
+                </label>
+                <select
+                  id="categoria-setor"
+                  value={setor}
+                  onChange={(event) => setSetor(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 p-2 text-black focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                >
+                  {SETORES.map((valor) => (
+                    <option key={valor} value={valor}>
+                      {valor.charAt(0) + valor.slice(1).toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Define para qual impressora os itens desta categoria são enviados.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowForm(false)}
+                  disabled={salvando}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" isLoading={salvando}>
+                  {editing ? 'Salvar' : 'Adicionar'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <ConfirmationModal
+        isOpen={paraExcluir !== null}
+        title="Excluir categoria"
+        description={
+          paraExcluir
+            ? `Tem certeza que deseja excluir "${paraExcluir.nome}"? Produtos vinculados a ela podem ficar sem categoria.`
+            : ''
+        }
+        confirmText={excluindo ? 'Excluindo...' : 'Excluir'}
+        onConfirm={confirmarExclusao}
+        onClose={() => setParaExcluir(null)}
+      />
     </div>
   )
 }
