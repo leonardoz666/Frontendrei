@@ -33,6 +33,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# O modelo de exemplo PRECISA ser versionado: é a documentação das variáveis
+# (NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SUPORTE_WHATSAPP). O `.env` real segue ignorado.
+!.env.example
 
 # vercel
 .vercel
