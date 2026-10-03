@@ -67,7 +67,12 @@ export default function AdminUsersPage() {
         router.replace('/login')
         return
       }
-      if (meData.user.role !== 'DONO' && meData.user.role !== 'ADMIN') {
+      // Espelha o gate REAL do backend: `/api/users` exige `usuarios.visualizar`
+      // (que GERENTE tem por padrão). Antes esta tela aceitava só DONO/ADMIN, então
+      // um GERENTE via o item no menu e era devolvido para a home — link quebrado.
+      const permissoes: string[] = meData.user.permissions ?? []
+      const podeVer = permissoes.includes('usuarios.visualizar')
+      if (!podeVer) {
         router.replace('/')
         return
       }
