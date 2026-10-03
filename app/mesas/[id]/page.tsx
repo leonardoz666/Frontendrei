@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
 import { PaymentModal } from '@/components/PaymentModal'
+import { unwrapList } from '@/app/lib/legacyArray'
 import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -142,7 +143,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         console.log('[DEBUG] Fetching categories');
         const productsRes = await fetch('/api/categories', { cache: 'no-store' })
         console.log(`[DEBUG] categories status: ${productsRes.status}`);
-        const productsData = await productsRes.json()
+        // `unwrapList` aceita array puro (contrato antigo) OU `{ data, meta }`
+        // (contrato paginado novo). Sem isso, no dia em que a rota passar a ser
+        // paginada, `productsData.sort` estoura "sort is not a function" na tela
+        // de lançamento de pedido — o coração da operação. Ver lib/legacyArray.ts.
+        const productsData = unwrapList<Categoria>(await productsRes.json())
 
         if (!cancelled) {
           const order = ['Entradas', 'Pratos Principais', 'Bebidas', 'Drinks']
