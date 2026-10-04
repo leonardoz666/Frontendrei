@@ -3,44 +3,11 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Armchair,
-  BedDouble,
-  Bike,
-  Boxes,
-  CalendarDays,
-  ChartColumn,
   ChevronDown,
-  ClipboardCheck,
-  ClipboardList,
-  Clock,
-  Contact,
-  FileSpreadsheet,
-  FileText,
-  History,
-  Landmark,
-  LayoutDashboard,
-  ListTree,
   LogOut,
-  Package,
-  PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
-  Pencil,
-  Printer,
   Receipt,
-  Settings,
-  Shield,
-  Sparkles,
-  Tags,
-  Target,
-  Truck,
-  UserCheck,
-  UserCog,
-  Users,
-  UtensilsCrossed,
-  Wallet,
-  Warehouse,
-  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -52,48 +19,9 @@ import {
   visibleNavGroups,
   writeStoredCollapsed,
   writeStoredGroupState,
-  type NavIconName,
   type NavItem,
   type NavUser,
 } from '@/app/lib/navigation'
-
-/** Nome de ícone (dado) -> componente lucide. O `Record` garante que nenhum nome fique sem ícone. */
-const NAV_ICONS: Record<NavIconName, LucideIcon> = {
-  LayoutDashboard,
-  ChartColumn,  Armchair,
-  ClipboardList,
-  Users,
-  Tags,
-  Contact,
-  Wallet,
-  Truck,
-  UtensilsCrossed,
-  Package,
-  FileSpreadsheet,
-  Boxes,
-  History,
-  ClipboardCheck,
-  PackageSearch,
-  Clock,
-  CalendarDays,
-  Pencil,
-  Shield,
-  BedDouble,
-  UserCheck,
-  Sparkles,
-  Landmark,
-  Bike,
-  FileText,
-  Settings,
-  UserCog,
-  Printer,
-  // Ícones exigidos pela árvore de navegação. Sem eles o `NAV_ICONS` resolveria
-  // para `undefined` e a Sidebar quebraria em runtime (o `tsc` não acusa, porque
-  // a árvore declara o nome como string).
-  Target,
-  Warehouse,
-  ListTree,
-}
 
 interface SidebarProps {
   isOpen: boolean
@@ -118,6 +46,7 @@ export default function Sidebar({
   const [fetchedUser, setFetchedUser] = useState<NavUser | null>(null)
   const [showBillModal, setShowBillModal] = useState(false)
   const [splitPeople, setSplitPeople] = useState('1')
+  const [searchTerm, setSearchTerm] = useState('')
   const [mounted, setMounted] = useState(false)
   const [selfCollapsed, setSelfCollapsed] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
@@ -148,10 +77,81 @@ export default function Sidebar({
   }, [userProp])
 
   const user = userProp !== undefined ? userProp : fetchedUser
+  const isWaiter = user?.role === 'GARCOM'
+
   const visibleGroups = useMemo(() => visibleNavGroups(user), [user])
   const active = useMemo(() => findActiveNavItem(pathname), [pathname])
   const activeGroupId = active?.group.id
   const activeHref = active?.item.href
+  const quickShortcuts = user?.role === 'GARCOM'
+    ? [
+        { href: '/', label: 'Início' },
+        { href: '/mesas', label: 'Mapa de Mesas' },
+        { href: '/minhas-mesas', label: 'Minhas Mesas' },
+      ]
+    : [
+        { href: '/', label: 'Início' },
+        { href: '/mesas', label: 'Mapa de Mesas' },
+        { href: '/admin', label: 'Painel' },
+      ]
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+  const filteredGroups = useMemo(() => {
+    if (!normalizedSearch) return visibleGroups
+    return visibleGroups
+      .map(({ group, items }) => {
+        const groupMatches = group.label.toLowerCase().includes(normalizedSearch)
+        const filteredItems = groupMatches
+          ? items
+          : items.filter(item => item.label.toLowerCase().includes(normalizedSearch))
+        return { group, items: filteredItems }
+      })
+      .filter(({ items }) => items.length > 0)
+  }, [normalizedSearch, visibleGroups])
+  const visualSections = useMemo(() => {
+    const sourceGroups = normalizedSearch ? filteredGroups : visibleGroups
+    const sectionDefinitions = [
+      {
+        id: 'atendimento',
+        label: 'ATENDIMENTO',
+        groupIds: ['inicio', 'mesas'],
+        itemFilter: (item: NavItem) => !['/', '/dashboard', '/mesas'].includes(item.href),
+      },
+      { id: 'cardapio-estoque', label: 'CARDÁPIO E ESTOQUE', groupIds: ['cardapio', 'estoque'] },
+      {
+        id: 'caixa',
+        label: 'CAIXA',
+        groupIds: ['caixa'],
+        itemFilter: (item: NavItem) => ['/caixa', '/caixa/fechamento'].includes(item.href),
+      },
+      {
+        id: 'nota-fiscal',
+        label: 'NOTA FISCAL',
+        groupIds: ['caixa', 'administracao'],
+        itemFilter: (item: NavItem) => ['/fiscal/notas', '/fiscal/radar-xml', '/admin/fiscal'].includes(item.href),
+      },
+    ]
+    const sections = sectionDefinitions
+      .map(section => ({
+        ...section,
+        items: section.groupIds.flatMap(groupId =>
+          (sourceGroups.find(group => group.group.id === groupId)?.items ?? []).filter(item =>
+            !section.itemFilter || section.itemFilter(item)
+          )
+        ),
+      }))
+      .filter(section => section.items.length > 0)
+    const assigned = new Set(sectionDefinitions.flatMap(section => section.groupIds))
+    sourceGroups
+      .filter(({ group }) => !assigned.has(group.id))
+      .forEach(({ group, items }) => sections.push({ id: group.id, label: group.label.toUpperCase(), groupIds: [group.id], items }))
+    return isWaiter ? sections.filter(section => section.id !== 'atendimento') : sections
+  }, [filteredGroups, isWaiter, normalizedSearch, visibleGroups])
+
+  const visualSectionForActive = useMemo(
+    () => visualSections.find(section => section.groupIds.includes(activeGroupId ?? '')),
+    [activeGroupId, visualSections]
+  )
+  const activeSectionId = visualSectionForActive?.id
 
   // Acordeão: preferências salvas (uma vez) + grupo da rota ativa sempre aberto.
   useEffect(() => {
@@ -240,7 +240,7 @@ export default function Sidebar({
   }
 
   const renderItem = (item: NavItem) => {
-    const Icon = NAV_ICONS[item.icon]
+    if (isCollapsed) return null
 
     if (item.disabled) {
       return (
@@ -248,14 +248,13 @@ export default function Sidebar({
           key={item.href}
           aria-disabled="true"
           title={`${item.label} — em breve`}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-300 cursor-not-allowed select-none ${
-            isCollapsed ? 'md:justify-center md:px-2' : ''
+          className={`flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-medium text-slate-300 cursor-not-allowed select-none ${
+            isCollapsed ? 'md:justify-center md:px-0' : ''
           }`}
         >
-          <Icon size={20} className="text-gray-300 shrink-0" />
           <span className={`flex-1 truncate ${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
           <span
-            className={`text-[10px] font-bold uppercase tracking-wide bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded ${
+            className={`rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 ${
               isCollapsed ? 'md:hidden' : ''
             }`}
           >
@@ -273,23 +272,17 @@ export default function Sidebar({
         href={item.href}
         title={item.label}
         aria-current={isActive ? 'page' : undefined}
-        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group font-medium text-sm ${
+        className={`group relative flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-semibold leading-5 tracking-[0.01em] transition-all duration-200 hover:translate-x-0.5 ${
           isActive
-            ? 'bg-orange-600 text-white shadow-lg shadow-orange-200'
-            : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
-        } ${isCollapsed ? 'md:justify-center md:px-2' : ''}`}
+            ? 'border border-orange-300 bg-orange-50 text-orange-800'
+            : 'text-slate-600 hover:bg-orange-50/70 hover:text-orange-800'
+        } ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
       >
-        <Icon
-          size={20}
-          className={`transition-colors duration-200 shrink-0 ${
-            isActive ? 'text-white' : 'text-gray-400 group-hover:text-orange-600'
-          }`}
-        />
         <span className={`flex-1 truncate ${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
         {item.shortcut && (
           <kbd
-            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-              isActive ? 'border-white/40 text-white/80' : 'border-gray-200 text-gray-400'
+            className={`rounded-full border px-2 py-0.5 font-mono text-[10px] ${
+              isActive ? 'border-orange-200 bg-white/70 text-orange-700' : 'border-slate-200 text-slate-400'
             } ${isCollapsed ? 'md:hidden' : ''}`}
           >
             {item.shortcut}
@@ -310,74 +303,109 @@ export default function Sidebar({
       )}
 
       <aside className={`
-        fixed inset-y-0 left-0 z-[70] w-64 bg-white flex flex-col transition-all duration-300 ease-in-out shadow-2xl
+        fixed inset-y-0 left-0 z-[70] w-72 bg-white flex flex-col transition-all duration-300 ease-in-out border-r border-slate-200 shadow-[18px_0_17px_rgba(15,20,31,0.06)]
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${isCollapsed ? 'md:w-20' : 'md:w-64'}
+        ${isCollapsed ? 'md:w-[88px]' : 'md:w-72'}
         md:translate-x-0
       `}>
         <div
-          className={`py-5 px-3 flex items-center justify-between gap-2 border-b border-gray-100 mb-2 ${
-            isCollapsed ? 'md:flex-col md:gap-3' : ''
+          className={`px-4 pt-[18px] pb-0 ${
+            isCollapsed ? 'md:px-4' : ''
           }`}
         >
-          <div className={`flex items-center gap-3 min-w-0 ${isCollapsed ? 'md:justify-center' : ''}`}>
-            <div className="bg-orange-600 p-2 rounded-lg shadow-sm shrink-0">
-              <UtensilsCrossed className="text-white" size={24} />
+          <div className={`flex h-[54px] items-center gap-3 ${isCollapsed ? 'md:justify-center' : ''}`}>
+            <div className={`flex min-w-0 items-center gap-3 ${isCollapsed ? 'md:justify-center' : ''}`}>
+              <div className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-[#f4510b] text-[22px] font-bold text-white ${isCollapsed ? 'md:h-14 md:w-14 md:rounded-[14px] md:text-2xl' : ''}`}>
+                R
+              </div>
+              <div className={`min-w-0 ${isCollapsed ? 'md:hidden' : ''}`}>
+                <span className="block truncate text-base font-bold leading-tight text-slate-950">
+                  Rei do Pirão
+                </span>
+                <span className="block truncate text-xs font-medium text-slate-500">Operação do salão</span>
+              </div>
             </div>
-            <span
-              className={`text-xl font-bold text-gray-800 tracking-tight truncate ${
-                isCollapsed ? 'md:hidden' : ''
-              }`}
+
+            <button
+              type="button"
+              onClick={handleToggleCollapse}
+              aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+              aria-expanded={!isCollapsed}
+              title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+              className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-orange-50 hover:text-orange-700 md:flex"
             >
-              Rei do Pirão
-            </span>
+              {isCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleToggleCollapse}
-            aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
-            aria-expanded={!isCollapsed}
-            title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
-            className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:bg-orange-50 hover:text-orange-600 transition-colors shrink-0"
-          >
-            {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-          </button>
+          <div className={`mt-3 ${isWaiter || isCollapsed ? 'hidden' : ''}`}>
+            <label className="flex h-10 items-center gap-2 rounded-[10px] border border-slate-200 bg-slate-50 px-3 focus-within:border-orange-300 focus-within:ring-4 focus-within:ring-orange-100">
+              <span className="shrink-0 text-[15px] font-semibold text-slate-400">/</span>
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400"
+                placeholder="Buscar módulo ou ação"
+                type="search"
+              />
+              <span className="rounded-[11px] bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                Ctrl K
+              </span>
+            </label>
+          </div>
+
+          <div className={`mt-3 ${isWaiter ? 'flex flex-col gap-1.5' : 'flex h-[58px] gap-2'} ${isCollapsed ? 'md:hidden' : ''}`}>
+            {quickShortcuts.map(shortcut => {
+              const activeShortcut = pathname === shortcut.href
+              return (
+                <Link
+                  key={shortcut.href}
+                  href={shortcut.href}
+                  title={shortcut.label}
+                  className={`flex items-center rounded-xl border px-2.5 text-[11px] font-semibold leading-3 shadow-sm transition-all duration-200 ${isWaiter ? 'min-h-10 w-full' : 'w-20'} ${
+                    activeShortcut
+                      ? 'border-orange-400 bg-orange-50 text-orange-900 shadow-orange-100'
+                      : 'border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-900 hover:shadow-orange-100'
+                  }`}
+                >
+                  {shortcut.label}
+                </Link>
+              )
+            })}
+          </div>
+          <div className="mt-4 h-px bg-slate-200" />
         </div>
 
-        <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-          {visibleGroups.map(({ group, items }) => {
-            const GroupIcon = NAV_ICONS[group.icon]
-            const isGroupActive = group.id === activeGroupId
-            const isGroupOpen = openGroups[group.id] ?? isGroupActive
+        <nav className={`flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] ${isCollapsed ? 'md:px-4' : ''}`}>
+          {filteredGroups.length === 0 && (
+            <div className={`rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-sm font-medium text-slate-500 ${isCollapsed ? 'md:hidden' : ''}`}>
+              Nenhum módulo encontrado
+            </div>
+          )}
+
+          {!isCollapsed && visualSections.map(section => {
+            const isGroupActive = section.id === activeSectionId
+            const isGroupOpen = Boolean(normalizedSearch) || (openGroups[section.id] ?? isGroupActive)
 
             return (
-              <div key={group.id} className="pt-1">
+              <div key={section.id} className="mb-4 rounded-2xl border-b border-slate-100 pb-3">
                 <button
                   type="button"
-                  onClick={() => toggleGroup(group.id)}
+                  onClick={() => toggleGroup(section.id)}
                   aria-expanded={isGroupOpen}
-                  title={group.label}
-                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${
-                    isGroupActive
-                      ? 'text-orange-600'
-                      : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-                  } ${isCollapsed ? 'md:justify-center md:px-2' : ''}`}
+                  title={section.label}
+                  className={`flex w-full items-center rounded-xl border-l-2 px-2.5 py-2 text-xs font-extrabold uppercase tracking-[0.12em] transition-colors ${isGroupActive ? 'border-orange-500 bg-orange-50/60 text-orange-800' : 'border-slate-300 text-slate-700 hover:border-orange-300 hover:bg-slate-50'}`}
                 >
-                  <GroupIcon size={18} className="shrink-0" />
-                  <span className={`flex-1 text-left truncate ${isCollapsed ? 'md:hidden' : ''}`}>
-                    {group.label}
-                  </span>
+                  <span className="flex-1 text-left truncate">{section.label}</span>
                   <ChevronDown
                     size={14}
-                    className={`shrink-0 transition-transform duration-200 ${
-                      isGroupOpen ? '' : '-rotate-90'
-                    } ${isCollapsed ? 'md:hidden' : ''}`}
+                    strokeWidth={2.5}
+                    className={`shrink-0 transition-transform duration-200 ${isGroupOpen ? '' : '-rotate-90'}`}
                   />
                 </button>
 
-                <div className={isGroupOpen ? 'mt-1 space-y-1' : 'hidden'}>
-                  {items.map(renderItem)}
+                <div className={isGroupOpen ? 'mt-2 space-y-1' : 'hidden'}>
+                  {section.items.map(renderItem)}
                 </div>
               </div>
             )
@@ -396,12 +424,12 @@ export default function Sidebar({
           )}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 bg-white">
+        <div className="border-t border-slate-100 bg-gradient-to-t from-slate-50 to-white p-3">
           {isTablePage && (
             <button
               onClick={() => setShowBillModal(true)}
               title="Solicitar Conta"
-              className={`w-full hidden md:flex items-center justify-center space-x-2 px-4 py-3 mb-4 rounded-xl border-2 border-orange-500 text-orange-600 font-bold hover:bg-orange-50 transition-colors ${
+              className={`mb-3 hidden w-full items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 font-bold text-orange-700 transition-colors hover:bg-orange-100 md:flex ${
                 isCollapsed ? 'md:px-2' : ''
               }`}
             >
@@ -411,14 +439,14 @@ export default function Sidebar({
           )}
 
           <div
-            className={`bg-slate-50 rounded-2xl p-3 flex items-center justify-between gap-2 group hover:bg-slate-100 transition-colors ${
+            className={`group flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm shadow-slate-950/[0.03] transition-colors hover:bg-slate-50 ${
               isCollapsed ? 'md:flex-col md:justify-center' : ''
             }`}
           >
             <div className={`flex items-center space-x-3 overflow-hidden ${isCollapsed ? 'md:space-x-0' : ''}`}>
               <div
                 title={user?.name ?? undefined}
-                className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 font-bold text-sm shrink-0 shadow-sm"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white shadow-sm"
               >
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
@@ -430,7 +458,7 @@ export default function Sidebar({
 
             <button
               onClick={handleLogout}
-              className="text-gray-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-white hover:shadow-sm shrink-0"
+              className="shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
               title="Sair"
               aria-label="Sair"
             >

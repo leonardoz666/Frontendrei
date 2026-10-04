@@ -7,7 +7,7 @@
  *    usuário chega sem a lista de permissões carregada (sessão antiga / resposta parcial);
  *  - item com `disabled: true` = módulo do PRD ainda NÃO implementado. Ele aparece
  *    esmaecido, com o selo "em breve", e NÃO navega — nada de link para rota inexistente;
- *  - só estas rotas existem hoje: `/`, `/dashboard`, `/mesas`, `/mesas-abertas`,
+ *  - só estas rotas existem hoje: `/`, `/dashboard`, `/mesas`,
  *    `/minhas-mesas`, `/admin`, `/admin/produtos`, `/admin/categorias`, `/admin/usuarios`
  *    e `/admin/impressoras`.
  *
@@ -29,6 +29,9 @@ export type NavPermission =
   | 'pagamentos.desconto'
   | 'pagamentos.cancelar'
   | 'pagamentos.estornar'
+  | 'caixa.abrir'
+  | 'caixa.movimentar'
+  | 'caixa.fechar'
   | 'produtos.visualizar'
   | 'produtos.criar'
   | 'produtos.editar'
@@ -99,8 +102,11 @@ export type NavIconName =
   | 'Target'
   | 'Warehouse'
   | 'ListTree'
+  | 'MapPin'
+  | 'HardDrive'
+  | 'QrCode'
 
-export type NavShortcut = 'F7' | 'F8'
+export type NavShortcut = 'F8'
 
 export interface NavItem {
   href: string
@@ -169,17 +175,17 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: 'F8',
       },
       {
-        href: '/mesas-abertas',
-        label: 'Mesas Abertas',
-        icon: 'ClipboardList',
-        permission: 'mesas.visualizar',
-        roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM'],
-      },
-      {
         href: '/minhas-mesas',
         label: 'Minhas Mesas',
         icon: 'Users',
         roles: ['GARCOM', 'GERENTE', 'DONO'],
+      },
+      {
+        href: '/admin/mesas/qrcodes',
+        label: 'QR-Code das Mesas',
+        icon: 'QrCode',
+        permission: 'cadastros.visualizar',
+        roles: ['ADMIN', 'DONO', 'GERENTE'],
       },
     ],
   },
@@ -194,6 +200,18 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'Tags',
         permission: 'cadastros.visualizar',
         roles: ['ADMIN', 'DONO', 'GERENTE'],
+      },
+      {
+        href: '/admin/pracas',
+        label: 'Praças',
+        icon: 'MapPin',
+        permission: 'cadastros.visualizar',
+      },
+      {
+        href: '/admin/pracas/vincular',
+        label: 'Vincular Impressora',
+        icon: 'Printer',
+        permission: 'cadastros.visualizar',
       },
       {
         href: '/admin/centros-custo',
@@ -246,18 +264,30 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM', 'COZINHA'],
       },
       {
+        href: '/admin/cardapio/tipos-tamanho',
+        label: 'Tipos e Tamanhos',
+        icon: 'ListTree',
+        anyPermission: ['produtos.visualizar', 'cardapio.publicar'],
+        roles: ['ADMIN', 'DONO', 'GERENTE'],
+      },
+      {
+        href: '/admin/cardapio/complementos',
+        label: 'Complementos',
+        icon: 'PackageSearch',
+        anyPermission: ['produtos.visualizar', 'cardapio.publicar'],
+        roles: ['ADMIN', 'DONO', 'GERENTE'],
+      },
+      {
         href: '/admin/cardapio',
-        label: 'Publicar Cardápio',
+        label: 'Organizar Cardápio',
         icon: 'UtensilsCrossed',
         permission: 'cardapio.publicar',
-        disabled: true,
       },
       {
         href: '/admin/cardapio/importar',
         label: 'Importar Cardápio',
         icon: 'FileSpreadsheet',
         permission: 'cardapio.importar',
-        disabled: true,
       },
     ],
   },
@@ -267,32 +297,40 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: 'Boxes',
     items: [
       {
-        href: '/estoque',
+        href: '/admin/estoque',
         label: 'Visão Geral',
         icon: 'Boxes',
         permission: 'estoque.visualizar',
-        disabled: true,
       },
       {
-        href: '/estoque/movimentacoes',
+        href: '/admin/estoque/movimentacoes',
         label: 'Movimentações',
         icon: 'History',
         permission: 'estoque.movimentar',
-        disabled: true,
       },
       {
-        href: '/estoque/inventario',
+        href: '/admin/estoque/inventario',
         label: 'Inventário',
         icon: 'ClipboardCheck',
-        permission: 'estoque.ajustar',
-        disabled: true,
+        permission: 'estoque.movimentar',
       },
       {
-        href: '/estoque/insumos',
+        href: '/admin/estoque/ficha-tecnica',
+        label: 'Ficha Técnica',
+        icon: 'ClipboardCheck',
+        permission: 'estoque.visualizar',
+      },
+      {
+        href: '/admin/estoque/insumos',
         label: 'Insumos',
         icon: 'PackageSearch',
         permission: 'estoque.visualizar',
-        disabled: true,
+      },
+      {
+        href: '/admin/estoque/grupos',
+        label: 'Grupos',
+        icon: 'Tags',
+        permission: 'estoque.visualizar',
       },
     ],
   },
@@ -306,7 +344,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Registro de Ponto',
         icon: 'Clock',
         permission: 'ponto.visualizar',
-        disabled: true,
       },
       {
         href: '/ponto/espelho',
@@ -341,14 +378,18 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Painel',
         icon: 'BedDouble',
         permission: 'hotelaria.visualizar',
-        disabled: true,
       },
       {
         href: '/hotelaria/reservas',
         label: 'Reservas',
         icon: 'CalendarDays',
         permission: 'hotelaria.reservar',
-        disabled: true,
+      },
+      {
+        href: '/hotelaria/mapa',
+        label: 'Mapa de Reservas',
+        icon: 'BedDouble',
+        permission: 'hotelaria.visualizar',
       },
       {
         href: '/hotelaria/checkin',
@@ -362,7 +403,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Governança',
         icon: 'Sparkles',
         permission: 'hotelaria.governanca',
-        disabled: true,
       },
     ],
   },
@@ -376,30 +416,26 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Caixa do Dia',
         icon: 'Wallet',
         roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA'],
-        disabled: true,
+        anyPermission: ['relatorios.caixa', 'caixa.abrir'],
       },
       {
         href: '/caixa/fechamento',
         label: 'Fechamento',
         icon: 'Landmark',
         roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA'],
-        disabled: true,
-      },
-      {
-        // F7 (PRD seção 13): atalho existe, módulo de delivery ainda não.
-        href: '/delivery',
-        label: 'Delivery',
-        icon: 'Bike',
-        roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA'],
-        disabled: true,
-        shortcut: 'F7',
+        anyPermission: ['relatorios.caixa', 'caixa.fechar'],
       },
       {
         href: '/fiscal/notas',
         label: 'Notas Fiscais',
         icon: 'FileText',
         permission: 'fiscal.visualizar',
-        disabled: true,
+      },
+      {
+        href: '/fiscal/radar-xml',
+        label: 'Radar XML SEFAZ',
+        icon: 'PackageSearch',
+        permission: 'fiscal.visualizar',
       },
     ],
   },
@@ -433,7 +469,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Configuração Fiscal',
         icon: 'FileText',
         permission: 'fiscal.configurar',
-        disabled: true,
       },
     ],
   },
@@ -447,7 +482,6 @@ export const ROUTE_SHORTCUTS: ReadonlyArray<{
   disabled: boolean
 }> = [
   { key: 'F8', href: '/mesas', label: 'Mapa de Mesas', disabled: false },
-  { key: 'F7', href: '/delivery', label: 'Delivery', disabled: true },
 ]
 
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = 'rei.sidebar.collapsed'
@@ -538,6 +572,14 @@ export function visibleNavGroups(user: NavUser | null | undefined): VisibleNavGr
     const items = group.items.filter(item => canSeeNavItem(user, item))
     if (items.length > 0) visible.push({ group, items })
   }
+
+  if (user?.role === 'GARCOM') {
+    const allowedForWaiter = new Set(['/', '/mesas', '/minhas-mesas'])
+    return visible
+      .map(({ group, items }) => ({ group, items: items.filter(item => allowedForWaiter.has(item.href)) }))
+      .filter(({ items }) => items.length > 0)
+  }
+
   return visible
 }
 

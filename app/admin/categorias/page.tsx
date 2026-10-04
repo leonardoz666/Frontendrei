@@ -2,18 +2,22 @@
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MoreVertical } from 'lucide-react'
+import { ImageIcon, Power, PowerOff } from 'lucide-react'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
 import { useToast } from '@/contexts/ToastContext'
 import { apiFetch } from '@/app/lib/api'
 import { usePagedQuery, type SortOrder } from '@/app/lib/pagination'
+import { SeloAtivo } from '@/app/lib/crud-client'
 
 type Categoria = {
   id: number
   nome: string
   setor: string
+  ativo: boolean
+  imagem: string | null
+  ordem: number
   _count?: { produtos: number }
   produtos?: Array<{ id: number }>
 }
@@ -50,7 +54,10 @@ export default function CategoriasPage() {
   const [showForm, setShowForm] = useState(false)
   const [nome, setNome] = useState('')
   const [setor, setSetor] = useState<string>('COZINHA')
+  const [imagem, setImagem] = useState('')
+  const [ordem, setOrdem] = useState('0')
   const [salvando, setSalvando] = useState(false)
+  const [alternandoId, setAlternandoId] = useState<number | null>(null)
   const [paraExcluir, setParaExcluir] = useState<Categoria | null>(null)
   const [excluindo, setExcluindo] = useState(false)
 
@@ -89,6 +96,8 @@ export default function CategoriasPage() {
     setEditing(null)
     setNome('')
     setSetor('COZINHA')
+    setImagem('')
+    setOrdem('0')
     setShowForm(true)
   }
 
@@ -96,6 +105,8 @@ export default function CategoriasPage() {
     setEditing(categoria)
     setNome(categoria.nome)
     setSetor(categoria.setor)
+    setImagem(categoria.imagem ?? '')
+    setOrdem(String(categoria.ordem ?? 0))
     setShowForm(true)
   }
 
@@ -103,12 +114,18 @@ export default function CategoriasPage() {
     event.preventDefault()
     setSalvando(true)
     const editando = editing
+    const ordemNumero = Number(ordem || 0)
+    if (!Number.isInteger(ordemNumero) || ordemNumero < 0) {
+      showToast('Ordem deve ser um número inteiro não negativo', 'error')
+      setSalvando(false)
+      return
+    }
 
     const resultado = await chamar(
       () =>
         apiFetch(editando ? `/categories/${editando.id}` : '/categories', {
           method: editando ? 'PUT' : 'POST',
-          body: { nome, setor },
+          body: { nome, setor, imagem, ordem: ordemNumero },
         }),
       'Erro ao salvar categoria'
     )
@@ -121,6 +138,24 @@ export default function CategoriasPage() {
     setEditing(null)
     setNome('')
     setSetor('COZINHA')
+    setImagem('')
+    setOrdem('0')
+    void refetch()
+  }
+
+  const alternarAtivo = async (categoria: Categoria) => {
+    setAlternandoId(categoria.id)
+    const resultado = await chamar(
+      () =>
+        apiFetch<Categoria>(`/categories/${categoria.id}/ativo`, {
+          method: 'PATCH',
+          body: { ativo: !categoria.ativo },
+        }),
+      'Erro ao alterar status da categoria'
+    )
+    setAlternandoId(null)
+    if (resultado === null) return
+    showToast(`Categoria ${resultado.ativo ? 'ativada' : 'desativada'}`, 'success')
     void refetch()
   }
 
@@ -138,11 +173,10 @@ export default function CategoriasPage() {
 
     showToast('Categoria excluída', 'success')
     setParaExcluir(null)
+    void refetch()
     // Se apagou a última linha da página, recuar evita cair numa página vazia.
     if (data && data.data.length === 1 && page > 1) {
       setPage((atual) => atual - 1)
-    } else {
-      void refetch()
     }
   }
 
@@ -151,7 +185,25 @@ export default function CategoriasPage() {
       key: 'nome',
       header: 'Categoria',
       sortKey: 'nome',
-      render: (categoria) => <span className="font-medium text-gray-900">{categoria.nome}</span>,
+      render: (categoria) => (
+        <div className="flex items-center gap-3">
+          {categoria.imagem ? (
+            <div
+              aria-hidden="true"
+              className="h-10 w-10 rounded bg-cover bg-center"
+              style={{ backgroundImage: `url(${categoria.imagem})` }}
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded bg-gray-100 text-gray-400">
+              <ImageIcon className="h-4 w-4" />
+            </div>
+          )}
+          <div>
+            <span className="font-medium text-gray-900">{categoria.nome}</span>
+            <p className="text-xs text-gray-500">Ordem {categoria.ordem ?? 0}</p>
+          </div>
+        </div>
+      ),
     },
     {
       key: 'setor',
@@ -165,6 +217,13 @@ export default function CategoriasPage() {
           {categoria.setor}
         </span>
       ),
+    },
+    {
+      key: 'ativo',
+      header: 'Status',
+      sortKey: 'ativo',
+      hideOnMobile: true,
+      render: (categoria) => <SeloAtivo ativo={categoria.ativo} />,
     },
     {
       key: 'produtos',
@@ -214,17 +273,20 @@ export default function CategoriasPage() {
           setOrder(direcao)
           setPage(1)
         }}
-        rowActions={{
+          rowActions={{
           onEdit: abrirEdicao,
           onDelete: setParaExcluir,
-          extra: () => (
+          deleteLabel: 'Desativar',
+          extra: (categoria) => (
             <button
               type="button"
-              title="Mais ações"
-              aria-label="Mais ações"
-              className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100"
+              title={categoria.ativo ? 'Desativar' : 'Ativar'}
+              aria-label={categoria.ativo ? 'Desativar categoria' : 'Ativar categoria'}
+              disabled={alternandoId === categoria.id}
+              onClick={() => void alternarAtivo(categoria)}
+              className="rounded-lg p-1.5 text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
             >
-              <MoreVertical className="h-4 w-4" />
+              {categoria.ativo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
             </button>
           ),
         }}
@@ -277,6 +339,34 @@ export default function CategoriasPage() {
                 </p>
               </div>
 
+              <div>
+                <label htmlFor="categoria-imagem" className="mb-1 block text-sm font-medium text-black">
+                  Imagem
+                </label>
+                <input
+                  id="categoria-imagem"
+                  type="url"
+                  value={imagem}
+                  onChange={(event) => setImagem(event.target.value)}
+                  placeholder="https://..."
+                  className="w-full rounded-lg border border-gray-300 p-2 text-black focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="categoria-ordem" className="mb-1 block text-sm font-medium text-black">
+                  Ordem
+                </label>
+                <input
+                  id="categoria-ordem"
+                  type="number"
+                  min={0}
+                  value={ordem}
+                  onChange={(event) => setOrdem(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 p-2 text-black focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                />
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button
                   type="button"
@@ -300,10 +390,10 @@ export default function CategoriasPage() {
         title="Excluir categoria"
         description={
           paraExcluir
-            ? `Tem certeza que deseja excluir "${paraExcluir.nome}"? Produtos vinculados a ela podem ficar sem categoria.`
+            ? `Tem certeza que deseja desativar "${paraExcluir.nome}"? Ela deixa de aparecer no cardápio, mas o histórico é preservado.`
             : ''
         }
-        confirmText={excluindo ? 'Excluindo...' : 'Excluir'}
+        confirmText={excluindo ? 'Desativando...' : 'Desativar'}
         onConfirm={confirmarExclusao}
         onClose={() => setParaExcluir(null)}
       />

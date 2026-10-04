@@ -3,12 +3,13 @@
 import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { io } from 'socket.io-client'
-import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, CheckCircle2, Search, CreditCard } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, CheckCircle2, Search, CreditCard, Receipt } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
 import { PaymentModal } from '@/components/PaymentModal'
 import { unwrapList } from '@/app/lib/legacyArray'
+import { getSocketUrl } from '@/app/lib/socket-url'
 import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -66,7 +67,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 id: item.id,
                 nome: item.produto.nome,
                 quantidade: item.quantidade,
-                preco: item.produto.preco,
+                preco: Number(item.precoUnitario ?? item.produto.preco) + (item.complementos ?? []).reduce((acc, complemento) => acc + Number(complemento.valorCobrado), 0),
                 observacao: item.observacao,
                 status: item.status,
                 horario: new Date(pedido.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -84,6 +85,20 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       console.error('[DEBUG] Error fetching table data:', error)
     }
   }, [mesaId])
+
+  const handleRequestBill = async () => {
+    try {
+      const res = await fetch(`/api/tables/${mesaId}/request-bill`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Não foi possível solicitar a conta')
+      }
+      showToast('Conta enviada para baixa.', 'success')
+      await fetchTableData()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Erro ao solicitar a conta', 'error')
+    }
+  }
 
   useEffect(() => {
     if (showTransferModal) {
@@ -178,7 +193,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   // Real-time updates via Socket.io
   useEffect(() => {
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000')
+    const socket = io(getSocketUrl())
 
     socket.on('connect', () => {
       console.log(`[DEBUG] Socket connected for table ${mesaId}`)
@@ -227,7 +242,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const addToCart = (produto: Produto & { setor: string }) => {
     if (tableStatus === 'FECHAMENTO') return
 
-    if (produto.tipoOpcao && produto.tipoOpcao !== 'padrao') {
+    if ((produto.tipoOpcao && produto.tipoOpcao !== 'padrao') || produto.tipo === 'POR_TAMANHO' || (produto.gruposComplemento?.length ?? 0) > 0) {
       setSelectedProduct(produto)
       return
     }
@@ -244,7 +259,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       return [...prev, {
         produtoId: produto.id,
         nome: produto.nome,
-        preco: produto.preco,
+        preco: Number(produto.valorPromo ?? produto.preco),
         quantidade: 1,
         observacao: '',
         setor: produto.setor
@@ -258,7 +273,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     observation: string,
     _options: string[],
     finalPrice: number,
-    extraItems?: Array<{ quantity: number, observation: string, preco: number }>
+    extraItems?: Array<{ quantity: number, observation: string, preco: number }>,
+    escolhas?: { tamanhoId?: number; complementos?: Array<{ complementoId: number }> }
   ) => {
     if (!selectedProduct) return
 
@@ -281,6 +297,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           preco: finalPrice,
           quantidade: quantity,
           observacao: observation,
+          tamanhoId: escolhas?.tamanhoId,
+          complementos: escolhas?.complementos,
           setor
         })
       }
@@ -301,7 +319,13 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
       // Merge with existing cart logic
       itemsToAdd.forEach(newItem => {
-        const existingIndex = newCart.findIndex(item => item.produtoId === newItem.produtoId && item.observacao === newItem.observacao)
+        const complementoKey = JSON.stringify(newItem.complementos ?? [])
+        const existingIndex = newCart.findIndex(item =>
+          item.produtoId === newItem.produtoId &&
+          item.observacao === newItem.observacao &&
+          item.tamanhoId === newItem.tamanhoId &&
+          JSON.stringify(item.complementos ?? []) === complementoKey
+        )
 
         if (existingIndex >= 0) {
           newCart[existingIndex] = {
@@ -337,6 +361,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           itens: cart.map(item => ({
             produtoId: item.produtoId,
             quantidade: item.quantidade,
+            tamanhoId: item.tamanhoId,
+            complementos: item.complementos,
             observacao: item.observacao
           }))
         })
@@ -435,6 +461,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             >
               <CreditCard size={18} />
               <span className="hidden sm:inline">Fechar Conta</span>
+              </button>
+          )}
+          {userRole === 'GARCOM' && tableStatus !== 'FECHAMENTO' && (
+            <button
+              type="button"
+              onClick={handleRequestBill}
+              className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 font-bold text-white shadow-lg shadow-orange-200 transition-colors hover:bg-orange-700"
+              title="Solicitar Conta"
+            >
+              <Receipt size={18} />
+              <span className="hidden sm:inline">Solicitar Conta</span>
             </button>
           )}
         </div>

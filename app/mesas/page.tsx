@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Loader2, X } from 'lucide-react'
+import { Plus, Loader2, X, ListPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { io } from 'socket.io-client'
 import { useToast } from '@/contexts/ToastContext'
 import { TableCard, Mesa } from '@/components/TableCard'
+import { getSocketUrl } from '@/app/lib/socket-url'
 
 type User = {
   role: string
@@ -24,7 +25,90 @@ export default function MesasPage() {
   const [showReopenModal, setShowReopenModal] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const [podeCadastrar, setPodeCadastrar] = useState(false)
+  const [pracas, setPracas] = useState<Array<{ id: number; nome: string }>>([])
+  const [showLoteModal, setShowLoteModal] = useState(false)
+  const [loteInicio, setLoteInicio] = useState('1')
+  const [loteFim, setLoteFim] = useState('50')
+  const [lotePracaId, setLotePracaId] = useState('')
+  const [lotePrevia, setLotePrevia] = useState<{ criadas: number; ignoradas: number; numerosIgnorados: number[] } | null>(null)
+  const [loteCarregando, setLoteCarregando] = useState(false)
+  const [loteErro, setLoteErro] = useState('')
   const router = useRouter()
+
+  const carregarPracas = async () => {
+    try {
+      const res = await fetch('/api/pracas?page=1&pageSize=100')
+      if (!res.ok) return
+      const corpo = (await res.json()) as { data?: Array<{ id: number; nome: string }> }
+      setPracas(corpo.data ?? [])
+    } catch {
+      // Praças são opcionais aqui: sem elas a geração continua (mesa fica "Não definida").
+    }
+  }
+
+  const abrirLote = () => {
+    setLoteInicio('1')
+    setLoteFim('50')
+    setLotePracaId('')
+    setLotePrevia(null)
+    setLoteErro('')
+    setShowLoteModal(true)
+  }
+
+  /**
+   * RF-MES-03: `previa: true` devolve o que SERIA criado sem gravar nada. É o que
+   * permite ao operador conferir antes de criar 300 mesas por engano.
+   */
+  const conferirLote = async () => {
+    setLoteErro('')
+    setLotePrevia(null)
+    setLoteCarregando(true)
+    try {
+      const res = await fetch('/api/tables/gerar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inicio: Number(loteInicio),
+          fim: Number(loteFim),
+          ...(lotePracaId ? { pracaId: Number(lotePracaId) } : {}),
+          previa: true,
+        }),
+      })
+      const corpo = await res.json()
+      if (!res.ok) throw new Error(corpo?.error || 'Falha ao conferir a faixa')
+      setLotePrevia({ criadas: corpo.criadas, ignoradas: corpo.ignoradas, numerosIgnorados: corpo.numerosIgnorados ?? [] })
+    } catch (erro) {
+      setLoteErro(erro instanceof Error ? erro.message : 'Falha ao conferir a faixa')
+    } finally {
+      setLoteCarregando(false)
+    }
+  }
+
+  const confirmarLote = async () => {
+    setLoteErro('')
+    setLoteCarregando(true)
+    try {
+      const res = await fetch('/api/tables/gerar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inicio: Number(loteInicio),
+          fim: Number(loteFim),
+          ...(lotePracaId ? { pracaId: Number(lotePracaId) } : {}),
+        }),
+      })
+      const corpo = await res.json()
+      if (!res.ok) throw new Error(corpo?.error || 'Falha ao gerar as mesas')
+      showToast(`${corpo.criadas} mesa(s) criada(s), ${corpo.ignoradas} já existia(m).`, 'success')
+      setShowLoteModal(false)
+      await fetchMesas()
+    } catch (erro) {
+      setLoteErro(erro instanceof Error ? erro.message : 'Falha ao gerar as mesas')
+    } finally {
+      setLoteCarregando(false)
+    }
+  }
 
   const handleTableClick = (mesa: Mesa) => {
     if (mesa.status === 'LIVRE') {
@@ -92,7 +176,9 @@ export default function MesasPage() {
       if (res.ok) {
         const data = await res.json()
         console.log('[DEBUG] /api/tables success, count:', data.length);
-        setMesas(data)
+        // O mapa representa somente atendimento em andamento. Mesas livres
+        // continuam cadastradas no banco, mas não ocupam o mapa até serem abertas.
+        setMesas(data.filter((mesa: Mesa) => mesa.status !== 'LIVRE'))
       } else {
          console.error(`[DEBUG] /api/tables failed: ${res.status}`);
          const txt = await res.text();
@@ -114,6 +200,10 @@ export default function MesasPage() {
                 return
             }
             setUser(meData.user)
+            // Cadastrar mesa é `cadastros.editar` (DT-1 da Fase 0), não `mesas.abrir`:
+            // o backend rejeita a criação sem essa permissão. A tela espelha o gate.
+            setPodeCadastrar(Array.isArray(meData.user.permissions) && meData.user.permissions.includes('cadastros.editar'))
+            void carregarPracas()
 
             // Initial fetch
             await fetchMesas()
@@ -127,7 +217,7 @@ export default function MesasPage() {
     init()
     
     // Socket connection for real-time updates
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000')
+    const socket = io(getSocketUrl())
 
     socket.on('connect', () => {
       console.log('[DEBUG] Socket connected')
@@ -228,19 +318,39 @@ export default function MesasPage() {
                   {creating ? <Loader2 className="animate-spin" size={24} /> : <Plus size={24} strokeWidth={2.5} />}
                 </button>
             )}
+
+            {/* Geração em lote (RF-MES-02/03). Visível para quem tem a permissão
+                que o backend realmente exige para criar mesa. */}
+            {podeCadastrar && (
+              <button
+                onClick={abrirLote}
+                title="Gerar mesas em lote (ex.: 1 a 300)"
+                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 h-14 px-5 rounded-2xl shadow-sm transition-all active:scale-95 flex items-center gap-2 font-semibold"
+              >
+                <ListPlus size={22} />
+                <span className="hidden sm:inline">Em lote</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-          {mesas.map((mesa) => (
-            <TableCard 
-              key={mesa.id} 
-              mesa={mesa} 
-              onClick={handleTableClick} 
-            />
-          ))}
-        </div>
+        {/* O mapa exibe apenas mesas abertas; mesas livres não aparecem como cartões. */}
+        {mesas.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+            <p className="text-lg font-semibold text-gray-700">Nenhuma mesa aberta</p>
+            <p className="mt-1 text-sm text-gray-500">As mesas aparecerão aqui quando um atendimento for iniciado.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+            {mesas.map((mesa) => (
+              <TableCard
+                key={mesa.id}
+                mesa={mesa}
+                onClick={handleTableClick}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Add Modal */}
@@ -394,6 +504,141 @@ export default function MesasPage() {
                   Confirmar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Geração de mesas em lote (RF-MES-02/03) */}
+      {showLoteModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <h2 className="text-xl font-bold text-gray-900">Gerar mesas em lote</h2>
+              <button
+                onClick={() => setShowLoteModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Fechar"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-6">
+              <p className="text-sm text-gray-600">
+                Cria todas as mesas de uma faixa de números. Números que já existem são
+                ignorados — nada é duplicado nem sobrescrito.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="lote-inicio" className="mb-1 block text-sm font-medium text-gray-700">
+                    Da mesa
+                  </label>
+                  <input
+                    id="lote-inicio"
+                    type="number"
+                    min={1}
+                    max={300}
+                    value={loteInicio}
+                    onChange={(e) => {
+                      setLoteInicio(e.target.value)
+                      setLotePrevia(null)
+                    }}
+                    className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lote-fim" className="mb-1 block text-sm font-medium text-gray-700">
+                    Até a mesa
+                  </label>
+                  <input
+                    id="lote-fim"
+                    type="number"
+                    min={1}
+                    max={300}
+                    value={loteFim}
+                    onChange={(e) => {
+                      setLoteFim(e.target.value)
+                      setLotePrevia(null)
+                    }}
+                    className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="lote-praca" className="mb-1 block text-sm font-medium text-gray-700">
+                  Praça (opcional)
+                </label>
+                <select
+                  id="lote-praca"
+                  value={lotePracaId}
+                  onChange={(e) => {
+                    setLotePracaId(e.target.value)
+                    setLotePrevia(null)
+                  }}
+                  className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="">Não definida</option>
+                  {pracas.map((praca) => (
+                    <option key={praca.id} value={praca.id}>
+                      {praca.nome}
+                    </option>
+                  ))}
+                </select>
+                {pracas.length === 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Nenhuma praça cadastrada. As mesas ficarão como &quot;Não definida&quot;.
+                  </p>
+                )}
+              </div>
+
+              {loteErro && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {loteErro}
+                </div>
+              )}
+
+              {lotePrevia && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-sm">
+                  <p className="font-semibold text-blue-900">
+                    {lotePrevia.criadas} mesa(s) serão criada(s)
+                    {lotePrevia.ignoradas > 0 && `, ${lotePrevia.ignoradas} já existem e serão ignoradas`}.
+                  </p>
+                  {lotePrevia.numerosIgnorados.length > 0 && (
+                    <p className="mt-1 text-xs text-blue-800">
+                      Já existem: {lotePrevia.numerosIgnorados.slice(0, 20).join(', ')}
+                      {lotePrevia.numerosIgnorados.length > 20 && ` (+${lotePrevia.numerosIgnorados.length - 20})`}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={conferirLote}
+                  disabled={loteCarregando}
+                  className="rounded-xl border-2 border-gray-200 px-4 py-2.5 font-bold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {loteCarregando ? 'Conferindo...' : 'Conferir antes'}
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarLote}
+                  disabled={loteCarregando || !lotePrevia}
+                  title={!lotePrevia ? 'Use "Conferir antes" para ver o que será criado' : undefined}
+                  className="rounded-xl bg-blue-600 px-4 py-2.5 font-bold text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Criar mesas
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                O botão &quot;Criar mesas&quot; só libera depois de conferir, para evitar criar
+                centenas de mesas por engano.
+              </p>
             </div>
           </div>
         </div>

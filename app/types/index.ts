@@ -3,6 +3,27 @@ export type Produto = {
   nome: string
   preco: number
   categoriaId: number
+  tipo?: 'COMUM' | 'POR_TAMANHO'
+  valorPromo?: number | string | null
+  ordem?: number
+  tipoTamanhoId?: number | null
+  tipoTamanho?: {
+    id: number
+    nome: string
+    tamanhos: Array<{ id: number; nome: string; valor: number | string; ordem: number }>
+  } | null
+  gruposComplemento?: Array<{
+    grupoId: number
+    ordem: number
+    grupo: {
+      id: number
+      nome: string
+      obrigatorio: boolean
+      minEscolhas: number
+      maxEscolhas: number | null
+      complementos: Array<{ id: number; nome: string; valor: number | string; ordem: number }>
+    }
+  }>
   tipoOpcao?: 'padrao' | 'tamanho_pg' | 'refrigerante' | 'sabores' | 'sabores_com_tamanho' | 'combinado'
   sabores?: string
   isDrink?: boolean
@@ -28,6 +49,8 @@ export type CartItem = {
   preco: number
   quantidade: number
   observacao: string
+  tamanhoId?: number
+  complementos?: Array<{ complementoId: number }>
   setor: string
 }
 
@@ -49,6 +72,8 @@ export type APIPedido = {
     quantidade: number
     observacao: string | null
     status: string
+    precoUnitario?: number | string | null
+    complementos?: Array<{ valorCobrado: number | string }>
     produto: {
       nome: string
       preco: number

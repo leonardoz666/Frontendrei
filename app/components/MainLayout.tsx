@@ -1,8 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, LogOut, Menu, MessageCircle, User as UserIcon } from 'lucide-react'
+import { LogOut, MessageCircle } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { useToast } from '@/contexts/ToastContext'
 import {
@@ -31,10 +32,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const isLoginPage = pathname === '/login'
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [user, setUser] = useState<NavUser | null>(null)
 
-  const sidebarOffset = isLoginPage ? '' : isCollapsed ? 'md:ml-20' : 'md:ml-64'
+  const isWaiter = user?.role === 'GARCOM'
+  const sidebarOffset = isLoginPage || isWaiter ? '' : isCollapsed ? 'md:ml-[88px]' : 'md:ml-72'
   const supportHref = isLoginPage ? null : resolveSupportHref(process.env.NEXT_PUBLIC_SUPORTE_WHATSAPP)
 
   // Estado recolhido persistido: lido após a montagem para não divergir do SSR.
@@ -70,19 +71,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     }
   }, [isLoginPage])
 
-  // Fecha o menu de usuário ao trocar de rota.
-  useEffect(() => {
-    setIsUserMenuOpen(false)
-  }, [pathname])
-
-  const handleLogout = async () => {
-    setIsUserMenuOpen(false)
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/login')
-    router.refresh()
-  }
-
-  // Atalhos globais (PRD seção 13): F8 = /mesas; F7 = delivery, ainda desabilitado.
+  // Atalho global (PRD seção 13): F8 abre o mapa de mesas.
   useEffect(() => {
     if (isLoginPage) return
 
@@ -111,87 +100,70 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isLoginPage, router, showToast])
 
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+    router.refresh()
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {!isLoginPage && (
         <>
-          {/* Cabeçalho: fixo no mobile; em telas grandes entra no fluxo abaixo da sidebar
-              (as páginas de mesas/produtos têm cabeçalho próprio `sticky top-0`). */}
-          <header
-            className={`bg-white border-b border-gray-200 p-4 flex items-center justify-between gap-3 sticky top-0 z-30 transition-[margin] duration-300 md:relative md:top-auto ${sidebarOffset}`}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                aria-label="Abrir menu"
-              >
-                <Menu size={24} />
-              </button>
-              <span className="font-bold text-gray-800 text-lg truncate">Rei do Pirão</span>
-            </div>
+          {isWaiter ? (
+            <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between gap-6 border-b border-slate-200 bg-white px-5 shadow-sm md:px-8">
+              <div className="flex shrink-0 items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-600 text-xl font-bold text-white">R</div>
+                <div className="hidden sm:block">
+                  <p className="text-base font-bold leading-tight text-slate-900">Rei do Pirão</p>
+                  <p className="text-xs font-medium text-slate-500">Operação do salão</p>
+                </div>
+              </div>
 
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsUserMenuOpen(prev => !prev)}
-                aria-haspopup="menu"
-                aria-expanded={isUserMenuOpen}
-                className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-gray-100 transition-colors"
-              >
-                <span className="w-9 h-9 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                  {user?.name?.charAt(0).toUpperCase() || <UserIcon size={18} />}
-                </span>
-                <span className="hidden sm:block text-left max-w-[10rem]">
-                  <span className="block text-sm font-semibold text-gray-900 truncate leading-tight">
-                    {user?.name ?? 'Carregando…'}
-                  </span>
-                  <span className="block text-[11px] text-gray-500 uppercase font-medium tracking-wide">
-                    {user?.role ?? ''}
-                  </span>
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`text-gray-400 transition-transform duration-200 shrink-0 ${
-                    isUserMenuOpen ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
-
-              {isUserMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setIsUserMenuOpen(false)} />
-                  <div
-                    role="menu"
-                    className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20"
+              <nav className="flex min-w-0 flex-1 items-center justify-center gap-2" aria-label="Navegação do garçom">
+                {[
+                  { href: '/', label: 'Início' },
+                  { href: '/mesas', label: 'Mapa de Mesas' },
+                  { href: '/minhas-mesas', label: 'Minhas Mesas' },
+                ].map(item => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-bold shadow-sm transition-all duration-200 ${pathname === item.href ? 'border-orange-400 bg-orange-50 text-orange-900 shadow-orange-100' : 'border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-900'}`}
                   >
-                    <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{user?.name ?? '—'}</p>
-                      <p className="text-xs text-gray-500 uppercase font-medium tracking-wide">
-                        {user?.role ?? '—'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
-                    >
-                      <LogOut size={18} />
-                      Sair
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </header>
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
 
-          <Sidebar
-            isOpen={isSidebarOpen}
-            onClose={() => setIsSidebarOpen(false)}
-            user={user}
-            collapsed={isCollapsed}
-            onToggleCollapse={toggleCollapsed}
-          />
+              <div className="flex shrink-0 items-center gap-3">
+                <div className="hidden text-right sm:block">
+                  <p className="max-w-36 truncate text-sm font-semibold text-slate-900">{user?.name ?? 'Garçom'}</p>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">GARÇOM</p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+                  {user?.name?.charAt(0).toUpperCase() || 'G'}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  title="Sair"
+                  aria-label="Sair"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                >
+                  <LogOut size={17} />
+                </button>
+              </div>
+            </header>
+          ) : (
+            <Sidebar
+              isOpen={isSidebarOpen}
+              onClose={() => setIsSidebarOpen(false)}
+              user={user}
+              collapsed={isCollapsed}
+              onToggleCollapse={toggleCollapsed}
+            />
+          )}
 
           {supportHref && (
             <a

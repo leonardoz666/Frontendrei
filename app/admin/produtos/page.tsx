@@ -24,6 +24,27 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
+type TipoTamanho = {
+  id: number
+  nome: string
+}
+
+type Dispositivo = {
+  id: number
+  nome: string
+  tipo: string
+  ativo: boolean
+}
+
+type ComplementoGrupo = {
+  id: number
+  nome: string
+  obrigatorio: boolean
+  minEscolhas: number
+  maxEscolhas: number | null
+  ativo: boolean
+}
+
 export default function ProdutosPage() {
   const { showToast } = useToast()
   const queryClient = useQueryClient()
@@ -61,6 +82,21 @@ export default function ProdutosPage() {
       // importação, então precisa de TODAS, não de uma página.
       return fetchList<Categoria>('/categories?page=1&pageSize=100')
     }
+  })
+
+  const { data: tiposTamanho = [] } = useQuery<TipoTamanho[]>({
+    queryKey: ['tipos-tamanho', 'select'],
+    queryFn: async () => fetchList<TipoTamanho>('/tipos-tamanho?page=1&pageSize=100&sort=nome&order=asc')
+  })
+
+  const { data: dispositivos = [] } = useQuery<Dispositivo[]>({
+    queryKey: ['dispositivos', 'select'],
+    queryFn: async () => fetchList<Dispositivo>('/dispositivos?page=1&pageSize=100&ativo=true&tipo=IMPRESSORA&sort=nome&order=asc')
+  })
+
+  const { data: gruposComplemento = [] } = useQuery<ComplementoGrupo[]>({
+    queryKey: ['complementos-grupos', 'select'],
+    queryFn: async () => fetchList<ComplementoGrupo>('/complementos/grupos?page=1&pageSize=100&ativo=true&sort=ordem&order=asc')
   })
 
   const [isAdding, setIsAdding] = useState(false)
@@ -171,8 +207,16 @@ export default function ProdutosPage() {
 
   // Form States
   const [nome, setNome] = useState('')
+  const [codigo, setCodigo] = useState('')
+  const [descricao, setDescricao] = useState('')
   const [preco, setPreco] = useState('')
+  const [valorPromo, setValorPromo] = useState('')
+  const [custo, setCusto] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
+  const [tipo, setTipo] = useState<'COMUM' | 'POR_TAMANHO'>('COMUM')
+  const [tipoTamanhoId, setTipoTamanhoId] = useState('')
+  const [dispositivoId, setDispositivoId] = useState('')
+  const [ordemProduto, setOrdemProduto] = useState('0')
   const [ativo, setAtivo] = useState(true)
   const [foto, setFoto] = useState<string | undefined>(undefined)
   const [file, setFile] = useState<File | null>(null)
@@ -182,6 +226,15 @@ export default function ProdutosPage() {
   const [isDrink, setIsDrink] = useState(false)
   const [isFood, setIsFood] = useState(true)
   const [favorito, setFavorito] = useState(false)
+  const [destaque, setDestaque] = useState(false)
+  const [controlaEstoque, setControlaEstoque] = useState(false)
+  const [autoatendimento, setAutoatendimento] = useState(false)
+  const [fiscal, setFiscal] = useState(false)
+  const [gruposComplementoIds, setGruposComplementoIds] = useState<number[]>([])
+  const [ncm, setNcm] = useState('')
+  const [cfop, setCfop] = useState('')
+  const [cstCsosn, setCstCsosn] = useState('')
+  const [aliquotaIcms, setAliquotaIcms] = useState('')
   const [permitirObservacao, setPermitirObservacao] = useState(true)
   const [permiteGeloLimao, setPermiteGeloLimao] = useState(false)
 
@@ -226,6 +279,10 @@ export default function ProdutosPage() {
     setSabores(sabores.filter(s => s !== saborToRemove))
   }
 
+  const appendText = (formData: FormData, field: string, value: string) => {
+    formData.append(field, value.trim())
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -237,8 +294,16 @@ export default function ProdutosPage() {
 
       const formData = new FormData()
       formData.append('nome', nome)
+      appendText(formData, 'codigo', codigo)
+      appendText(formData, 'descricao', descricao)
       formData.append('preco', preco || '0')
+      appendText(formData, 'valorPromo', valorPromo)
+      formData.append('custo', custo || '0')
       if (categoriaId) formData.append('categoriaId', categoriaId)
+      formData.append('tipo', tipo)
+      appendText(formData, 'tipoTamanhoId', tipo === 'POR_TAMANHO' ? tipoTamanhoId : '')
+      appendText(formData, 'dispositivoId', dispositivoId)
+      formData.append('ordem', ordemProduto || '0')
       formData.append('ativo', String(ativo))
       if (file) formData.append('foto', file)
       formData.append('tipoOpcao', tipoOpcao)
@@ -246,6 +311,14 @@ export default function ProdutosPage() {
       formData.append('isDrink', String(isDrink))
       formData.append('isFood', String(isFood))
       formData.append('favorito', String(favorito))
+      formData.append('destaque', String(destaque))
+      formData.append('controlaEstoque', String(controlaEstoque))
+      formData.append('autoatendimento', String(autoatendimento))
+      formData.append('fiscal', String(fiscal))
+      appendText(formData, 'ncm', ncm)
+      appendText(formData, 'cfop', cfop)
+      appendText(formData, 'cstCsosn', cstCsosn)
+      appendText(formData, 'aliquotaIcms', aliquotaIcms)
       formData.append('permitirObservacao', String(permitirObservacao))
       formData.append('permiteGeloLimao', String(permiteGeloLimao))
 
@@ -255,6 +328,16 @@ export default function ProdutosPage() {
       })
 
       if (!res.ok) throw new Error('Erro ao salvar produto')
+      const produtoSalvo = await res.json() as Produto
+
+      const gruposRes = await fetch(`/api/products/${produtoSalvo.id}/grupos-complemento`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grupos: gruposComplementoIds.map((grupoId, index) => ({ grupoId, ordem: index }))
+        })
+      })
+      if (!gruposRes.ok) throw new Error('Erro ao salvar complementos do produto')
 
       showToast(editingId ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!', 'success')
       resetForm()
@@ -269,10 +352,18 @@ export default function ProdutosPage() {
 
   const resetForm = () => {
     setNome('')
+    setCodigo('')
+    setDescricao('')
     setPreco('')
+    setValorPromo('')
+    setCusto('')
     setAtivo(true)
     setEditingId(null)
     setIsAdding(false)
+    setTipo('COMUM')
+    setTipoTamanhoId('')
+    setDispositivoId('')
+    setOrdemProduto('0')
     setFoto(undefined)
     setFile(null)
     setTipoOpcao('padrao')
@@ -281,6 +372,15 @@ export default function ProdutosPage() {
     setIsDrink(false)
     setIsFood(true)
     setFavorito(false)
+    setDestaque(false)
+    setControlaEstoque(false)
+    setAutoatendimento(false)
+    setFiscal(false)
+    setGruposComplementoIds([])
+    setNcm('')
+    setCfop('')
+    setCstCsosn('')
+    setAliquotaIcms('')
     setPermitirObservacao(true)
     setPermiteGeloLimao(false)
     setError('')
@@ -291,8 +391,16 @@ export default function ProdutosPage() {
     setEditingId(prod.id)
     setIsAdding(true)
     setNome(prod.nome)
+    setCodigo(prod.codigo ?? '')
+    setDescricao(prod.descricao ?? '')
     setPreco(prod.preco.toString())
+    setValorPromo(prod.valorPromo === null || prod.valorPromo === undefined ? '' : String(prod.valorPromo))
+    setCusto(prod.custo === null || prod.custo === undefined ? '' : String(prod.custo))
     setCategoriaId(prod.categoriaId ? prod.categoriaId.toString() : (categorias[0]?.id.toString() || ''))
+    setTipo(prod.tipo ?? 'COMUM')
+    setTipoTamanhoId(prod.tipoTamanhoId ? String(prod.tipoTamanhoId) : '')
+    setDispositivoId(prod.dispositivoId ? String(prod.dispositivoId) : '')
+    setOrdemProduto(prod.ordem === undefined || prod.ordem === null ? '0' : String(prod.ordem))
     setAtivo(prod.ativo)
     setFoto(prod.foto)
     setTipoOpcao((prod.tipoOpcao as Produto['tipoOpcao']) || 'padrao')
@@ -310,6 +418,15 @@ export default function ProdutosPage() {
     setIsDrink(prod.isDrink || false)
     setIsFood(prod.isFood !== undefined ? prod.isFood : true)
     setFavorito(prod.favorito || false)
+    setDestaque(prod.destaque || false)
+    setControlaEstoque(prod.controlaEstoque || false)
+    setAutoatendimento(prod.autoatendimento || false)
+    setFiscal(prod.fiscal || false)
+    setGruposComplementoIds((prod.gruposComplemento ?? []).map((vinculo) => vinculo.grupoId))
+    setNcm(prod.ncm ?? '')
+    setCfop(prod.cfop ?? '')
+    setCstCsosn(prod.cstCsosn ?? '')
+    setAliquotaIcms(prod.aliquotaIcms === null || prod.aliquotaIcms === undefined ? '' : String(prod.aliquotaIcms))
     setPermitirObservacao(prod.permitirObservacao !== undefined ? prod.permitirObservacao : true)
     setPermiteGeloLimao(prod.permiteGeloLimao || false)
     setFile(null)
@@ -649,7 +766,7 @@ export default function ProdutosPage() {
       {/* Modal Add/Edit Product */}
       {isAdding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm max-h-[90vh] rounded-2xl border border-gray-200 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
+          <div className="bg-white w-full max-w-lg max-h-[90vh] rounded-2xl border border-gray-200 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="flex justify-between items-center p-4 border-b border-gray-200 shrink-0">
               <h2 className="text-lg font-bold text-gray-900">{editingId ? 'Editar Produto' : 'Novo Produto'}</h2>
               <button onClick={resetForm} className="text-gray-400 hover:text-gray-900 p-1 rounded-lg hover:bg-gray-100">
@@ -707,8 +824,41 @@ export default function ProdutosPage() {
                   />
                 </div>
 
-                {/* Price & Category */}
                 <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Código</label>
+                    <input
+                      type="text"
+                      value={codigo}
+                      onChange={e => setCodigo(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                      placeholder="SKU ou PLU"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Ordem</label>
+                    <input
+                      type="number"
+                      value={ordemProduto}
+                      onChange={e => setOrdemProduto(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Descrição</label>
+                  <textarea
+                    value={descricao}
+                    onChange={e => setDescricao(e.target.value)}
+                    className="w-full min-h-20 bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-blue-600 outline-none text-sm resize-none"
+                    placeholder="Detalhes exibidos no cardápio"
+                  />
+                </div>
+
+                {/* Price & Category */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Preço (R$)</label>
                     <input
@@ -716,6 +866,28 @@ export default function ProdutosPage() {
                       step="0.01"
                       value={preco}
                       onChange={e => setPreco(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Promo (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={valorPromo}
+                      onChange={e => setValorPromo(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Custo</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={custo}
+                      onChange={e => setCusto(e.target.value)}
                       className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-blue-600 outline-none text-sm"
                       placeholder="0.00"
                     />
@@ -749,6 +921,88 @@ export default function ProdutosPage() {
                       ))}
                     </select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Tipo de Preço</label>
+                    <select
+                      value={tipo}
+                      onChange={e => setTipo(e.target.value as 'COMUM' | 'POR_TAMANHO')}
+                      className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                    >
+                      <option value="COMUM">Preço único</option>
+                      <option value="POR_TAMANHO">Por tabela de tamanhos</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Tabela de Tamanhos</label>
+                    <select
+                      value={tipoTamanhoId}
+                      onChange={e => setTipoTamanhoId(e.target.value)}
+                      disabled={tipo !== 'POR_TAMANHO'}
+                      className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                    >
+                      <option value="">Selecione</option>
+                      {tiposTamanho.map(item => (
+                        <option key={item.id} value={item.id}>{item.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Impressora de Produção</label>
+                  <select
+                    value={dispositivoId}
+                    onChange={e => setDispositivoId(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                  >
+                    <option value="">Usar roteamento por categoria/praça</option>
+                    {dispositivos.map(item => (
+                      <option key={item.id} value={item.id}>{item.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Grupos de Complementos</label>
+                    <span className="text-[10px] text-gray-400">{gruposComplementoIds.length} vinculados</span>
+                  </div>
+                  {gruposComplemento.length === 0 ? (
+                    <p className="text-xs text-gray-500">Cadastre grupos em Cardápio &gt; Complementos.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 max-h-44 overflow-y-auto pr-1">
+                      {gruposComplemento.map(grupo => {
+                        const marcado = gruposComplementoIds.includes(grupo.id)
+                        return (
+                          <button
+                            key={grupo.id}
+                            type="button"
+                            onClick={() => setGruposComplementoIds(prev => marcado ? prev.filter(id => id !== grupo.id) : [...prev, grupo.id])}
+                            className={clsx(
+                              "flex items-center justify-between gap-3 rounded-lg border p-2.5 text-left transition-colors",
+                              marcado ? "border-orange-300 bg-orange-50" : "border-gray-200 bg-white hover:border-orange-200"
+                            )}
+                          >
+                            <span>
+                              <span className="block text-sm font-bold text-gray-800">{grupo.nome}</span>
+                              <span className="block text-[10px] text-gray-500">
+                                {grupo.obrigatorio ? 'Obrigatório' : 'Opcional'} · min {grupo.minEscolhas} · max {grupo.maxEscolhas ?? 'livre'}
+                              </span>
+                            </span>
+                            <span className={clsx(
+                              "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                              marcado ? "bg-orange-600 border-orange-600" : "border-gray-400 bg-white"
+                            )}>
+                              {marcado && <Check size={14} className="text-white" />}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Option Type */}
@@ -827,6 +1081,73 @@ export default function ProdutosPage() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-2">
+                    <div 
+                      className="flex items-center gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
+                      onClick={() => setFavorito(!favorito)}
+                    >
+                      <div className={clsx(
+                        "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                        favorito ? "bg-amber-500 border-amber-500" : "border-gray-400 bg-white"
+                      )}>
+                        {favorito && <Check size={14} className="text-white" />}
+                      </div>
+                      <span className="text-sm font-bold text-gray-700">Favorito</span>
+                    </div>
+
+                    <div 
+                      className="flex items-center gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
+                      onClick={() => setDestaque(!destaque)}
+                    >
+                      <div className={clsx(
+                        "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                        destaque ? "bg-amber-500 border-amber-500" : "border-gray-400 bg-white"
+                      )}>
+                        {destaque && <Check size={14} className="text-white" />}
+                      </div>
+                      <span className="text-sm font-bold text-gray-700">Destaque</span>
+                    </div>
+
+                    <div 
+                      className="flex items-center gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
+                      onClick={() => setControlaEstoque(!controlaEstoque)}
+                    >
+                      <div className={clsx(
+                        "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                        controlaEstoque ? "bg-emerald-600 border-emerald-600" : "border-gray-400 bg-white"
+                      )}>
+                        {controlaEstoque && <Check size={14} className="text-white" />}
+                      </div>
+                      <span className="text-sm font-bold text-gray-700">Estoque</span>
+                    </div>
+
+                    <div 
+                      className="flex items-center gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
+                      onClick={() => setFiscal(!fiscal)}
+                    >
+                      <div className={clsx(
+                        "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                        fiscal ? "bg-indigo-600 border-indigo-600" : "border-gray-400 bg-white"
+                      )}>
+                        {fiscal && <Check size={14} className="text-white" />}
+                      </div>
+                      <span className="text-sm font-bold text-gray-700">Fiscal</span>
+                    </div>
+
+                    <div 
+                      className="flex items-center gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
+                      onClick={() => setAutoatendimento(!autoatendimento)}
+                    >
+                      <div className={clsx(
+                        "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
+                        autoatendimento ? "bg-blue-600 border-blue-600" : "border-gray-400 bg-white"
+                      )}>
+                        {autoatendimento && <Check size={14} className="text-white" />}
+                      </div>
+                      <span className="text-sm font-bold text-gray-700">Autoatendimento</span>
+                    </div>
+                  </div>
+
                   {/* Permitir Observação */}
                   <div 
                     className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
@@ -861,6 +1182,43 @@ export default function ProdutosPage() {
                     </div>
                   </div>
                 </div>
+
+                {fiscal && (
+                  <div className="space-y-3 bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                    <label className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Fiscal</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        value={ncm}
+                        onChange={e => setNcm(e.target.value)}
+                        className="w-full bg-white border border-indigo-100 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                        placeholder="NCM"
+                      />
+                      <input
+                        type="text"
+                        value={cfop}
+                        onChange={e => setCfop(e.target.value)}
+                        className="w-full bg-white border border-indigo-100 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                        placeholder="CFOP"
+                      />
+                      <input
+                        type="text"
+                        value={cstCsosn}
+                        onChange={e => setCstCsosn(e.target.value)}
+                        className="w-full bg-white border border-indigo-100 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                        placeholder="CST/CSOSN"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={aliquotaIcms}
+                        onChange={e => setAliquotaIcms(e.target.value)}
+                        className="w-full bg-white border border-indigo-100 rounded-lg p-2.5 text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                        placeholder="ICMS %"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Sabores List */}
                 {(tipoOpcao === 'sabores' || tipoOpcao === 'sabores_com_tamanho' || tipoOpcao === 'combinado' || tipoOpcao === 'refrigerante') && (

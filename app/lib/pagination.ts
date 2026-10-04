@@ -208,13 +208,14 @@ export function usePagedQuery<T>(
   const normalizedPageSize = normalizePageSize(pageSize)
   const normalizedSort = sort?.trim() ? sort.trim() : null
 
-  const url = `${resource}${buildListQuery({
+  const queryString = buildListQuery({
     page: normalizedPage,
     pageSize: normalizedPageSize,
     search: debouncedSearch,
     sort: normalizedSort,
     order,
-  })}`
+  })
+  const url = `${resource}${resource.includes('?') ? `&${queryString.slice(1)}` : queryString}`
 
   const resolvedKey = queryKey ?? [
     resource,

@@ -11,7 +11,8 @@ interface ProductOptionsModalProps {
     observation: string, 
     selectedOptions: string[],
     finalPrice: number,
-    extraItems?: Array<{quantity: number, observation: string, preco: number}>
+    extraItems?: Array<{quantity: number, observation: string, preco: number}>,
+    escolhas?: { tamanhoId?: number; complementos?: Array<{ complementoId: number }> }
   ) => void
 }
 
@@ -20,6 +21,8 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
   const [observation, setObservation] = useState('')
   const [selectedOptions, setSelectedOptions] = useState<string[]>([])
   const [optionQuantities, setOptionQuantities] = useState<Record<string, number>>({})
+  const [selectedTamanhoId, setSelectedTamanhoId] = useState<number | undefined>(undefined)
+  const [selectedComplementos, setSelectedComplementos] = useState<number[]>([])
   const [wantsGelo, setWantsGelo] = useState(false)
   const [wantsLimao, setWantsLimao] = useState(false)
   
@@ -31,6 +34,8 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
       setObservation('')
       setSelectedOptions([])
       setOptionQuantities({})
+      setSelectedTamanhoId(undefined)
+      setSelectedComplementos([])
       setWantsGelo(false)
       setWantsLimao(false)
     }
@@ -48,6 +53,21 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
   }
 
   const options = parseSabores()
+  const tamanhos = product.tipo === 'POR_TAMANHO' ? (product.tipoTamanho?.tamanhos ?? []) : []
+  const gruposComplemento = product.gruposComplemento ?? []
+  const tamanhoSelecionado = tamanhos.find(tamanho => tamanho.id === selectedTamanhoId)
+  const precoBase = tamanhoSelecionado ? Number(tamanhoSelecionado.valor) : Number(product.valorPromo ?? product.preco)
+  const complementosSelecionados = gruposComplemento
+    .flatMap(vinculo => vinculo.grupo.complementos)
+    .filter(complemento => selectedComplementos.includes(complemento.id))
+  const complementoTotal = complementosSelecionados.reduce((acc, complemento) => acc + Number(complemento.valor), 0)
+  const precoUnitario = precoBase + complementoTotal
+  const complementoInvalido = gruposComplemento.some(vinculo => {
+    const idsDoGrupo = new Set(vinculo.grupo.complementos.map(complemento => complemento.id))
+    const escolhidos = selectedComplementos.filter(id => idsDoGrupo.has(id)).length
+    const minimo = vinculo.grupo.obrigatorio ? Math.max(1, vinculo.grupo.minEscolhas) : vinculo.grupo.minEscolhas
+    return escolhidos < minimo || (vinculo.grupo.maxEscolhas !== null && escolhidos > vinculo.grupo.maxEscolhas)
+  })
 
   const updateOptionQuantity = (opt: string, delta: number) => {
     setOptionQuantities(prev => {
@@ -91,15 +111,22 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
     }
 
     // Construct final observation with options
-    const optionsText = selectedOptions.length > 0 ? `( ${selectedOptions.join(', ')} ) ` : ''
+    const tamanhoText = tamanhoSelecionado ? `Tamanho: ${tamanhoSelecionado.nome}` : ''
+    const complementosText = complementosSelecionados.length > 0 ? `Adicionais: ${complementosSelecionados.map(c => c.nome).join(', ')}` : ''
+    const optionsText = [...(selectedOptions.length > 0 ? [`( ${selectedOptions.join(', ')} )`] : []), tamanhoText, complementosText]
+      .filter(Boolean)
+      .join(' | ')
     
     let obs = observation
     if (wantsGelo) obs = obs ? `${obs}, Gelo` : 'Gelo'
     if (wantsLimao) obs = obs ? `${obs}, Limão` : 'Limão'
     
-    const finalObs = (optionsText + obs).trim()
+    const finalObs = [optionsText, obs].filter(Boolean).join(' | ').trim()
     
-    onConfirm(quantity, finalObs, selectedOptions, product.preco)
+    onConfirm(quantity, finalObs, selectedOptions, precoUnitario, undefined, {
+      tamanhoId: selectedTamanhoId,
+      complementos: selectedComplementos.map(complementoId => ({ complementoId }))
+    })
   }
 
   const toggleOption = (opt: string) => {
@@ -368,6 +395,7 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
     : quantity
 
   const totalPrice = totalQuantity * product.preco
+  const totalPriceNovo = totalQuantity * precoUnitario
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4">
@@ -377,7 +405,7 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white rounded-t-2xl sticky top-0 z-10">
           <div>
             <h2 className="text-lg font-bold text-gray-900 leading-tight">{product.nome}</h2>
-            <p className="text-orange-500 font-bold">R$ {product.preco.toFixed(2).replace('.', ',')}</p>
+            <p className="text-orange-500 font-bold">R$ {precoUnitario.toFixed(2).replace('.', ',')}</p>
           </div>
           <button 
             onClick={onClose}
@@ -389,6 +417,67 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {renderContent()}
+
+          {tamanhos.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-bold text-gray-700">Tamanho</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {tamanhos.map(tamanho => (
+                  <button
+                    key={tamanho.id}
+                    onClick={() => setSelectedTamanhoId(tamanho.id)}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      selectedTamanhoId === tamanho.id
+                        ? 'border-orange-500 bg-orange-50 text-orange-700 font-bold'
+                        : 'border-gray-100 bg-white text-gray-600 hover:border-orange-200'
+                    }`}
+                  >
+                    <span className="block">{tamanho.nome}</span>
+                    <span className="text-xs">R$ {Number(tamanho.valor).toFixed(2).replace('.', ',')}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {gruposComplemento.map(vinculo => (
+            <div key={vinculo.grupoId} className="space-y-3">
+              <div>
+                <h3 className="font-bold text-gray-700">{vinculo.grupo.nome}</h3>
+                <p className="text-xs text-gray-500">
+                  {vinculo.grupo.obrigatorio ? 'Obrigatório' : 'Opcional'} · min {vinculo.grupo.obrigatorio ? Math.max(1, vinculo.grupo.minEscolhas) : vinculo.grupo.minEscolhas} · max {vinculo.grupo.maxEscolhas ?? 'livre'}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {vinculo.grupo.complementos.map(complemento => {
+                  const marcado = selectedComplementos.includes(complemento.id)
+                  const idsDoGrupo = new Set(vinculo.grupo.complementos.map(item => item.id))
+                  const escolhidosNoGrupo = selectedComplementos.filter(id => idsDoGrupo.has(id)).length
+                  const maximoAtingido = !marcado && vinculo.grupo.maxEscolhas !== null && escolhidosNoGrupo >= vinculo.grupo.maxEscolhas
+                  return (
+                    <button
+                      key={complemento.id}
+                      onClick={() => {
+                        if (maximoAtingido) return
+                        setSelectedComplementos(prev => marcado
+                          ? prev.filter(id => id !== complemento.id)
+                          : [...prev, complemento.id]
+                        )
+                      }}
+                      className={`p-3 rounded-xl border-2 text-left transition-all flex items-center justify-between ${
+                        marcado
+                          ? 'border-orange-500 bg-orange-50 text-orange-700 font-bold'
+                          : 'border-gray-100 bg-white text-gray-600 hover:border-orange-200'
+                      }`}
+                    >
+                      <span>{complemento.nome}</span>
+                      <span className="text-xs">+ R$ {Number(complemento.valor).toFixed(2).replace('.', ',')}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
 
           {/* Quantity - Hide for refrigerante since it has per-item quantity */}
           {product.tipoOpcao !== 'refrigerante' && (
@@ -478,12 +567,14 @@ export function ProductOptionsModal({ isOpen, onClose, product, onConfirm }: Pro
               (product.tipoOpcao === 'refrigerante' && Object.keys(optionQuantities).length === 0) ||
               (product.tipoOpcao === 'sabores' && selectedOptions.length === 0) ||
               (product.tipoOpcao === 'tamanho_pg' && selectedOptions.length === 0) ||
-              (product.tipoOpcao === 'sabores_com_tamanho' && selectedOptions.length < 2)
+              (product.tipoOpcao === 'sabores_com_tamanho' && selectedOptions.length < 2) ||
+              (tamanhos.length > 0 && !selectedTamanhoId) ||
+              complementoInvalido
             }
             className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-orange-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             <span>Adicionar ao Pedido</span>
             <span className="bg-white/20 px-2 py-0.5 rounded text-sm">
-              R$ {totalPrice.toFixed(2).replace('.', ',')}
+              R$ {(product.tipoOpcao === 'refrigerante' ? totalPrice : totalPriceNovo).toFixed(2).replace('.', ',')}
             </span>
           </button>
         </div>

@@ -13,6 +13,7 @@ interface ConfirmationModalProps {
   variant?: 'danger' | 'success' | 'warning' | 'info';
   children?: ReactNode;
   showCancel?: boolean;
+  closeOnConfirm?: boolean;
 }
 
 export function ConfirmationModal({
@@ -25,7 +26,8 @@ export function ConfirmationModal({
   cancelText = 'Cancelar',
   variant = 'danger',
   children,
-  showCancel = true
+  showCancel = true,
+  closeOnConfirm = true
 }: ConfirmationModalProps) {
   if (!isOpen) return null;
 
@@ -58,7 +60,7 @@ export function ConfirmationModal({
             <button
               onClick={() => {
                 if (onConfirm) onConfirm();
-                onClose();
+                if (closeOnConfirm) onClose();
               }}
               className={clsx(
                 "flex-1 py-3 px-4 rounded-xl font-bold text-white transition-colors flex items-center justify-center gap-2",

@@ -5,7 +5,7 @@ import { X, CreditCard, Smartphone, Banknote, Calculator, Check, Loader2, Users,
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 
-type PaymentMethod = 'DINHEIRO' | 'PIX' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO'
+type PaymentMethod = 'DINHEIRO' | 'PIX' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO' | 'VALE_REFEICAO'
 
 type PaymentItem = {
     id: number | string
@@ -31,6 +31,7 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
     const [splitCount, setSplitCount] = useState(1)
     const [processing, setProcessing] = useState(false)
     const [pagoParcialInfo, setPagoParcialInfo] = useState<{ saldoRestante: number; pagoAteAgora: number } | null>(null)
+    const [emitirNfce, setEmitirNfce] = useState(true)
 
     const [splitMode, setSplitMode] = useState<'PEOPLE' | 'ITEMS'>('PEOPLE')
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string | number>>(new Set())
@@ -42,7 +43,7 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
 
         if (splitMode === 'PEOPLE') {
             const perPerson = fullFinalTotal / splitCount
-            return { rawTotal: rawFullTotal, serviceFee: serviceFeeFull, finalTotal: fullFinalTotal, perPerson }
+            return { rawTotal: rawFullTotal, serviceFee: serviceFeeFull, finalTotal: fullFinalTotal, perPerson, fullFinalTotal }
         } else {
             let itemsTotal = 0
             items.forEach(item => {
@@ -67,6 +68,7 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
         { id: 'PIX' as PaymentMethod, label: 'PIX', icon: Smartphone, color: 'bg-teal-500' },
         { id: 'CARTAO_CREDITO' as PaymentMethod, label: 'Crédito', icon: CreditCard, color: 'bg-blue-500' },
         { id: 'CARTAO_DEBITO' as PaymentMethod, label: 'Débito', icon: CreditCard, color: 'bg-purple-500' },
+        { id: 'VALE_REFEICAO' as PaymentMethod, label: 'Vale-refeição', icon: CreditCard, color: 'bg-amber-500' },
     ]
 
     const handleConfirmPayment = async () => {
@@ -82,7 +84,8 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                 body: JSON.stringify({
                     tipo: selectedMethod,
                     valor: valueToPay,
-                    troco: selectedMethod === 'DINHEIRO' ? Math.max(0, change) : 0
+                    troco: selectedMethod === 'DINHEIRO' ? Math.max(0, change) : 0,
+                    emitirNfce
                 })
             })
 
@@ -90,7 +93,17 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
 
             if (res.ok) {
                 if (data.fechado) {
-                    showToast('Conta fechada com sucesso!', 'success')
+                    if (data.nfce) {
+                        const autorizada = data.nfce.status === 'AUTORIZADA'
+                        showToast(
+                            autorizada
+                                ? `Conta fechada e NFC-e ${data.nfce.serie}/${data.nfce.numero} autorizada`
+                                : `Conta fechada. NFC-e pendente/rejeitada: ${data.nfce.motivoRejeicao || data.nfce.status}`,
+                            autorizada ? 'success' : 'warning'
+                        )
+                    } else {
+                        showToast('Conta fechada com sucesso!', 'success')
+                    }
                     onSuccess()
                     onClose()
                 } else {
@@ -133,6 +146,7 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
             setSelectedItemIds(new Set())
             setSplitCount(1)
             setSplitMode('PEOPLE')
+            setEmitirNfce(true)
         }
     }, [isOpen])
 
@@ -312,6 +326,19 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                                 })}
                             </div>
                         </div>
+
+                        <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-3 text-sm text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={emitirNfce}
+                                onChange={(event) => setEmitirNfce(event.target.checked)}
+                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            />
+                            <span>
+                                <span className="block font-semibold text-gray-900">Emitir NFC-e ao fechar</span>
+                                <span className="text-gray-500">A emissão só ocorre quando a conta for quitada totalmente.</span>
+                            </span>
+                        </label>
 
                         {/* Cash amount input */}
                         {selectedMethod === 'DINHEIRO' && (

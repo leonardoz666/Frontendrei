@@ -9,11 +9,30 @@ export type Categoria = {
 
 export type Produto = {
   id: number
+  codigo?: string | null
   nome: string
+  descricao?: string | null
   preco: number
   ativo: boolean
   categoriaId: number | null
   categoria?: Categoria
+  tipo?: 'COMUM' | 'POR_TAMANHO'
+  tipoTamanhoId?: number | null
+  tipoTamanho?: { id: number; nome: string } | null
+  valorPromo?: number | string | null
+  custo?: number | string | null
+  fiscal?: boolean
+  ncm?: string | null
+  cfop?: string | null
+  cstCsosn?: string | null
+  aliquotaIcms?: number | string | null
+  dispositivoId?: number | null
+  dispositivo?: { id: number; nome: string } | null
+  gruposComplemento?: Array<{ grupoId: number; ordem: number; grupo?: { id: number; nome: string } }>
+  destaque?: boolean
+  controlaEstoque?: boolean
+  autoatendimento?: boolean
+  ordem?: number
   foto?: string
   tipoOpcao?: 'padrao' | 'tamanho_pg' | 'refrigerante' | 'sabores' | 'sabores_com_tamanho' | 'combinado'
   sabores?: string // JSON string
@@ -101,8 +120,24 @@ export const ProductCard = memo(function ProductCard({ prod, onEdit, onDelete }:
         <div className="flex items-start justify-between gap-1">
           <span className="font-bold text-[10px] sm:text-xs leading-tight text-gray-800 line-clamp-2">{prod.nome}</span>
         </div>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <span className="text-[10px] font-semibold text-gray-900">
+            {prod.tipo === 'POR_TAMANHO' ? 'Por tamanho' : `R$ ${Number(prod.valorPromo ?? prod.preco ?? 0).toFixed(2)}`}
+          </span>
+          {prod.codigo && <span className="text-[8px] text-gray-400 truncate">{prod.codigo}</span>}
+        </div>
         
         <div className="mt-1.5 flex flex-wrap gap-1">
+          {prod.tipo === 'POR_TAMANHO' && (
+            <span className="text-[8px] sm:text-[9px] px-1 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 leading-none">
+              {prod.tipoTamanho?.nome ?? 'Tamanhos'}
+            </span>
+          )}
+          {prod.controlaEstoque && (
+            <span className="text-[8px] sm:text-[9px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 leading-none">
+              Estoque
+            </span>
+          )}
           {prod.tipoOpcao !== 'padrao' && (
             <span className="text-[8px] sm:text-[9px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 leading-none">
               {prod.tipoOpcao === 'refrigerante' ? 'Bebida' : 
@@ -125,6 +160,11 @@ export const ProductCard = memo(function ProductCard({ prod, onEdit, onDelete }:
          prev.prod.preco === next.prod.preco &&
          prev.prod.foto === next.prod.foto &&
          prev.prod.tipoOpcao === next.prod.tipoOpcao &&
+         prev.prod.tipo === next.prod.tipo &&
+         prev.prod.tipoTamanhoId === next.prod.tipoTamanhoId &&
+         prev.prod.valorPromo === next.prod.valorPromo &&
+         prev.prod.codigo === next.prod.codigo &&
+         prev.prod.controlaEstoque === next.prod.controlaEstoque &&
          prev.prod.isDrink === next.prod.isDrink &&
          prev.prod.isFood === next.prod.isFood
 })

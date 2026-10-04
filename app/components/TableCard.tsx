@@ -6,6 +6,10 @@ export interface Mesa {
   id: number
   numero: number
   status: MesaStatus
+  praca?: {
+    id: number
+    nome: string
+  } | null
   comandas: {
     id: number
     abertaEm: string
@@ -51,31 +55,31 @@ export function TableCard({ mesa, onClick }: TableCardProps) {
     <div
       onClick={() => onClick(mesa)}
       className={clsx(
-        "bg-white rounded-[2rem] p-6 flex flex-col items-center justify-center gap-4 aspect-square shadow-[0_2px_20px_rgba(0,0,0,0.04)] border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg",
+        "bg-white rounded-2xl p-3 flex min-h-[148px] flex-col items-center justify-center gap-2 shadow-[0_2px_14px_rgba(0,0,0,0.04)] border transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg",
         borderColor
       )}
     >
       <span className={clsx(
-        "text-5xl font-bold tracking-tight",
+        "text-4xl font-bold tracking-tight",
         numColor
       )}>
         {mesa.numero.toString().padStart(2, '0')}
       </span>
       
       <div className={clsx(
-        "px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase",
+        "px-3 py-1 rounded-full text-[9px] font-bold tracking-wider uppercase",
         badgeClass
       )}>
         {statusText}
       </div>
 
       {(isOcupada || isFechamento) && mesa.comandas?.[0] && (
-        <div className="flex flex-col items-center mt-3 animate-in fade-in slide-in-from-bottom-2">
-          <span className="text-xs font-bold text-gray-600 truncate max-w-[120px] flex items-center gap-1">
-            👤 {mesa.comandas[0].usuario?.nome?.split(' ')[0] || 'Desconhecido'}
+        <div className="mt-1 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2">
+          <span className="max-w-[120px] truncate text-[11px] font-bold text-gray-600">
+            {mesa.comandas[0].usuario?.nome?.split(' ')[0] || 'Desconhecido'}
           </span>
-          <span className="text-[10px] font-medium text-gray-400 mt-0.5 flex items-center gap-1">
-            🕒 {formatTime(mesa.comandas[0].abertaEm)}
+          <span className="mt-0.5 text-[10px] font-medium text-gray-400">
+            {formatTime(mesa.comandas[0].abertaEm)}
           </span>
         </div>
       )}
