@@ -37,7 +37,10 @@ import { useToast } from '@/contexts/ToastContext'
 
 const RESOURCE = '/dispositivos'
 const LIST_RESOURCE = '/dispositivos?tipo=IMPRESSORA'
-const PRINTER_AGENT_URL = (process.env.NEXT_PUBLIC_PRINTER_AGENT_URL || '').replace(/\/$/, '')
+// The Vercel app runs in the cloud, while the Windows agent runs on the
+// operator's computer. In the browser, loopback is therefore the default
+// production bridge; the env var remains available for a custom local URL.
+const PRINTER_AGENT_URL = (process.env.NEXT_PUBLIC_PRINTER_AGENT_URL || 'http://127.0.0.1:4100').replace(/\/$/, '')
 const PRINTER_AGENT_TOKEN = process.env.NEXT_PUBLIC_PRINTER_AGENT_TOKEN || ''
 
 const CONEXOES = ['TCP', 'USB'] as const
