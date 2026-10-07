@@ -47,9 +47,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { useToast } from '@/contexts/ToastContext'
 import { apiFetch } from '@/app/lib/api'
+import { RequestBillModal } from '@/app/components/RequestBillModal'
 import {
   buildSidebarVisualSections,
   findActiveNavItem,
@@ -124,12 +123,9 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { showToast } = useToast()
   const [fetchedUser, setFetchedUser] = useState<NavUser | null>(null)
   const [showBillModal, setShowBillModal] = useState(false)
-  const [splitPeople, setSplitPeople] = useState('1')
   const [searchTerm, setSearchTerm] = useState('')
-  const [mounted, setMounted] = useState(false)
   const [selfCollapsed, setSelfCollapsed] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [visibility, setVisibility] = useState(() => readStoredSidebarVisibility(null))
@@ -139,10 +135,6 @@ export default function Sidebar({
   useEffect(() => {
     if (isOpen) onClose()
   }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // O MainLayout já busca o usuário; a busca própria só roda no uso avulso da Sidebar.
   useEffect(() => {
@@ -282,29 +274,6 @@ export default function Sidebar({
 
   const isTablePage = pathname.startsWith('/mesas/') && pathname !== '/mesas'
   const currentMesaId = isTablePage ? pathname.split('/')[2] : null
-
-  const handleRequestBill = async () => {
-    if (!currentMesaId) return
-    try {
-      await apiFetch(`/tables/${currentMesaId}/request-bill`, { method: 'POST' })
-      setShowBillModal(false)
-      router.push('/mesas')
-    } catch (error) {
-      console.error('Error requesting bill:', error)
-    }
-  }
-
-  const handlePrintPartialBill = async () => {
-    if (!currentMesaId) return
-    try {
-      await apiFetch(`/tables/${currentMesaId}/print-partial`, { method: 'POST' })
-      setShowBillModal(false)
-      showToast('Conta parcial enviada para a impressora!', 'success')
-    } catch (error) {
-      console.error('Error printing partial bill:', error)
-      showToast(error instanceof Error ? error.message : 'Erro ao imprimir conta parcial', 'error')
-    }
-  }
 
   const renderItem = (item: NavItem) => {
     const Icon = NAV_ICONS[item.icon]
@@ -553,59 +522,13 @@ export default function Sidebar({
           </div>
         </div>
 
-        {mounted && showBillModal && createPortal(
-          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white text-black rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-              <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  💰 Solicitação de Conta
-                </h2>
-                <p className="text-orange-100 text-sm mt-1">Selecione uma opção abaixo</p>
-              </div>
-
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-black mb-2">
-                    Dividir para quantas pessoas?
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="1"
-                      value={splitPeople}
-                      onChange={(e) => setSplitPeople(e.target.value)}
-                      className="w-full p-4 pl-12 border border-gray-200 rounded-xl focus:ring-4 focus:ring-orange-100 focus:border-orange-500 outline-none transition-all text-lg font-bold text-black bg-gray-50"
-                    />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl">👥</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  <button
-                    onClick={handleRequestBill}
-                    className="w-full p-4 bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white font-bold rounded-xl transition-all shadow-lg shadow-green-200 flex items-center justify-center gap-2"
-                  >
-                    ✅ Fechar Conta
-                  </button>
-
-                  <button
-                    onClick={handlePrintPartialBill}
-                    className="w-full p-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
-                  >
-                    📄 Conta Parcial
-                  </button>
-
-                  <button
-                    onClick={() => setShowBillModal(false)}
-                    className="w-full p-4 bg-gray-100 hover:bg-gray-200 active:scale-[0.98] text-black font-bold rounded-xl transition-all flex items-center justify-center gap-2"
-                  >
-                    ❌ Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
+        {currentMesaId && (
+          <RequestBillModal
+            isOpen={showBillModal}
+            mesaId={currentMesaId}
+            onClose={() => setShowBillModal(false)}
+            onRequestSuccess={() => router.push('/mesas')}
+          />
         )}
       </aside>
     </>

@@ -2,11 +2,12 @@
 
 import { useEffect, useState, use, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRightLeft, X, ListOrdered, ListPlus, Trash2, Rocket, PlusCircle, Minus, Plus, Search, CreditCard, Receipt, Lock, Printer, Loader2 } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, ListPlus, Trash2, Rocket, PlusCircle, Minus, Plus, Search, CreditCard, Receipt, Lock, Loader2 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
 import { PaymentModal } from '@/components/PaymentModal'
+import { RequestBillModal } from '@/app/components/RequestBillModal'
 import { unwrapList } from '@/app/lib/legacyArray'
 import { connectTableSocket } from '@/app/lib/table-socket'
 import { apiFetch } from '@/app/lib/api'
@@ -29,8 +30,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null)
   const [userPermissions, setUserPermissions] = useState<string[]>([])
   const [showReviewModal, setShowReviewModal] = useState(false)
-  const [showBillModal, setShowBillModal] = useState(false)
-  const [billActionPending, setBillActionPending] = useState<'request' | 'print' | null>(null)
   const [reviewError, setReviewError] = useState('')
   const submitInFlight = useRef(false)
   const reviewCloseButton = useRef<HTMLButtonElement>(null)
@@ -83,6 +82,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   // Payment Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showBillModal, setShowBillModal] = useState(false)
   const [mesaNumero, setMesaNumero] = useState(mesaId)
 
   const fetchTableData = useCallback(async () => {
@@ -116,33 +116,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       console.error(`Erro ao carregar mesa ${mesaId}:`, error)
     }
   }, [mesaId])
-
-  const handleRequestBill = async () => {
-    setBillActionPending('request')
-    try {
-      await apiFetch(`/tables/${mesaId}/request-bill`, { method: 'POST' })
-      showToast('Conta enviada para baixa.', 'success')
-      setShowBillModal(false)
-      await fetchTableData()
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Erro ao solicitar a conta', 'error')
-    } finally {
-      setBillActionPending(null)
-    }
-  }
-
-  const handlePrintPartialBill = async () => {
-    setBillActionPending('print')
-    try {
-      await apiFetch(`/tables/${mesaId}/print-partial`, { method: 'POST' })
-      showToast('Conta parcial enviada para a impressora.', 'success')
-      setShowBillModal(false)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Erro ao imprimir conta parcial', 'error')
-    } finally {
-      setBillActionPending(null)
-    }
-  }
 
   useEffect(() => {
     if (showTransferModal || showItemTransferModal) {
@@ -249,7 +222,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   const canCreateOrder = userPermissions.includes('pedidos.criar')
   const canRequestBill = userPermissions.includes('pedidos.editar')
-  const canTransferItems = userPermissions.includes('pedidos.transferir')
+  const canTransferItems = userPermissions.includes('mesas.transferir_itens')
   const canTransferTable = userPermissions.includes('mesas.transferir')
   const canRegisterPayment = userPermissions.includes('pagamentos.registrar')
 
@@ -514,6 +487,18 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   <span className="text-xs font-medium text-gray-500">Comanda</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  {canTransferTable && (
+                    <button
+                      type="button"
+                      onClick={() => { setTargetTableId(null); setShowTransferModal(true) }}
+                      title="Trocar de mesa"
+                      aria-label="Trocar de mesa"
+                      className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+                    >
+                      <ArrowRightLeft size={16} />
+                      <span className="hidden sm:inline">Trocar mesa</span>
+                    </button>
+                  )}
                   {canTransferItems && submittedItems.some(item => item.status !== 'CANCELADO') && (
                     <button
                       type="button"
@@ -523,26 +508,26 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                         setShowItemTransferModal(true)
                       }}
                       title="Transferir itens individualmente"
-                      className="flex items-center gap-1.5 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+                      className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
                     >
                       <ListPlus size={16} />
                       <span>Transferir itens</span>
                     </button>
                   )}
-                  {canTransferTable && (
-                    <button type="button" onClick={() => { setTargetTableId(null); setShowTransferModal(true) }} title="Trocar de mesa" aria-label="Trocar de mesa" className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-100">
-                      <ArrowRightLeft size={16} />
-                      <span className="hidden sm:inline">Trocar mesa</span>
-                    </button>
-                  )}
                   {canRegisterPayment && submittedItems.length > 0 && (
-                    <button type="button" onClick={() => setShowPaymentModal(true)} title="Fechar conta" aria-label="Fechar conta" className="flex items-center gap-1.5 rounded-md bg-green-600 px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-green-700">
+                    <button type="button" onClick={() => setShowPaymentModal(true)} title="Fechar conta" aria-label="Fechar conta" className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-green-600 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700">
                       <CreditCard size={16} />
                       <span className="hidden sm:inline">Fechar conta</span>
                     </button>
                   )}
                   {canRequestBill && tableStatus !== 'FECHAMENTO' && (
-                    <button type="button" onClick={() => setShowBillModal(true)} title="Solicitar conta" aria-label="Solicitar conta" className="flex items-center gap-1.5 rounded-md bg-orange-600 px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-orange-700">
+                    <button
+                      type="button"
+                      onClick={() => setShowBillModal(true)}
+                      title="Solicitar conta"
+                      aria-label="Solicitar conta"
+                      className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-orange-600 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700"
+                    >
                       <Receipt size={16} />
                       <span className="hidden sm:inline">Solicitar conta</span>
                     </button>
@@ -733,78 +718,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           product={selectedProduct}
           onConfirm={handleModalConfirm}
         />
-      )}
-
-      {showBillModal && createPortal(
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !billActionPending) setShowBillModal(false)
-          }}
-        >
-          <div role="dialog" aria-modal="true" aria-labelledby="bill-modal-title" className="w-full max-w-md overflow-hidden rounded-lg bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-orange-700">
-                  <Receipt size={21} />
-                </div>
-                <div>
-                  <h2 id="bill-modal-title" className="text-lg font-bold text-slate-950">Solicitação de conta</h2>
-                  <p className="mt-0.5 text-sm text-slate-500">Mesa {mesaNumero}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowBillModal(false)}
-                disabled={Boolean(billActionPending)}
-                aria-label="Fechar solicitação de conta"
-                className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-3 p-5">
-              <button
-                type="button"
-                onClick={handlePrintPartialBill}
-                disabled={Boolean(billActionPending)}
-                className="flex w-full items-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-left transition-colors hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50"
-              >
-                {billActionPending === 'print' ? <Loader2 className="shrink-0 animate-spin text-slate-600" size={21} /> : <Printer className="shrink-0 text-slate-600" size={21} />}
-                <span>
-                  <span className="block font-semibold text-slate-900">Imprimir conta parcial</span>
-                  <span className="mt-0.5 block text-xs text-slate-500">Mantém a mesa aberta para novos pedidos.</span>
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleRequestBill}
-                disabled={Boolean(billActionPending)}
-                className="flex w-full items-center gap-3 rounded-lg bg-orange-600 px-4 py-3 text-left text-white shadow-sm transition-colors hover:bg-orange-700 disabled:opacity-50"
-              >
-                {billActionPending === 'request' ? <Loader2 className="shrink-0 animate-spin" size={21} /> : <Receipt className="shrink-0" size={21} />}
-                <span>
-                  <span className="block font-semibold">Enviar para fechamento</span>
-                  <span className="mt-0.5 block text-xs text-orange-100">Bloqueia novos lançamentos e avisa o caixa.</span>
-                </span>
-              </button>
-            </div>
-
-            <div className="border-t border-slate-200 bg-slate-50 px-5 py-3">
-              <button
-                type="button"
-                onClick={() => setShowBillModal(false)}
-                disabled={Boolean(billActionPending)}
-                className="flex h-10 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
       )}
 
       {showItemTransferModal && (
@@ -1045,6 +958,12 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           showToast('Pagamento registrado com sucesso!', 'success')
           router.push('/mesas')
         }}
+      />
+      <RequestBillModal
+        isOpen={showBillModal}
+        mesaId={mesaId}
+        onClose={() => setShowBillModal(false)}
+        onRequestSuccess={() => router.push('/mesas')}
       />
 
     </div>
