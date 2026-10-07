@@ -114,8 +114,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       {!isLoginPage && user && (
         <>
           {isWaiter ? (
-            <header className="sticky top-0 z-30 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-5 md:px-8 xl:min-h-[76px] xl:grid-cols-[1fr_auto_1fr] xl:gap-6 xl:py-0">
-              <div className="col-start-1 row-start-1 flex shrink-0 items-center gap-3 xl:col-auto xl:row-auto">
+            <header className="sticky top-0 z-30 grid min-h-[60px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-5 md:px-8 xl:min-h-[76px] xl:grid-cols-[1fr_auto_1fr] xl:gap-6 xl:py-0">
+              <div className="hidden shrink-0 items-center gap-3 xl:flex">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-600 text-xl font-bold text-white">R</div>
                 <div className="hidden sm:block">
                   <p className="text-base font-bold leading-tight text-slate-900">Rei do Pirão</p>
@@ -123,11 +123,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
 
-              <nav className="col-span-3 row-start-2 grid min-w-0 w-full grid-cols-3 items-stretch justify-center gap-2 xl:col-span-1 xl:row-auto xl:flex xl:w-auto xl:flex-none xl:items-center" aria-label="Navegação do garçom">
+              <nav className="col-start-1 row-start-1 grid min-w-0 w-full grid-cols-3 items-stretch justify-center gap-1.5 sm:gap-2 xl:col-start-2 xl:flex xl:w-auto xl:flex-none xl:items-center" aria-label="Navegação do garçom">
                 {[
-                  { href: '/', label: 'Início' },
-                  { href: '/mesas', label: 'Mapa de Mesas' },
-                  { href: '/minhas-mesas', label: 'Minhas Mesas' },
+                  { href: '/', label: 'Início', mobileLabel: 'Início' },
+                  { href: '/mesas', label: 'Mapa de Mesas', mobileLabel: 'Mesas' },
+                  { href: '/minhas-mesas', label: 'Minhas Mesas', mobileLabel: 'Minhas' },
                 ].map(item => (
                   <Link
                     key={item.href}
@@ -135,12 +135,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                     aria-current={pathname === item.href ? 'page' : undefined}
                     className={`flex min-h-10 min-w-0 items-center justify-center rounded-lg border px-2 py-2 text-center text-xs font-bold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 sm:px-4 sm:text-sm xl:py-2.5 ${pathname === item.href ? 'border-orange-600 bg-orange-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950'}`}
                   >
-                    {item.label}
+                    <span className="sm:hidden">{item.mobileLabel}</span>
+                    <span className="hidden sm:inline">{item.label}</span>
                   </Link>
                 ))}
               </nav>
 
-              <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-2 sm:gap-3 xl:col-auto xl:row-auto xl:gap-6 xl:justify-self-end">
+              <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-end gap-2 sm:gap-3 xl:col-start-3 xl:gap-6 xl:justify-self-end">
                 <div
                   id="waiter-header-status"
                   className="hidden min-w-[250px] shrink-0 items-center justify-center xl:flex"
