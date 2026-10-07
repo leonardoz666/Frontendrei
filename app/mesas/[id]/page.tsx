@@ -84,6 +84,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showBillModal, setShowBillModal] = useState(false)
   const [mesaNumero, setMesaNumero] = useState(mesaId)
+  const paymentEntryHandled = useRef(false)
 
   const fetchTableData = useCallback(async () => {
     try {
@@ -223,8 +224,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const canCreateOrder = userPermissions.includes('pedidos.criar')
   const canRequestBill = userPermissions.includes('pedidos.editar')
   const canTransferItems = tableStatus === 'OCUPADA' && userPermissions.includes('mesas.transferir_itens')
-  const canTransferTable = userPermissions.includes('mesas.transferir')
-  const canRegisterPayment = userPermissions.includes('pagamentos.registrar')
+  const canTransferTable = tableStatus === 'OCUPADA' && userPermissions.includes('mesas.transferir')
+  const canRegisterPayment = userPermissions.includes('pagamentos.abrir') && userPermissions.includes('pagamentos.registrar')
+  const canApplyDiscount = userPermissions.includes('pagamentos.desconto')
+
+  useEffect(() => {
+    if (paymentEntryHandled.current || !canRegisterPayment || !tableStatus) return
+    if (new URLSearchParams(window.location.search).get('recebimento') !== '1') return
+
+    paymentEntryHandled.current = true
+    setShowPaymentModal(true)
+  }, [canRegisterPayment, tableStatus])
 
   const filteredProducts = useMemo(() => {
     const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -950,10 +960,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       {/* Payment Modal */}
       <PaymentModal
         isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
+        onClose={() => {
+          setShowPaymentModal(false)
+          if (new URLSearchParams(window.location.search).get('recebimento') === '1') {
+            router.replace(`/mesas/${mesaId}`)
+          }
+        }}
         items={submittedItems.filter(i => i.status !== 'CANCELADO')}
         mesaId={mesaId}
         mesaNumero={mesaNumero}
+        canApplyDiscount={canApplyDiscount}
         onSuccess={() => {
           showToast('Pagamento registrado com sucesso!', 'success')
           router.push('/mesas')

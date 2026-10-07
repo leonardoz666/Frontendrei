@@ -29,6 +29,16 @@ type FormState = {
   valorTotal: string
 }
 
+type RelatorioFiscal = {
+  totais: { quantidade: number; valor: number }
+  porTipoStatus: Array<{ tipo: string; status: string; quantidade: number; valor: number }>
+  produtos: Array<{ codigo: string; descricao: string; emissoes: number; quantidade: number; valor: number }>
+}
+
+function dataInput(data: Date): string {
+  return data.toISOString().slice(0, 10)
+}
+
 const FORM_VAZIO: FormState = {
   tipo: 'NFCE',
   numero: '',
@@ -44,6 +54,36 @@ export default function NotasFiscaisPage() {
   const pagina = paginaAtual({ data }, ui.page, ui.pageSize)
   const [form, setForm] = useState<FormState>(FORM_VAZIO)
   const [salvando, setSalvando] = useState(false)
+  const [inicio, setInicio] = useState(dataInput(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)))
+  const [fim, setFim] = useState(dataInput(new Date()))
+  const [relatorio, setRelatorio] = useState<RelatorioFiscal | null>(null)
+  const [processando, setProcessando] = useState(false)
+
+  const parametrosPeriodo = () => new URLSearchParams({
+    ini: new Date(`${inicio}T00:00:00`).toISOString(),
+    fim: new Date(`${fim}T23:59:59`).toISOString(),
+  }).toString()
+
+  const carregarRelatorio = async () => {
+    try {
+      setRelatorio(await apiFetch<RelatorioFiscal>(`/fiscal/relatorios/resumo?${parametrosPeriodo()}`))
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao gerar relatório fiscal', 'error')
+    }
+  }
+
+  const reprocessarFila = async () => {
+    setProcessando(true)
+    try {
+      const resultado = await apiFetch<{ processadas: number; autorizadas: number; falhas: number }>('/fiscal/fila/reprocessar', { method: 'POST', body: { limite: 20 } })
+      showToast(`${resultado.processadas} processada(s), ${resultado.autorizadas} autorizada(s), ${resultado.falhas} falha(s).`, resultado.falhas ? 'warning' : 'success')
+      void refetch()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao reprocessar fila', 'error')
+    } finally {
+      setProcessando(false)
+    }
+  }
 
   const emitir = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -83,8 +123,39 @@ export default function NotasFiscaisPage() {
     <div className="mx-auto min-w-0 max-w-7xl px-4 py-6 [overflow-wrap:anywhere] sm:px-6 lg:px-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Notas fiscais</h1>
       <p className="mb-6 text-sm text-gray-600">
-        Scaffold fiscal com provider fake. Emissão real depende de provedor homologado e configuração fiscal validada.
+        Emissão, acompanhamento, contingência e arquivos fiscais. A autorização real depende do ACBrMonitor homologado.
       </p>
+
+      <section className="mb-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm font-medium text-gray-700">Início<input type="date" value={inicio} onChange={(event) => setInicio(event.target.value)} className="mt-1 block rounded-lg border border-gray-300 p-2 text-black" /></label>
+            <label className="text-sm font-medium text-gray-700">Fim<input type="date" value={fim} onChange={(event) => setFim(event.target.value)} className="mt-1 block rounded-lg border border-gray-300 p-2 text-black" /></label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => void carregarRelatorio()}>Gerar relatório</Button>
+            <Button type="button" variant="outline" onClick={() => window.open(`/api/fiscal/exportar-xml?${parametrosPeriodo()}`, '_blank')}>Baixar XML ZIP</Button>
+            <Button type="button" onClick={() => void reprocessarFila()} isLoading={processando}>Reprocessar fila</Button>
+          </div>
+        </div>
+        {relatorio && (
+          <div className="mt-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-gray-200 p-3"><p className="text-xs font-bold uppercase text-gray-500">Notas</p><p className="mt-1 text-xl font-bold text-gray-900">{relatorio.totais.quantidade}</p></div>
+              <div className="rounded-lg border border-gray-200 p-3"><p className="text-xs font-bold uppercase text-gray-500">Valor</p><p className="mt-1 text-xl font-bold text-gray-900">{formatarMoeda(relatorio.totais.valor)}</p></div>
+              {relatorio.porTipoStatus.slice(0, 2).map((grupo) => <div key={`${grupo.tipo}-${grupo.status}`} className="rounded-lg border border-gray-200 p-3"><p className="text-xs font-bold uppercase text-gray-500">{grupo.tipo} · {grupo.status}</p><p className="mt-1 text-xl font-bold text-gray-900">{grupo.quantidade}</p></div>)}
+            </div>
+            {relatorio.produtos.length > 0 && (
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase text-gray-600"><tr><th className="px-3 py-2">Produto</th><th className="px-3 py-2 text-right">Quantidade</th><th className="px-3 py-2 text-right">Valor</th></tr></thead>
+                  <tbody className="divide-y divide-gray-100">{relatorio.produtos.map((produto) => <tr key={`${produto.codigo}-${produto.descricao}`}><td className="px-3 py-2"><span className="font-medium text-gray-900">{produto.descricao}</span><span className="ml-2 font-mono text-xs text-gray-500">{produto.codigo}</span></td><td className="px-3 py-2 text-right">{produto.quantidade.toLocaleString('pt-BR')}</td><td className="px-3 py-2 text-right">{formatarMoeda(produto.valor)}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       <form onSubmit={emitir} className="mb-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
         <h2 className="mb-3 text-lg font-semibold text-gray-900">Criar nota na fila</h2>
@@ -120,6 +191,13 @@ export default function NotasFiscaisPage() {
         onPageSizeChange={ui.setPageSize}
         onSearch={ui.definirBusca}
         onSort={ui.definirOrdenacao}
+        rowActions={{
+          extra: (nota) => (
+            <button type="button" onClick={() => window.open(`/api/fiscal/notas/${nota.id}/danfe`, '_blank')} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100">
+              DANFE
+            </button>
+          )
+        }}
       />
     </div>
   )

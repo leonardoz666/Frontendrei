@@ -72,8 +72,11 @@ type XmlRecebido = {
   emitenteNome: string | null
   valorTotal: number
   statusConferencia: string
+  statusManifestacao: string
   recebidoEm: string
 }
+
+type TipoManifestacao = 'CIENCIA' | 'CONFIRMACAO' | 'DESCONHECIMENTO' | 'NAO_REALIZADA'
 
 type ListaApi<T> = {
   data: T[]
@@ -108,6 +111,8 @@ export default function RadarXmlPage() {
   const [analisando, setAnalisando] = useState(false)
   const [sincronizando, setSincronizando] = useState(false)
   const [importando, setImportando] = useState(false)
+  const [manifestandoId, setManifestandoId] = useState<number | null>(null)
+  const [manifestacoes, setManifestacoes] = useState<Record<number, TipoManifestacao>>({})
   const [activeTab, setActiveTab] = useState<'sefaz' | 'manual'>('sefaz')
 
   const carregarRadar = useCallback(async () => {
@@ -202,6 +207,32 @@ export default function RadarXmlPage() {
       await carregarRadar()
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao atualizar conferência', 'error')
+    }
+  }
+
+  const manifestar = async (item: XmlRecebido) => {
+    const tipo = manifestacoes[item.id] ?? 'CIENCIA'
+    let justificativa: string | undefined
+    if (tipo === 'NAO_REALIZADA') {
+      justificativa = window.prompt('Informe o motivo da operação não realizada (mínimo de 15 caracteres):')?.trim()
+      if (!justificativa) return
+      if (justificativa.length < 15) {
+        showToast('A justificativa deve ter pelo menos 15 caracteres', 'warning')
+        return
+      }
+    }
+    setManifestandoId(item.id)
+    try {
+      const resposta = await apiFetch<{ avisoConsulta: string | null }>(`/fiscal/radar-xml/recebidos/${item.id}/manifestar`, {
+        method: 'POST',
+        body: { tipo, justificativa },
+      })
+      showToast(resposta.avisoConsulta ?? 'Manifestação enviada à SEFAZ', resposta.avisoConsulta ? 'warning' : 'success')
+      await carregarRadar()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao manifestar documento', 'error')
+    } finally {
+      setManifestandoId(null)
     }
   }
 
@@ -425,7 +456,7 @@ export default function RadarXmlPage() {
           </Button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-sm">
+          <table className="w-full min-w-[1120px] text-left text-sm">
             <thead className="border-y border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
                 <th className="px-3 py-2">NSU</th>
@@ -434,13 +465,14 @@ export default function RadarXmlPage() {
                 <th className="px-3 py-2">Emissão</th>
                 <th className="px-3 py-2 text-right">Valor</th>
                 <th className="px-3 py-2">Conferência</th>
+                <th className="px-3 py-2">Manifestação</th>
                 <th className="px-3 py-2">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {recebidos.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-gray-500">Nenhum XML recebido ainda</td>
+                  <td colSpan={8} className="px-3 py-8 text-center text-gray-500">Nenhum XML recebido ainda</td>
                 </tr>
               )}
               {recebidos.map((item) => (
@@ -457,6 +489,25 @@ export default function RadarXmlPage() {
                   <td className="px-3 py-2 text-gray-700">{dataFiscal(item.emitidaEm)}</td>
                   <td className="px-3 py-2 text-right font-medium text-gray-900">{dinheiro(item.valorTotal)}</td>
                   <td className="px-3 py-2 font-medium text-gray-900">{item.statusConferencia}</td>
+                  <td className="px-3 py-2">
+                    <p className="mb-2 text-xs font-semibold text-gray-700">{item.statusManifestacao}</p>
+                    <div className="flex items-center gap-2">
+                      <select
+                        aria-label={`Manifestação da nota ${item.numero ?? item.id}`}
+                        value={manifestacoes[item.id] ?? 'CIENCIA'}
+                        onChange={(event) => setManifestacoes((atual) => ({ ...atual, [item.id]: event.target.value as TipoManifestacao }))}
+                        className="h-9 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                      >
+                        <option value="CIENCIA">Ciência</option>
+                        <option value="CONFIRMACAO">Confirmar operação</option>
+                        <option value="DESCONHECIMENTO">Desconhecer operação</option>
+                        <option value="NAO_REALIZADA">Operação não realizada</option>
+                      </select>
+                      <Button type="button" size="sm" onClick={() => void manifestar(item)} isLoading={manifestandoId === item.id} disabled={!item.chave}>
+                        Enviar
+                      </Button>
+                    </div>
+                  </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-2">
                       <Button type="button" size="sm" variant="outline" onClick={() => void atualizarConferencia(item, 'CONFERIDO')}>

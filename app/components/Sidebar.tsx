@@ -31,7 +31,6 @@ import {
   Pencil,
   Printer,
   QrCode,
-  Receipt,
   Settings,
   Shield,
   Sparkles,
@@ -48,7 +47,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '@/app/lib/api'
-import { RequestBillModal } from '@/app/components/RequestBillModal'
 import {
   buildSidebarVisualSections,
   findActiveNavItem,
@@ -124,7 +122,6 @@ export default function Sidebar({
   const pathname = usePathname()
   const router = useRouter()
   const [fetchedUser, setFetchedUser] = useState<NavUser | null>(null)
-  const [showBillModal, setShowBillModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selfCollapsed, setSelfCollapsed] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
@@ -271,9 +268,6 @@ export default function Sidebar({
     router.push('/login')
     router.refresh()
   }
-
-  const isTablePage = pathname.startsWith('/mesas/') && pathname !== '/mesas'
-  const currentMesaId = isTablePage ? pathname.split('/')[2] : null
 
   const renderItem = (item: NavItem) => {
     const Icon = NAV_ICONS[item.icon]
@@ -466,33 +460,9 @@ export default function Sidebar({
             )
           })}
 
-          {isTablePage && (
-            <div className="md:hidden px-1 pt-2">
-              <button
-                onClick={() => setShowBillModal(true)}
-                className="w-full text-left px-4 py-3 rounded-lg transition-colors hover:bg-orange-50 text-orange-600 font-bold flex items-center space-x-3 border border-orange-200 bg-orange-50/50"
-              >
-                <Receipt size={20} className="text-orange-600" />
-                <span>Solicitar Conta</span>
-              </button>
-            </div>
-          )}
         </nav>
 
         <div className="border-t border-slate-300 bg-[#e8eef5] p-3">
-          {isTablePage && (
-            <button
-              onClick={() => setShowBillModal(true)}
-              title="Solicitar Conta"
-              className={`mb-3 hidden w-full items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 font-bold text-orange-700 transition-colors hover:bg-orange-100 md:flex ${
-                isCollapsed ? 'md:px-2' : ''
-              }`}
-            >
-              <Receipt size={20} className="shrink-0" />
-              <span className={isCollapsed ? 'md:hidden' : ''}>Solicitar Conta</span>
-            </button>
-          )}
-
           <div
             className={`group flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm shadow-slate-950/[0.03] transition-colors hover:bg-slate-50 ${
               isCollapsed ? 'md:flex-col md:justify-center' : ''
@@ -522,14 +492,6 @@ export default function Sidebar({
           </div>
         </div>
 
-        {currentMesaId && (
-          <RequestBillModal
-            isOpen={showBillModal}
-            mesaId={currentMesaId}
-            onClose={() => setShowBillModal(false)}
-            onRequestSuccess={() => router.push('/mesas')}
-          />
-        )}
       </aside>
     </>
   )

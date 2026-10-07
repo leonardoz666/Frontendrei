@@ -39,6 +39,12 @@ type Movimento = {
   insumo?: { id: number; codigo: string; nome: string; unidade: string }
 }
 
+type RelatorioEstoque = {
+  valorEstoque: number
+  movimentos: number
+  porTipo: Array<{ tipo: string; quantidadeMovimentos: number; quantidade: number; valor: number }>
+}
+
 const MODULOS = [
   {
     href: '/admin/estoque/grupos',
@@ -85,13 +91,14 @@ function formatarData(valor: string): string {
 }
 
 async function carregarResumo() {
-  const [insumos, alertas, movimentos] = await Promise.all([
+  const [insumos, alertas, movimentos, relatorio] = await Promise.all([
     apiFetch<Lista<Insumo>>('/insumos?page=1&pageSize=10&ativo=true&sort=nome&order=asc'),
     apiFetch<Lista<Insumo>>('/insumos/alertas?page=1&pageSize=10&sort=saldoAtual&order=asc'),
-    apiFetch<Lista<Movimento>>('/insumos/movimentos?page=1&pageSize=5&sort=criadoEm&order=desc')
+    apiFetch<Lista<Movimento>>('/insumos/movimentos?page=1&pageSize=5&sort=criadoEm&order=desc'),
+    apiFetch<RelatorioEstoque>('/insumos/relatorios/resumo')
   ])
 
-  return { insumos, alertas, movimentos }
+  return { insumos, alertas, movimentos, relatorio }
 }
 
 export default function EstoquePage() {
@@ -130,7 +137,7 @@ export default function EstoquePage() {
         </div>
       )}
 
-      <section className="mb-4 grid gap-3 md:grid-cols-3">
+      <section className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Insumos ativos</p>
           <p className="mt-2 text-3xl font-bold text-gray-900">{isLoading ? '...' : totalInsumos}</p>
@@ -144,6 +151,12 @@ export default function EstoquePage() {
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Movimentos auditados</p>
           <p className="mt-2 text-3xl font-bold text-gray-900">{isLoading ? '...' : totalMovimentos}</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Valor em estoque</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900">
+            {isLoading ? '...' : Number(data?.relatorio.valorEstoque ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </p>
         </div>
       </section>
 
@@ -219,6 +232,32 @@ export default function EstoquePage() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="mt-4 rounded-lg border border-gray-200 bg-white">
+        <div className="border-b border-gray-200 px-4 py-3">
+          <h2 className="text-sm font-bold text-gray-900">Movimentações dos últimos 30 dias por tipo</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 text-xs uppercase text-gray-600">
+              <tr><th className="px-4 py-3">Tipo</th><th className="px-4 py-3 text-right">Registros</th><th className="px-4 py-3 text-right">Quantidade</th><th className="px-4 py-3 text-right">Valor</th></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data?.relatorio.porTipo.map((item) => (
+                <tr key={item.tipo}>
+                  <td className="px-4 py-3 font-medium text-gray-900">{item.tipo}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{item.quantidadeMovimentos}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{item.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{item.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                </tr>
+              ))}
+              {!isLoading && data?.relatorio.porTipo.length === 0 && (
+                <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-500">Nenhuma movimentação no período.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   )

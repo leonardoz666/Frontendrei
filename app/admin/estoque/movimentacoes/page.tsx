@@ -6,6 +6,7 @@ import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
+import { ExportMenu } from '@/app/components/ui/ExportMenu'
 import { apiFetch, fetchList } from '@/app/lib/api'
 import { usePagedQuery } from '@/app/lib/pagination'
 import { comoDecimalDigitado, comoNumero, formatarMoeda, paginaAtual, useListaCrud } from '@/app/lib/crud-client'
@@ -233,6 +234,24 @@ function MovimentacoesEstoqueContent() {
         onPageSizeChange={ui.setPageSize}
         onSearch={ui.definirBusca}
         onSort={ui.definirOrdenacao}
+        toolbar={
+          <ExportMenu
+            fileName="movimentacoes-estoque"
+            title="Movimentações de estoque"
+            getRows={() => pagina.data.map((movimento) => ({
+              data: new Date(movimento.criadoEm).toLocaleString('pt-BR'),
+              codigo: movimento.insumo?.codigo ?? '',
+              insumo: movimento.insumo?.nome ?? '',
+              tipo: movimento.tipo,
+              sentido: movimento.sentido,
+              quantidade: comoNumero(movimento.quantidade),
+              unidade: movimento.insumo?.unidade ?? '',
+              custoUnitario: comoNumero(movimento.custoUnitario),
+              motivo: movimento.motivo ?? '',
+              documento: movimento.documento ?? '',
+            }))}
+          />
+        }
         createAction={{ label: 'Novo movimento', onClick: abrirForm }}
       />
 

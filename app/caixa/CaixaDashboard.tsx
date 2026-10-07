@@ -72,17 +72,19 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
   const [valorMovimento, setValorMovimento] = useState('')
   const [descricao, setDescricao] = useState('')
   const [observacao, setObservacao] = useState('')
+  const [fechamentoCego, setFechamentoCego] = useState(true)
 
   const loadStatus = useCallback(async () => {
     try {
       setLoading(true)
-      setData(await apiFetch<CashStatus>('/caixa/status?resumo=true'))
+      const ocultar = fechamento && fechamentoCego ? '&ocultarConferencia=true' : ''
+      setData(await apiFetch<CashStatus>(`/caixa/status?resumo=true${ocultar}`))
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao consultar o caixa', 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [fechamento, fechamentoCego, showToast])
 
   useEffect(() => { void loadStatus() }, [loadStatus])
 
@@ -145,6 +147,7 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
     if (ok) {
       setSaldoInformado('')
       setObservacao('')
+      window.location.assign('/caixa/historico')
     }
   }
 
@@ -191,10 +194,15 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
       <PageHeading title={fechamento ? 'Fechamento do Caixa' : 'Caixa do Dia'} subtitle={`Caixa #${data.caixa.id} aberto em ${dateTime.format(new Date(data.caixa.abertoEm))}`} onRefresh={loadStatus} />
       <CashTabs fechamento={fechamento} />
 
+      {fechamento && <label className="mt-6 flex max-w-3xl cursor-pointer items-center justify-between gap-4 border-y border-slate-200 bg-white px-4 py-3">
+        <span><span className="block text-sm font-bold text-slate-900">Fechamento cego</span><span className="text-xs text-slate-500">Oculta os valores esperados até o saldo contado ser enviado.</span></span>
+        <input type="checkbox" checked={fechamentoCego} onChange={(event) => setFechamentoCego(event.target.checked)} className="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
+      </label>}
+
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Saldo inicial" value={formatMoney(data.saldoInicial)} icon={<Wallet size={19} />} />
-        <Metric label="Vendas recebidas" value={formatMoney(data.vendasTotal)} icon={<Banknote size={19} />} accent="green" />
-        <Metric label="Dinheiro esperado" value={formatMoney(data.dinheiroEsperado)} icon={<CheckCircle2 size={19} />} accent="blue" />
+        <Metric label="Vendas recebidas" value={fechamento && fechamentoCego ? 'Oculto' : formatMoney(data.vendasTotal)} icon={<Banknote size={19} />} accent="green" />
+        <Metric label="Dinheiro esperado" value={fechamento && fechamentoCego ? 'Oculto' : formatMoney(data.dinheiroEsperado)} icon={<CheckCircle2 size={19} />} accent="blue" />
         <Metric label="Movimentos" value={String(data.quantidadeMovimentos ?? 0)} icon={<ArrowUpFromLine size={19} />} accent="slate" />
       </div>
 
@@ -205,7 +213,7 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{data.quantidadePagamentos ?? 0} pagamentos</span>
           </div>
           <div className="mt-5 divide-y divide-slate-100">
-            {paymentRows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Nenhuma venda recebida neste caixa.</p> : paymentRows.map(row => (
+            {fechamento && fechamentoCego ? <p className="py-8 text-center text-sm font-medium text-slate-500">Valores ocultos durante o fechamento cego.</p> : paymentRows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Nenhuma venda recebida neste caixa.</p> : paymentRows.map(row => (
               <div key={row.tipo} className="flex items-center justify-between py-3"><span className="text-sm font-medium text-slate-600">{formatPaymentType(row.tipo)}</span><strong className="text-sm text-slate-900">{formatMoney(row.total)}</strong></div>
             ))}
           </div>
@@ -238,6 +246,9 @@ function CashTabs({ fechamento }: { fechamento: boolean }) {
       </Link>
       <Link href="/caixa/fechamento" aria-current={fechamento ? 'page' : undefined} className={`rounded-md border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1 ${fechamento ? 'border-orange-600 bg-orange-600 text-white shadow-sm' : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-white hover:text-slate-950'}`}>
         Fechamento
+      </Link>
+      <Link href="/caixa/historico" className="rounded-md border border-transparent px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:border-slate-200 hover:bg-white hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1">
+        Histórico
       </Link>
     </nav>
   )

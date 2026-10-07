@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
+import { ExportMenu } from '@/app/components/ui/ExportMenu'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
 import { fetchList } from '@/app/lib/api'
 import { usePagedQuery } from '@/app/lib/pagination'
@@ -219,6 +220,22 @@ export default function FichaTecnicaPage() {
         onPageSizeChange={ui.setPageSize}
         onSearch={ui.definirBusca}
         onSort={ui.definirOrdenacao}
+        toolbar={
+          <ExportMenu
+            fileName="ficha-tecnica"
+            title="Ficha técnica"
+            getRows={() => pagina.data.map((item) => ({
+              produtoCodigo: item.produto?.codigo ?? '',
+              produto: item.produto?.nome ?? '',
+              insumoCodigo: item.insumo?.codigo ?? '',
+              insumo: item.insumo?.nome ?? '',
+              quantidade: comoNumero(item.quantidade),
+              unidade: item.insumo?.unidade ?? '',
+              rendimento: comoNumero(item.rendimento),
+              ativo: item.ativo ? 'Ativo' : 'Inativo',
+            }))}
+          />
+        }
         rowActions={{
           onEdit: abrirEdicao,
           onDelete: setParaExcluir,

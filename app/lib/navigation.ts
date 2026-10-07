@@ -34,6 +34,7 @@ export type NavPermission =
   | 'caixa.abrir'
   | 'caixa.movimentar'
   | 'caixa.fechar'
+  | 'caixa.ajustar_fechado'
   | 'produtos.visualizar'
   | 'produtos.criar'
   | 'produtos.editar'
@@ -428,6 +429,12 @@ export const NAV_GROUPS: NavGroup[] = [
         anyPermission: ['relatorios.caixa', 'caixa.fechar'],
       },
       {
+        href: '/caixa/historico',
+        label: 'Histórico de Caixas',
+        icon: 'History',
+        permission: 'relatorios.caixa',
+      },
+      {
         href: '/fiscal/notas',
         label: 'Notas Fiscais',
         icon: 'FileText',
@@ -676,7 +683,7 @@ export function buildSidebarVisualSections(
       id: 'caixa',
       label: 'CAIXA',
       groupIds: ['caixa'],
-      itemFilter: item => ['/caixa', '/caixa/fechamento'].includes(item.href),
+      itemFilter: item => ['/caixa', '/caixa/fechamento', '/caixa/historico'].includes(item.href),
     },
     {
       id: 'nota-fiscal',

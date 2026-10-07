@@ -47,7 +47,6 @@ export default function MesasPage() {
   const [selectedTable, setSelectedTable] = useState<Mesa | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [showReopenModal, setShowReopenModal] = useState(false)
-  const [showCloseModal, setShowCloseModal] = useState(false)
   const [tableActionPending, setTableActionPending] = useState(false)
   const tableActionInFlight = useRef(false)
   const [user, setUser] = useState<User | null>(null)
@@ -153,7 +152,7 @@ export default function MesasPage() {
       setSelectedTable(mesa)
       setShowModal(true)
     } else if (mesa.status === 'FECHAMENTO') {
-      if (canReopen || canClose) {
+      if (canReopen || canRegisterPayment) {
         setSelectedTable(mesa)
         setShowReopenModal(true)
       } else {
@@ -164,7 +163,7 @@ export default function MesasPage() {
     }
   }
 
-  const executeTableAction = async (action: 'open' | 'reopen' | 'close'): Promise<boolean> => {
+  const executeTableAction = async (action: 'open' | 'reopen'): Promise<boolean> => {
     if (!selectedTable || tableActionInFlight.current) return false
     tableActionInFlight.current = true
     setTableActionPending(true)
@@ -191,19 +190,6 @@ export default function MesasPage() {
       setShowReopenModal(false)
       await fetchMesas()
       router.push(`/mesas/${table.id}`)
-    }
-  }
-
-  const confirmCloseTable = () => {
-    if (!selectedTable || tableActionPending) return
-    setShowCloseModal(true)
-  }
-
-  const executeCloseTable = async () => {
-    if (await executeTableAction('close')) {
-      setShowReopenModal(false)
-      setShowCloseModal(false)
-      await fetchMesas()
     }
   }
 
@@ -296,7 +282,10 @@ export default function MesasPage() {
   const isWaiter = user?.role === 'GARCOM'
   const canCreate = user?.role === 'ADMIN' || user?.role === 'DONO'
   const canReopen = Boolean(user?.permissions?.includes('mesas.reabrir'))
-  const canClose = Boolean(user?.permissions?.includes('mesas.fechar'))
+  const canRegisterPayment = Boolean(
+    user?.permissions?.includes('pagamentos.abrir') &&
+    user.permissions.includes('pagamentos.registrar')
+  )
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>
 
@@ -482,9 +471,9 @@ export default function MesasPage() {
                 </button>
               )}
 
-              {canClose && (
+              {canRegisterPayment && (
                 <button 
-                  onClick={confirmCloseTable} 
+                  onClick={() => router.push(`/mesas/${selectedTable.id}?recebimento=1`)}
                   disabled={tableActionPending}
                   className="w-full py-3 px-4 rounded-xl bg-red-600 font-bold text-white hover:bg-red-700 shadow-lg shadow-red-200 transition-colors"
                 >
@@ -513,38 +502,6 @@ export default function MesasPage() {
           </div>
         </div>
       )}
-      {showCloseModal && selectedTable && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6">
-              <h2 className="text-xl font-bold mb-2">Baixar Conta</h2>
-              <p className="text-gray-600 mb-6">
-                Tem certeza que deseja baixar a conta e liberar a <strong>Mesa {selectedTable.numero}</strong>?
-                <br/><br/>
-                Isso irá finalizar a comanda e liberar a mesa para novos clientes.
-              </p>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowCloseModal(false)}
-                  disabled={tableActionPending}
-                  className="flex-1 py-3 px-4 rounded-xl bg-gray-100 font-bold text-gray-700 hover:bg-gray-200 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={executeCloseTable}
-                  disabled={tableActionPending}
-                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 font-bold text-white hover:bg-red-700 shadow-lg shadow-red-200 transition-colors"
-                >
-                  Confirmar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Geração de mesas em lote (RF-MES-02/03) */}
       {showLoteModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
