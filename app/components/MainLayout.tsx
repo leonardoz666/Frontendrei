@@ -114,8 +114,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       {!isLoginPage && user && (
         <>
           {isWaiter ? (
-            <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between gap-6 border-b border-slate-200 bg-white px-5 shadow-sm md:px-8 xl:grid xl:grid-cols-[1fr_auto_1fr]">
-              <div className="flex shrink-0 items-center gap-3">
+            <header className="sticky top-0 z-30 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-5 md:px-8 xl:min-h-[76px] xl:grid-cols-[1fr_auto_1fr] xl:gap-6 xl:py-0">
+              <div className="col-start-1 row-start-1 flex shrink-0 items-center gap-3 xl:col-auto xl:row-auto">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-600 text-xl font-bold text-white">R</div>
                 <div className="hidden sm:block">
                   <p className="text-base font-bold leading-tight text-slate-900">Rei do Pirão</p>
@@ -123,7 +123,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
 
-              <nav className="flex min-w-0 flex-1 items-center justify-center gap-2 xl:flex-none" aria-label="Navegação do garçom">
+              <nav className="col-span-3 row-start-2 grid min-w-0 w-full grid-cols-3 items-stretch justify-center gap-2 xl:col-span-1 xl:row-auto xl:flex xl:w-auto xl:flex-none xl:items-center" aria-label="Navegação do garçom">
                 {[
                   { href: '/', label: 'Início' },
                   { href: '/mesas', label: 'Mapa de Mesas' },
@@ -133,14 +133,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                     key={item.href}
                     href={item.href}
                     aria-current={pathname === item.href ? 'page' : undefined}
-                    className={`rounded-lg border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 ${pathname === item.href ? 'border-orange-600 bg-orange-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950'}`}
+                    className={`flex min-h-10 min-w-0 items-center justify-center rounded-lg border px-2 py-2 text-center text-xs font-bold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 sm:px-4 sm:text-sm xl:py-2.5 ${pathname === item.href ? 'border-orange-600 bg-orange-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950'}`}
                   >
                     {item.label}
                   </Link>
                 ))}
               </nav>
 
-              <div className="flex shrink-0 items-center justify-end gap-6 xl:justify-self-end">
+              <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-end gap-2 sm:gap-3 xl:col-auto xl:row-auto xl:gap-6 xl:justify-self-end">
                 <div
                   id="waiter-header-status"
                   className="hidden min-w-[250px] shrink-0 items-center justify-center xl:flex"
