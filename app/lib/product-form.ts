@@ -8,7 +8,7 @@ export type ProductFormValues = {
   categoriaId: string
   tipo: 'COMUM' | 'POR_TAMANHO'
   tipoTamanhoId: string
-  dispositivoId: string
+  dispositivoIds: number[]
   ordemProduto: string
   ativo: boolean
   file: File | null
@@ -42,7 +42,8 @@ export function buildProductFormData(values: ProductFormValues): FormData {
   if (values.categoriaId) form.append('categoriaId', values.categoriaId)
   form.append('tipo', values.tipo)
   appendText('tipoTamanhoId', values.tipo === 'POR_TAMANHO' ? values.tipoTamanhoId : '')
-  appendText('dispositivoId', values.dispositivoId)
+  appendText('dispositivoId', values.dispositivoIds[0]?.toString() ?? '')
+  form.append('dispositivoIds', JSON.stringify(values.dispositivoIds))
   form.append('ordem', values.ordemProduto || '0')
   form.append('ativo', String(values.ativo))
   if (values.file) form.append('foto', values.file)

@@ -148,7 +148,7 @@ export default function ImportarCardapioPage() {
         </Button>
       </div>
 
-      <section className="mb-6 border-y border-gray-200 bg-white py-5">
+      <section className="mb-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
         <div className="grid gap-4 md:grid-cols-[280px_1fr_auto] md:items-end">
           <div>
             <label htmlFor="tipo-importacao" className="mb-1 block text-sm font-medium text-black">
@@ -212,7 +212,7 @@ export default function ImportarCardapioPage() {
               ['Produtos novos', preview.resumo.produtosNovos],
               ['Atualizados', preview.resumo.produtosAtualizados],
             ].map(([label, value]) => (
-              <div key={label} className="border-y border-gray-200 bg-white py-4">
+              <div key={label} className="border-y border-gray-200 bg-white px-4 py-4 sm:px-5">
                 <div className="text-xs font-medium uppercase text-gray-500">{label}</div>
                 <div className="mt-1 text-2xl font-bold text-gray-900">{value}</div>
               </div>

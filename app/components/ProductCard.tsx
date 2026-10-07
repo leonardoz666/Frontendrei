@@ -28,6 +28,7 @@ export type Produto = {
   aliquotaIcms?: number | string | null
   dispositivoId?: number | null
   dispositivo?: { id: number; nome: string } | null
+  impressoras?: Array<{ dispositivoId: number; ordem: number; dispositivo: { id: number; nome: string } }>
   gruposComplemento?: Array<{ grupoId: number; ordem: number; grupo?: { id: number; nome: string } }>
   destaque?: boolean
   controlaEstoque?: boolean

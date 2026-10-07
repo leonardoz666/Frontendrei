@@ -51,7 +51,7 @@ export default function Sidebar({
   const [mounted, setMounted] = useState(false)
   const [selfCollapsed, setSelfCollapsed] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
-  const activeGroupRef = useRef<string | undefined>(undefined)
+  const activeSectionRef = useRef<string | undefined>(undefined)
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -81,7 +81,6 @@ export default function Sidebar({
 
   const visibleGroups = useMemo(() => visibleNavGroups(user), [user])
   const active = useMemo(() => findActiveNavItem(pathname), [pathname])
-  const activeGroupId = active?.group.id
   const activeHref = active?.item.href
   const quickShortcuts = user?.role === 'GARCOM'
     ? [
@@ -131,25 +130,36 @@ export default function Sidebar({
       },
     ]
     const sections = sectionDefinitions
-      .map(section => ({
-        ...section,
-        items: section.groupIds.flatMap(groupId =>
-          (sourceGroups.find(group => group.group.id === groupId)?.items ?? []).filter(item =>
-            !section.itemFilter || section.itemFilter(item)
-          )
-        ),
-      }))
+      .map(section => {
+        const groups = section.groupIds
+          .map(groupId => {
+            const source = sourceGroups.find(({ group }) => group.id === groupId)
+            return source && {
+              id: groupId,
+              label: source.group.label,
+              items: source.items.filter(item => !section.itemFilter || section.itemFilter(item)),
+            }
+          })
+          .filter((group): group is NonNullable<typeof group> => Boolean(group && group.items.length))
+        return { ...section, groups, items: groups.flatMap(group => group.items) }
+      })
       .filter(section => section.items.length > 0)
     const assigned = new Set(sectionDefinitions.flatMap(section => section.groupIds))
     sourceGroups
       .filter(({ group }) => !assigned.has(group.id))
-      .forEach(({ group, items }) => sections.push({ id: group.id, label: group.label.toUpperCase(), groupIds: [group.id], items }))
+      .forEach(({ group, items }) => sections.push({
+        id: group.id,
+        label: group.label.toUpperCase(),
+        groupIds: [group.id],
+        groups: [{ id: group.id, label: group.label, items }],
+        items,
+      }))
     return isWaiter ? sections.filter(section => section.id !== 'atendimento') : sections
   }, [filteredGroups, isWaiter, normalizedSearch, visibleGroups])
 
   const visualSectionForActive = useMemo(
-    () => visualSections.find(section => section.groupIds.includes(activeGroupId ?? '')),
-    [activeGroupId, visualSections]
+    () => visualSections.find(section => section.items.some(item => item.href === activeHref)),
+    [activeHref, visualSections]
   )
   const activeSectionId = visualSectionForActive?.id
 
@@ -159,18 +169,18 @@ export default function Sidebar({
   }, [])
 
   useEffect(() => {
-    if (!activeGroupId || activeGroupRef.current === activeGroupId) return
-    activeGroupRef.current = activeGroupId
+    if (!activeSectionId || activeSectionRef.current === activeSectionId) return
+    activeSectionRef.current = activeSectionId
     setOpenGroups(prev => {
       // Sem preferência salva o grupo já abre pela regra padrão; se havia preferência,
       // ela é descartada ao entrar na rota para o grupo ativo abrir automaticamente.
-      if (!(activeGroupId in prev)) return prev
+      if (!(activeSectionId in prev)) return prev
       const next = { ...prev }
-      delete next[activeGroupId]
+      delete next[activeSectionId]
       writeStoredGroupState(next)
       return next
     })
-  }, [activeGroupId])
+  }, [activeSectionId])
 
   // Fallback de colapso/persistência quando a Sidebar é usada fora do MainLayout.
   useEffect(() => {
@@ -194,7 +204,7 @@ export default function Sidebar({
 
   const toggleGroup = (groupId: string) => {
     setOpenGroups(prev => {
-      const isOpenNow = prev[groupId] ?? groupId === activeGroupId
+      const isOpenNow = prev[groupId] ?? groupId === activeSectionId
       const next = { ...prev, [groupId]: !isOpenNow }
       writeStoredGroupState(next)
       return next
@@ -242,7 +252,7 @@ export default function Sidebar({
           key={item.href}
           aria-disabled="true"
           title={`${item.label} — em breve`}
-          className={`flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-medium text-slate-300 cursor-not-allowed select-none ${
+          className={`flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] font-medium text-slate-300 cursor-not-allowed select-none ${
             isCollapsed ? 'md:justify-center md:px-0' : ''
           }`}
         >
@@ -266,10 +276,10 @@ export default function Sidebar({
         href={item.href}
         title={item.label}
         aria-current={isActive ? 'page' : undefined}
-        className={`group relative flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-semibold leading-5 tracking-[0.01em] transition-all duration-200 hover:translate-x-0.5 ${
+        className={`group relative flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] font-medium leading-5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
           isActive
-            ? 'border border-orange-300 bg-orange-50 text-orange-800'
-            : 'text-slate-600 hover:bg-orange-50/70 hover:text-orange-800'
+            ? 'bg-orange-50 font-semibold text-orange-800 before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-orange-500'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
         } ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
       >
         <span className={`flex-1 truncate ${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
@@ -348,7 +358,7 @@ export default function Sidebar({
             </label>
           </div>
 
-          <div className={`mt-3 ${isWaiter ? 'flex flex-col gap-1.5' : 'flex h-[58px] gap-2'} ${isCollapsed ? 'md:hidden' : ''}`}>
+          <div className={`mt-3 ${isWaiter ? 'flex flex-col gap-1.5' : 'flex gap-1 rounded-lg bg-slate-100 p-1'} ${isCollapsed ? 'md:hidden' : ''}`}>
             {quickShortcuts.map(shortcut => {
               const activeShortcut = pathname === shortcut.href
               return (
@@ -356,10 +366,10 @@ export default function Sidebar({
                   key={shortcut.href}
                   href={shortcut.href}
                   title={shortcut.label}
-                  className={`flex items-center rounded-xl border px-2.5 text-[11px] font-semibold leading-3 shadow-sm transition-all duration-200 ${isWaiter ? 'min-h-10 w-full' : 'w-20'} ${
+                  className={`flex items-center justify-center rounded-md border px-2 text-center text-[11px] font-bold leading-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1 ${isWaiter ? 'min-h-10 w-full' : 'min-h-10 min-w-0 flex-1'} ${
                     activeShortcut
-                      ? 'border-orange-400 bg-orange-50 text-orange-900 shadow-orange-100'
-                      : 'border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-900 hover:shadow-orange-100'
+                      ? 'border-orange-600 bg-orange-600 text-white shadow-sm'
+                      : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-white hover:text-slate-950'
                   }`}
                 >
                   {shortcut.label}
@@ -382,13 +392,13 @@ export default function Sidebar({
             const isGroupOpen = Boolean(normalizedSearch) || (openGroups[section.id] ?? isGroupActive)
 
             return (
-              <div key={section.id} className="mb-4 rounded-2xl border-b border-slate-100 pb-3">
+              <div key={section.id} className="mb-2 border-b border-slate-100 pb-2">
                 <button
                   type="button"
                   onClick={() => toggleGroup(section.id)}
                   aria-expanded={isGroupOpen}
                   title={section.label}
-                  className={`flex w-full items-center rounded-xl border-l-2 px-2.5 py-2 text-xs font-extrabold uppercase tracking-[0.12em] transition-colors ${isGroupActive ? 'border-orange-500 bg-orange-50/60 text-orange-800' : 'border-slate-300 text-slate-700 hover:border-orange-300 hover:bg-slate-50'}`}
+                  className={`flex min-h-10 w-full items-center rounded-md border-l-[3px] px-3 py-2 text-[12px] font-bold uppercase tracking-[0.06em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${isGroupActive ? 'border-orange-500 bg-orange-50 text-orange-900' : 'border-transparent bg-slate-50 text-slate-800 hover:bg-slate-100'}`}
                 >
                   <span className="flex-1 text-left truncate">{section.label}</span>
                   <ChevronDown
@@ -398,8 +408,19 @@ export default function Sidebar({
                   />
                 </button>
 
-                <div className={isGroupOpen ? 'mt-2 space-y-1' : 'hidden'}>
-                  {section.items.map(renderItem)}
+                <div className={isGroupOpen ? 'mt-1 pl-3' : 'hidden'}>
+                  {section.groups.map((group, index) => (
+                    <div key={group.id} className={index > 0 ? 'mt-2 border-t border-slate-100 pt-2' : ''}>
+                      {section.id === 'cardapio-estoque' && (
+                        <div className="px-3 pb-1 text-[11px] font-semibold text-slate-500">
+                          {group.label}
+                        </div>
+                      )}
+                      <div className="space-y-0.5 border-l border-slate-200 pl-1">
+                        {group.items.map(renderItem)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )

@@ -216,7 +216,7 @@ export default function ReservasPage() {
       <p className="mb-6 text-sm text-gray-600">Reservas bloqueiam sobreposição de período na mesma unidade.</p>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-3">
-        <form onSubmit={criarUnidade} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={criarUnidade} className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Nova unidade</h2>
           <div className="space-y-3">
             <input value={unidadeNome} onChange={(event) => setUnidadeNome(event.target.value)} placeholder="Nome" className="w-full rounded-lg border border-gray-300 p-2 text-black" />
@@ -227,7 +227,7 @@ export default function ReservasPage() {
           </div>
         </form>
 
-        <form onSubmit={criarHospede} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={criarHospede} className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Novo hóspede</h2>
           <div className="space-y-3">
             <input value={hospedeNome} onChange={(event) => setHospedeNome(event.target.value)} placeholder="Nome" className="w-full rounded-lg border border-gray-300 p-2 text-black" />
@@ -238,7 +238,7 @@ export default function ReservasPage() {
           </div>
         </form>
 
-        <form onSubmit={criarReserva} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={criarReserva} className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Nova reserva</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <select value={reservaForm.hospedeId} onChange={(event) => setReservaForm((atual) => ({ ...atual, hospedeId: event.target.value }))} className="rounded-lg border border-gray-300 p-2 text-black" required>
@@ -257,7 +257,7 @@ export default function ReservasPage() {
         </form>
       </div>
 
-      <section className="mb-6 border-y border-gray-200 bg-white py-5">
+      <section className="mb-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">FNRH CSV</h2>

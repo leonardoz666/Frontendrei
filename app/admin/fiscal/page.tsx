@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
@@ -134,6 +134,8 @@ const INUTILIZACAO_VAZIA = {
   justificativa: '',
 }
 
+const fiscalInputClass = 'mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100'
+
 function formatarData(valor: string | null | undefined): string {
   if (!valor) return '—'
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(valor))
@@ -156,6 +158,9 @@ export default function AdminFiscalPage() {
   const { data, isLoading, isError, error, refetch } = usePagedQuery<EmpresaFiscal>(ui.listaParams)
   const pagina = paginaAtual({ data }, ui.page, ui.pageSize)
   const [form, setForm] = useState<FormState>(FORM_VAZIO)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
   const [salvando, setSalvando] = useState(false)
   const [checkProdutos, setCheckProdutos] = useState<CheckProdutos | null>(null)
   const [checandoProdutos, setChecandoProdutos] = useState(false)
@@ -208,6 +213,10 @@ export default function AdminFiscalPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (showForm) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [showForm, editingId])
+
   const salvar = async (event: FormEvent) => {
     event.preventDefault()
     if (!form.razaoSocial.trim() || !form.cnpj.trim()) {
@@ -216,9 +225,18 @@ export default function AdminFiscalPage() {
     }
     setSalvando(true)
     try {
-      await apiFetch('/fiscal/empresas', { method: 'POST', body: form })
-      showToast('Empresa fiscal criada', 'success')
+      const body = editingId === null ? form : {
+        ...form,
+        csc: form.csc || undefined,
+        certificadoSenha: form.certificadoSenha || undefined,
+      }
+      await apiFetch(editingId === null ? '/fiscal/empresas' : `/fiscal/empresas/${editingId}`, {
+        method: editingId === null ? 'POST' : 'PATCH', body,
+      })
+      showToast(editingId === null ? 'Empresa fiscal criada' : 'Empresa fiscal atualizada', 'success')
       setForm(FORM_VAZIO)
+      setEditingId(null)
+      setShowForm(false)
       ui.reiniciarPagina()
       void refetch()
     } catch (err) {
@@ -226,6 +244,24 @@ export default function AdminFiscalPage() {
     } finally {
       setSalvando(false)
     }
+  }
+
+  const editarEmpresa = (empresa: EmpresaFiscal) => {
+    setForm({
+      razaoSocial: empresa.razaoSocial,
+      cnpj: empresa.cnpj,
+      regime: empresa.regime,
+      crt: empresa.crt,
+      ambiente: empresa.ambiente,
+      serieNfce: empresa.serieNfce,
+      serieNfe: empresa.serieNfe,
+      cscId: empresa.cscId ?? '',
+      csc: '',
+      certificadoPath: empresa.certificadoPath ?? '',
+      certificadoSenha: '',
+    })
+    setEditingId(empresa.id)
+    setShowForm(true)
   }
 
   const baixarXml = async (nota: NotaFiscal) => {
@@ -342,7 +378,7 @@ export default function AdminFiscalPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className="mx-auto min-w-0 max-w-7xl px-4 py-6 [overflow-wrap:anywhere] sm:px-6 lg:px-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Configuração fiscal</h1>
       <p className="mb-6 text-sm text-gray-600">
         Cadastro-base para SEFAZ direta via ACBrMonitor. Certificado A1 e CSC são gravados criptografados e não retornam na API.
@@ -350,7 +386,7 @@ export default function AdminFiscalPage() {
 
       <section className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-gray-900">Provider fiscal</h2>
             <p className="text-sm text-gray-600">
               {providerStatus
@@ -358,7 +394,7 @@ export default function AdminFiscalPage() {
                 : 'Cheque a conexão com o ACBrMonitor antes de homologar emissões.'}
             </p>
             {providerStatus?.erro && <p className="mt-1 text-sm text-amber-700">{providerStatus.erro}</p>}
-            {providerStatus?.resposta && <p className="mt-1 max-w-2xl truncate font-mono text-xs text-gray-500">{providerStatus.resposta}</p>}
+            {providerStatus?.resposta && <p className="mt-1 max-w-2xl whitespace-pre-wrap font-mono text-xs text-gray-500">{providerStatus.resposta}</p>}
           </div>
           <Button type="button" variant="outline" onClick={() => void checarProviderFiscal()} isLoading={checandoProvider}>
             Checar ACBr
@@ -366,32 +402,82 @@ export default function AdminFiscalPage() {
         </div>
       </section>
 
-      <form onSubmit={salvar} className="mb-6 border-y border-gray-200 bg-white py-5">
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">Nova empresa fiscal</h2>
-        <div className="grid gap-3 md:grid-cols-3">
-          <input value={form.razaoSocial} onChange={(event) => setForm((atual) => ({ ...atual, razaoSocial: event.target.value }))} placeholder="Razão social" className="rounded-lg border border-gray-300 p-2 text-black" required />
-          <input value={form.cnpj} onChange={(event) => setForm((atual) => ({ ...atual, cnpj: event.target.value }))} placeholder="CNPJ" className="rounded-lg border border-gray-300 p-2 text-black" required />
-          <select value={form.ambiente} onChange={(event) => setForm((atual) => ({ ...atual, ambiente: event.target.value }))} className="rounded-lg border border-gray-300 p-2 text-black">
-            <option value="HOMOLOGACAO">Homologação</option>
-            <option value="PRODUCAO">Produção</option>
-          </select>
-          <input value={form.regime} onChange={(event) => setForm((atual) => ({ ...atual, regime: event.target.value }))} placeholder="Regime" className="rounded-lg border border-gray-300 p-2 text-black" />
-          <input value={form.crt} onChange={(event) => setForm((atual) => ({ ...atual, crt: event.target.value }))} placeholder="CRT" className="rounded-lg border border-gray-300 p-2 text-black" />
-          <input value={form.serieNfe} onChange={(event) => setForm((atual) => ({ ...atual, serieNfe: event.target.value }))} placeholder="Série NF-e" className="rounded-lg border border-gray-300 p-2 text-black" />
-          <input value={form.cscId} onChange={(event) => setForm((atual) => ({ ...atual, cscId: event.target.value }))} placeholder="ID CSC" className="rounded-lg border border-gray-300 p-2 text-black" />
-          <input value={form.csc} onChange={(event) => setForm((atual) => ({ ...atual, csc: event.target.value }))} placeholder="CSC/token NFC-e" type="password" className="rounded-lg border border-gray-300 p-2 text-black" />
-          <input value={form.certificadoPath} onChange={(event) => setForm((atual) => ({ ...atual, certificadoPath: event.target.value }))} placeholder="Caminho do certificado A1 (.pfx)" className="rounded-lg border border-gray-300 p-2 text-black md:col-span-2" />
-          <div className="flex gap-2">
-            <input value={form.serieNfce} onChange={(event) => setForm((atual) => ({ ...atual, serieNfce: event.target.value }))} placeholder="Série NFC-e" className="min-w-0 flex-1 rounded-lg border border-gray-300 p-2 text-black" />
-            <input value={form.certificadoSenha} onChange={(event) => setForm((atual) => ({ ...atual, certificadoSenha: event.target.value }))} placeholder="Senha A1" type="password" className="min-w-0 flex-1 rounded-lg border border-gray-300 p-2 text-black" />
-            <Button type="submit" isLoading={salvando}>Criar</Button>
+      <section className="mb-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold text-gray-900">Empresas fiscais</h2>
+            <p className="text-sm text-gray-600">Cadastre a empresa ou atualize CNPJ e certificado para habilitar o Radar XML.</p>
           </div>
+          <Button type="button" onClick={() => { setForm(FORM_VAZIO); setEditingId(null); setShowForm(true) }}>Nova empresa</Button>
         </div>
-      </form>
+        {isError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{(error as Error)?.message ?? 'Falha ao carregar empresas'}</div>}
+        {!isLoading && !isError && !ui.search && pagina.meta.total === 0 ? (
+          <div className="border-l-4 border-orange-400 bg-orange-50 px-4 py-4 text-sm text-orange-950">
+            Nenhuma empresa cadastrada. Adicione CNPJ e certificado A1 para preparar a consulta SEFAZ.
+          </div>
+        ) : <DataTable
+          ariaLabel="Empresas fiscais"
+          columns={columns}
+          data={pagina.data}
+          getRowId={(empresa) => empresa.id}
+          meta={pagina.meta}
+          loading={isLoading}
+          itemLabel="empresas"
+          storageKey="admin-fiscal-empresas"
+          emptyMessage="Nenhuma empresa fiscal cadastrada"
+          onPageChange={ui.setPage}
+          onPageSizeChange={ui.setPageSize}
+          onSearch={ui.definirBusca}
+          onSort={ui.definirOrdenacao}
+          rowActions={{ onEdit: editarEmpresa, editLabel: 'Editar empresa fiscal' }}
+        />}
+      </section>
+
+      {showForm && <form ref={formRef} onSubmit={salvar} autoComplete="off" className="mb-6 scroll-mt-6 border-y border-gray-200 bg-white px-4 py-6 sm:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold text-gray-900">{editingId === null ? 'Nova empresa fiscal' : 'Editar empresa fiscal'}</h2>
+            <p className="mt-1 text-sm text-gray-600">Dados da empresa, numeração de notas e credenciais para emissão.</p>
+          </div>
+          <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingId(null); setForm(FORM_VAZIO) }}>Cancelar</Button>
+        </div>
+
+        <fieldset className="mt-5">
+          <legend className="mb-3 text-sm font-bold text-slate-800">Identificação</legend>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
+            <label className="min-w-0 text-sm font-medium text-slate-700">Razão social<input value={form.razaoSocial} onChange={(event) => setForm((atual) => ({ ...atual, razaoSocial: event.target.value }))} className={fiscalInputClass} required /></label>
+            <label className="text-sm font-medium text-slate-700">CNPJ<input value={form.cnpj} onChange={(event) => setForm((atual) => ({ ...atual, cnpj: event.target.value }))} inputMode="numeric" className={fiscalInputClass} required /></label>
+            <label className="text-sm font-medium text-slate-700">Ambiente<select value={form.ambiente} onChange={(event) => setForm((atual) => ({ ...atual, ambiente: event.target.value }))} className={fiscalInputClass}><option value="HOMOLOGACAO">Homologação</option><option value="PRODUCAO">Produção</option></select></label>
+          </div>
+        </fieldset>
+
+        <fieldset className="mt-6 border-t border-slate-100 pt-5">
+          <legend className="text-sm font-bold text-slate-800">Regime e numeração</legend>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-sm font-medium text-slate-700">Regime tributário<input value={form.regime} onChange={(event) => setForm((atual) => ({ ...atual, regime: event.target.value }))} className={fiscalInputClass} /></label>
+            <label className="text-sm font-medium text-slate-700">CRT<input value={form.crt} onChange={(event) => setForm((atual) => ({ ...atual, crt: event.target.value }))} className={fiscalInputClass} /></label>
+            <label className="text-sm font-medium text-slate-700">Série NF-e<input value={form.serieNfe} onChange={(event) => setForm((atual) => ({ ...atual, serieNfe: event.target.value }))} className={fiscalInputClass} /></label>
+            <label className="text-sm font-medium text-slate-700">Série NFC-e<input value={form.serieNfce} onChange={(event) => setForm((atual) => ({ ...atual, serieNfce: event.target.value }))} className={fiscalInputClass} /></label>
+          </div>
+        </fieldset>
+
+        <fieldset className="mt-6 border-t border-slate-100 pt-5">
+          <legend className="text-sm font-bold text-slate-800">Credenciais fiscais</legend>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-sm font-medium text-slate-700">ID do CSC<input value={form.cscId} onChange={(event) => setForm((atual) => ({ ...atual, cscId: event.target.value }))} autoComplete="off" className={fiscalInputClass} /></label>
+            <label className="text-sm font-medium text-slate-700">CSC / token NFC-e<input value={form.csc} onChange={(event) => setForm((atual) => ({ ...atual, csc: event.target.value }))} type="password" autoComplete="new-password" className={fiscalInputClass} /></label>
+            <label className="text-sm font-medium text-slate-700 lg:col-span-2">Caminho do certificado A1 (.pfx)<input value={form.certificadoPath} onChange={(event) => setForm((atual) => ({ ...atual, certificadoPath: event.target.value }))} className={fiscalInputClass} /></label>
+            <label className="text-sm font-medium text-slate-700">Senha do certificado A1<input value={form.certificadoSenha} onChange={(event) => setForm((atual) => ({ ...atual, certificadoSenha: event.target.value }))} type="password" autoComplete="new-password" className={fiscalInputClass} /></label>
+          </div>
+        </fieldset>
+
+        {editingId !== null && <p className="mt-4 text-xs text-slate-500">Deixe os campos de senha vazios para manter os valores atuais.</p>}
+        <div className="mt-6 flex justify-end border-t border-slate-100 pt-5"><Button type="submit" isLoading={salvando}>{editingId === null ? 'Criar empresa fiscal' : 'Salvar alterações'}</Button></div>
+      </form>}
 
       <section className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-gray-900">Check produtos fiscais</h2>
             <p className="text-sm text-gray-600">
               Valida NCM, CFOP, CST/CSOSN e alíquota dos produtos marcados como fiscais.
@@ -433,7 +519,7 @@ export default function AdminFiscalPage() {
         )}
       </section>
 
-      <section className="mb-6 border-y border-gray-200 bg-white py-5">
+      <section className="mb-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Operação fiscal</h2>
@@ -495,22 +581,22 @@ export default function AdminFiscalPage() {
       </section>
 
       <section className="mb-6 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
-        <form onSubmit={solicitarInutilizacao} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={solicitarInutilizacao} className="min-w-0 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Inutilizar numeração</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <select value={inutilizacaoForm.tipo} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, tipo: event.target.value }))} className="rounded-lg border border-gray-300 p-2 text-black">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-slate-700">Tipo de nota<select value={inutilizacaoForm.tipo} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, tipo: event.target.value }))} className={fiscalInputClass}>
               <option value="NFCE">NFC-e</option>
               <option value="NFE">NF-e</option>
-            </select>
-            <input value={inutilizacaoForm.serie} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, serie: event.target.value }))} placeholder="Série" className="rounded-lg border border-gray-300 p-2 text-black" />
-            <input value={inutilizacaoForm.numeroIni} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, numeroIni: event.target.value }))} placeholder="Número inicial" type="number" min="1" className="rounded-lg border border-gray-300 p-2 text-black" required />
-            <input value={inutilizacaoForm.numeroFim} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, numeroFim: event.target.value }))} placeholder="Número final" type="number" min="1" className="rounded-lg border border-gray-300 p-2 text-black" required />
-            <textarea value={inutilizacaoForm.justificativa} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, justificativa: event.target.value }))} placeholder="Justificativa legal" className="min-h-24 rounded-lg border border-gray-300 p-2 text-black sm:col-span-2" required />
+            </select></label>
+            <label className="text-sm font-medium text-slate-700">Série<input value={inutilizacaoForm.serie} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, serie: event.target.value }))} className={fiscalInputClass} /></label>
+            <label className="text-sm font-medium text-slate-700">Número inicial<input value={inutilizacaoForm.numeroIni} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, numeroIni: event.target.value }))} type="number" min="1" className={fiscalInputClass} required /></label>
+            <label className="text-sm font-medium text-slate-700">Número final<input value={inutilizacaoForm.numeroFim} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, numeroFim: event.target.value }))} type="number" min="1" className={fiscalInputClass} required /></label>
+            <label className="text-sm font-medium text-slate-700 sm:col-span-2">Justificativa legal<textarea value={inutilizacaoForm.justificativa} onChange={(event) => setInutilizacaoForm((atual) => ({ ...atual, justificativa: event.target.value }))} className={`${fiscalInputClass} min-h-24`} required /></label>
             <Button type="submit" isLoading={salvandoInutilizacao} className="sm:col-span-2">Solicitar inutilização</Button>
           </div>
         </form>
 
-        <div className="border-y border-gray-200 bg-white py-5">
+        <div className="min-w-0 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Últimas inutilizações</h2>
           <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
             {inutilizacoes.length === 0 && <div className="px-4 py-6 text-center text-sm text-gray-500">Nenhuma inutilização encontrada</div>}
@@ -528,7 +614,7 @@ export default function AdminFiscalPage() {
         </div>
       </section>
 
-      <section className="mb-6 border-y border-gray-200 bg-white py-5">
+      <section className="mb-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
         <h2 className="mb-3 text-lg font-semibold text-gray-900">Fila fiscal</h2>
         <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
           {fila.length === 0 && <div className="px-4 py-6 text-center text-sm text-gray-500">Fila fiscal vazia</div>}
@@ -546,24 +632,6 @@ export default function AdminFiscalPage() {
           ))}
         </div>
       </section>
-
-      {isError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{(error as Error)?.message ?? 'Falha ao carregar empresas'}</div>}
-
-      <DataTable
-        ariaLabel="Empresas fiscais"
-        columns={columns}
-        data={pagina.data}
-        getRowId={(empresa) => empresa.id}
-        meta={pagina.meta}
-        loading={isLoading}
-        itemLabel="empresas"
-        storageKey="admin-fiscal-empresas"
-        emptyMessage="Nenhuma empresa fiscal encontrada"
-        onPageChange={ui.setPage}
-        onPageSizeChange={ui.setPageSize}
-        onSearch={ui.definirBusca}
-        onSort={ui.definirOrdenacao}
-      />
 
       <ConfirmationModal
         isOpen={notaParaCancelar !== null}

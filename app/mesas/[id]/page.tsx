@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, Search, CreditCard, Receipt, Lock } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, Minus, Plus, Search, CreditCard, Receipt, Lock } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
@@ -272,6 +272,19 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     setSearchTerm('') // Clear search after adding
   }
 
+  const decreaseCartQuantity = (produtoId: number) => {
+    setReviewError('')
+    setCart(prev => {
+      let index = prev.length - 1
+      while (index >= 0 && prev[index].produtoId !== produtoId) index--
+      if (index < 0) return prev
+      if (prev[index].quantidade === 1) return prev.filter((_, itemIndex) => itemIndex !== index)
+      return prev.map((item, itemIndex) => itemIndex === index
+        ? { ...item, quantidade: item.quantidade - 1 }
+        : item)
+    })
+  }
+
   const handleModalConfirm = (
     quantity: number,
     observation: string,
@@ -390,6 +403,13 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     return cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
   }, [cart])
   const cartItemCount = useMemo(() => cart.reduce((total, item) => total + item.quantidade, 0), [cart])
+  const cartQuantities = useMemo(() => {
+    const quantities = new Map<number, number>()
+    for (const item of cart) {
+      quantities.set(item.produtoId, (quantities.get(item.produtoId) ?? 0) + item.quantidade)
+    }
+    return quantities
+  }, [cart])
 
   const groupedByProduct = useMemo(() => {
     const products: { [nome: string]: { nome: string, variations: { [key: string]: SubmittedItem & { quantidade: number } } } } = {}
@@ -555,33 +575,55 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
               {/* Product Grid */}
               <div className="flex-1 overflow-y-auto">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 pb-4">
+                <div className="grid grid-cols-2 gap-3 pb-4 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
                   {filteredProducts.map(produto => {
                     const isInactive = produto.ativo === false
+                    const isDisabled = isInactive || tableStatus === 'FECHAMENTO'
+                    const quantity = cartQuantities.get(produto.id) ?? 0
                     return (
-                      <button
+                      <article
                         key={produto.id}
-                        onClick={() => !isInactive && addToCart(produto)}
-                        disabled={isInactive || tableStatus === 'FECHAMENTO'}
-                        className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between min-h-[100px] text-left transition-all ${isInactive || tableStatus === 'FECHAMENTO'
-                          ? 'opacity-60 cursor-not-allowed bg-gray-50'
-                          : 'hover:border-orange-500 hover:shadow-md'
+                        className={`flex flex-col rounded-md border bg-white p-3 text-left transition-colors ${isDisabled
+                          ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
+                          : quantity > 0 ? 'border-orange-500' : 'border-gray-200 hover:border-orange-500'
                           }`}
                       >
-                        <div>
-                          <h3 className="font-bold text-sm text-gray-900 line-clamp-2 leading-tight">{produto.nome}</h3>
-                          <p className="text-xs text-gray-500 mt-1">{produto.setor}</p>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => addToCart(produto)}
+                          disabled={isDisabled}
+                          aria-label={`Adicionar ${produto.nome} ao pedido`}
+                          title={produto.nome}
+                          className="block w-full text-left disabled:cursor-not-allowed"
+                        >
+                          <h3 className="line-clamp-2 text-base font-semibold leading-snug text-gray-900">{produto.nome}</h3>
+                        </button>
 
-                        <div className="flex items-end justify-between mt-3">
-                          <span className="font-bold text-base text-gray-900">R$ {produto.preco.toFixed(2).replace('.', ',')}</span>
-                          {!isInactive && tableStatus !== 'FECHAMENTO' && (
-                            <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center">
+                        <div className="mt-2 flex flex-wrap items-end justify-between gap-1">
+                          <span className="whitespace-nowrap text-sm font-bold text-gray-900">R$ {produto.preco.toFixed(2).replace('.', ',')}</span>
+                          {!isDisabled && (quantity === 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => addToCart(produto)}
+                              title={`Adicionar ${produto.nome}`}
+                              aria-label={`Adicionar ${produto.nome}`}
+                              className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200"
+                            >
                               <PlusCircle size={20} />
+                            </button>
+                          ) : (
+                            <div role="group" aria-label={`Quantidade de ${produto.nome}`} className="ml-auto flex h-9 shrink-0 items-center rounded-md bg-neutral-950 text-white">
+                              <button type="button" onClick={() => decreaseCartQuantity(produto.id)} title="Diminuir quantidade" aria-label={`Diminuir quantidade de ${produto.nome}`} className="flex h-9 w-9 items-center justify-center rounded-l-md hover:bg-neutral-800">
+                                <Minus size={16} />
+                              </button>
+                              <output className="w-4 text-center text-sm font-semibold" aria-live="polite">{quantity}</output>
+                              <button type="button" onClick={() => addToCart(produto)} title="Aumentar quantidade" aria-label={`Aumentar quantidade de ${produto.nome}`} className="flex h-9 w-9 items-center justify-center rounded-r-md hover:bg-neutral-800">
+                                <Plus size={16} />
+                              </button>
                             </div>
-                          )}
+                          ))}
                         </div>
-                      </button>
+                      </article>
                     )
                   })}
                   {filteredProducts.length === 0 && (

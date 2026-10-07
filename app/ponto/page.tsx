@@ -430,7 +430,7 @@ export default function PontoPage() {
       </p>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <form onSubmit={registrarPonto} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={registrarPonto} className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-900">
             <Clock className="h-5 w-5 text-orange-600" />
             Registrar ponto
@@ -447,7 +447,7 @@ export default function PontoPage() {
           </div>
         </form>
 
-        <form onSubmit={ajustarPonto} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={ajustarPonto} className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Ajustar registro</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <input value={ajusteNsr} onChange={(event) => setAjusteNsr(event.target.value)} placeholder="NSR original" inputMode="numeric" className="rounded-lg border border-gray-300 p-2 text-black" required />
@@ -466,7 +466,7 @@ export default function PontoPage() {
       </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <form onSubmit={criarFuncionario} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={criarFuncionario} className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Novo funcionário</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <input value={funcionarioForm.nome} onChange={(event) => setFuncionarioForm((atual) => ({ ...atual, nome: event.target.value }))} placeholder="Nome" className="rounded-lg border border-gray-300 p-2 text-black" required />
@@ -479,7 +479,7 @@ export default function PontoPage() {
           </div>
         </form>
 
-        <section className="border-y border-gray-200 bg-white py-5">
+        <section className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Arquivos AFD/AEJ</h2>
           <div className="grid gap-3 sm:grid-cols-[1fr_1fr_120px_auto_auto]">
             <input value={afdInicio} onChange={(event) => setAfdInicio(event.target.value)} type="datetime-local" className="rounded-lg border border-gray-300 p-2 text-black" aria-label="Início do AFD" />
@@ -587,7 +587,7 @@ export default function PontoPage() {
       </section>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <form onSubmit={criarJornada} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={criarJornada} className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-900">
             <Clock className="h-5 w-5 text-orange-600" />
             Jornada
@@ -613,7 +613,7 @@ export default function PontoPage() {
           )}
         </form>
 
-        <form onSubmit={criarEscala} className="border-y border-gray-200 bg-white py-5">
+        <form onSubmit={criarEscala} className="border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-900">
             <CalendarDays className="h-5 w-5 text-orange-600" />
             Escala

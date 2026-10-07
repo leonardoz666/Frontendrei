@@ -138,12 +138,14 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
       showToast('Informe o saldo contado no caixa.', 'error')
       return
     }
-    await submit('/api/caixa/fechar', {
+    const ok = await submit('/api/caixa/fechar', {
       saldoInformado: value,
       observacao: observacao.trim() || undefined,
     }, 'Caixa fechado com sucesso.')
-    setSaldoInformado('')
-    setObservacao('')
+    if (ok) {
+      setSaldoInformado('')
+      setObservacao('')
+    }
   }
 
   const movements = data?.caixa?.movimentos ?? []
@@ -160,8 +162,16 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
   if (!data?.aberto || !data.caixa) {
     return (
       <main className="mx-auto w-full max-w-5xl px-5 py-8 lg:px-8">
-        <PageHeading title="Caixa do Dia" subtitle="Abra o caixa para iniciar a operação." onRefresh={loadStatus} />
-        <section className="mt-8 max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <PageHeading title={fechamento ? 'Fechamento do Caixa' : 'Caixa do Dia'} subtitle={fechamento ? 'Não há caixa aberto para fechar.' : 'Abra o caixa para iniciar a operação.'} onRefresh={loadStatus} />
+        <CashTabs fechamento={fechamento} />
+        {fechamento ? (
+          <section className="mt-8 max-w-xl border-l-4 border-slate-300 bg-white px-6 py-7">
+            <LockKeyhole size={24} className="text-slate-500" />
+            <h2 className="mt-4 text-lg font-bold text-slate-900">Nenhum fechamento pendente</h2>
+            <p className="mt-1 text-sm text-slate-600">O fechamento fica disponível depois que um caixa é aberto.</p>
+            <Link href="/caixa" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-orange-700 hover:text-orange-800">Ir para Caixa do Dia</Link>
+          </section>
+        ) : <section className="mt-8 max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50 text-orange-600"><Wallet size={24} /></div>
           <h2 className="text-xl font-bold text-slate-900">Abrir caixa</h2>
           <p className="mt-1 text-sm text-slate-500">Informe o dinheiro disponível no início do turno.</p>
@@ -171,7 +181,7 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
             <input value={saldoInicial} onChange={event => setSaldoInicial(event.target.value)} type="number" min="0" step="0.01" className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-4 text-lg font-semibold outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" />
           </div>
           <button onClick={openCash} disabled={saving} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"><Wallet size={18} /> Abrir caixa</button>
-        </section>
+        </section>}
       </main>
     )
   }
@@ -179,6 +189,7 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
   return (
     <main className="mx-auto w-full max-w-7xl px-5 py-8 lg:px-8">
       <PageHeading title={fechamento ? 'Fechamento do Caixa' : 'Caixa do Dia'} subtitle={`Caixa #${data.caixa.id} aberto em ${dateTime.format(new Date(data.caixa.abertoEm))}`} onRefresh={loadStatus} />
+      <CashTabs fechamento={fechamento} />
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Saldo inicial" value={formatMoney(data.saldoInicial)} icon={<Wallet size={19} />} />
@@ -187,7 +198,7 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
         <Metric label="Movimentos" value={String(data.quantidadeMovimentos ?? 0)} icon={<ArrowUpFromLine size={19} />} accent="slate" />
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className={`mt-6 grid gap-6 ${fechamento ? 'max-w-3xl' : 'xl:grid-cols-[1.1fr_0.9fr]'}`}>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div><h2 className="text-lg font-bold text-slate-900">Resumo das vendas</h2><p className="mt-1 text-sm text-slate-500">Pagamentos registrados desde a abertura.</p></div>
@@ -200,22 +211,35 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {!fechamento && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold text-slate-900">Movimentações</h2><p className="mt-1 text-sm text-slate-500">Ajustes manuais do caixa.</p></div><button onClick={() => setShowMovement('SUPRIMENTO')} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:border-orange-300 hover:text-orange-700"><Plus size={16} /> Registrar</button></div>
           <div className="mt-5 divide-y divide-slate-100">
             {movements.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Nenhum movimento registrado.</p> : movements.map(movement => <MovementRow key={movement.id} movement={movement} />)}
           </div>
-        </section>
+        </section>}
       </div>
 
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-lg font-bold text-slate-900">Conferência</h2><p className="mt-1 text-sm text-slate-500">Conte o dinheiro físico e compare com o valor esperado.</p></div><div className="flex gap-2"><button onClick={() => setShowMovement('SANGRIA')} className="inline-flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100"><ArrowDownToLine size={16} /> Sangria</button><button onClick={() => setShowMovement('SUPRIMENTO')} className="inline-flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><ArrowUpFromLine size={16} /> Suprimento</button></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-lg font-bold text-slate-900">Conferência</h2><p className="mt-1 text-sm text-slate-500">Conte o dinheiro físico e compare com o valor esperado.</p></div>{!fechamento && <div className="flex gap-2"><button onClick={() => setShowMovement('SANGRIA')} className="inline-flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100"><ArrowDownToLine size={16} /> Sangria</button><button onClick={() => setShowMovement('SUPRIMENTO')} className="inline-flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><ArrowUpFromLine size={16} /> Suprimento</button></div>}</div>
         {fechamento ? <div className="mt-6 grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end"><label className="block text-sm font-semibold text-slate-700">Saldo contado<input value={saldoInformado} onChange={event => setSaldoInformado(event.target.value)} type="number" min="0" step="0.01" placeholder="0,00" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-lg font-semibold outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></label><label className="block text-sm font-semibold text-slate-700">Observação<input value={observacao} onChange={event => setObservacao(event.target.value)} placeholder="Opcional" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" /></label><button onClick={closeCash} disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 font-bold text-white hover:bg-slate-800 disabled:opacity-60"><LockKeyhole size={18} /> Fechar caixa</button></div> : <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-slate-50 p-4"><div><p className="text-sm font-semibold text-slate-700">Pronto para conferir?</p><p className="mt-1 text-sm text-slate-500">O fechamento registra o saldo contado e eventuais diferenças.</p></div><Link href="/caixa/fechamento" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 font-bold text-white hover:bg-slate-800"><LockKeyhole size={18} /> Ir para fechamento</Link></div>}
         {difference !== null && <p className={`mt-4 text-sm font-bold ${difference === 0 ? 'text-emerald-700' : difference > 0 ? 'text-blue-700' : 'text-red-700'}`}>Diferença da conferência: {formatMoney(difference)}</p>}
       </section>
 
       {showMovement && <MovementModal type={showMovement} value={valorMovimento} description={descricao} saving={saving} onValueChange={setValorMovimento} onDescriptionChange={setDescricao} onClose={() => setShowMovement(null)} onSubmit={registerMovement} />}
     </main>
+  )
+}
+
+function CashTabs({ fechamento }: { fechamento: boolean }) {
+  return (
+    <nav aria-label="Etapas do caixa" className="mt-6 flex w-fit max-w-full gap-1 rounded-lg bg-slate-100 p-1">
+      <Link href="/caixa" aria-current={!fechamento ? 'page' : undefined} className={`rounded-md border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1 ${!fechamento ? 'border-orange-600 bg-orange-600 text-white shadow-sm' : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-white hover:text-slate-950'}`}>
+        Caixa do Dia
+      </Link>
+      <Link href="/caixa/fechamento" aria-current={fechamento ? 'page' : undefined} className={`rounded-md border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1 ${fechamento ? 'border-orange-600 bg-orange-600 text-white shadow-sm' : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-white hover:text-slate-950'}`}>
+        Fechamento
+      </Link>
+    </nav>
   )
 }
 

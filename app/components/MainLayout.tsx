@@ -132,7 +132,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`rounded-xl border px-4 py-2.5 text-sm font-bold shadow-sm transition-all duration-200 ${pathname === item.href ? 'border-orange-400 bg-orange-50 text-orange-900 shadow-orange-100' : 'border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-900'}`}
+                    aria-current={pathname === item.href ? 'page' : undefined}
+                    className={`rounded-lg border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 ${pathname === item.href ? 'border-orange-600 bg-orange-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950'}`}
                   >
                     {item.label}
                   </Link>
@@ -183,7 +184,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </>
       )}
 
-      <main className={`flex-1 transition-[margin] duration-300 ${sidebarOffset}`}>
+      <main className={`min-w-0 flex-1 transition-[margin] duration-300 ${sidebarOffset}`}>
         {children}
       </main>
     </div>

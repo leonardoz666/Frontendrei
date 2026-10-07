@@ -233,7 +233,7 @@ export function DataTable<T>({
   const columnCount = columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)
 
   return (
-    <div className="w-full">
+    <div className="min-w-0 w-full [overflow-wrap:anywhere]">
       {/* Barra de controles: pageSize + busca + ações da tela */}
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -279,7 +279,7 @@ export function DataTable<T>({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm" aria-label={ariaLabel}>
             <thead className="bg-gray-50">
@@ -392,7 +392,7 @@ export function DataTable<T>({
                         <td
                           key={column.key}
                           className={cn(
-                            'px-3 py-3 text-gray-800',
+                            'px-3 py-3 text-gray-800 break-words',
                             ALIGN_CLASS[column.align ?? 'left'],
                             column.hideOnMobile && 'hidden md:table-cell',
                             column.className

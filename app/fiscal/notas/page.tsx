@@ -80,13 +80,13 @@ export default function NotasFiscaisPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className="mx-auto min-w-0 max-w-7xl px-4 py-6 [overflow-wrap:anywhere] sm:px-6 lg:px-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Notas fiscais</h1>
       <p className="mb-6 text-sm text-gray-600">
         Scaffold fiscal com provider fake. Emissão real depende de provedor homologado e configuração fiscal validada.
       </p>
 
-      <form onSubmit={emitir} className="mb-6 border-y border-gray-200 bg-white py-5">
+      <form onSubmit={emitir} className="mb-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
         <h2 className="mb-3 text-lg font-semibold text-gray-900">Criar nota na fila</h2>
         <div className="grid gap-3 md:grid-cols-[120px_120px_120px_180px_1fr_auto]">
           <select value={form.tipo} onChange={(event) => setForm((atual) => ({ ...atual, tipo: event.target.value }))} className="rounded-lg border border-gray-300 p-2 text-black">

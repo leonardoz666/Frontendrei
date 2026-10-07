@@ -22,7 +22,8 @@ import {
   Check,
   Pencil, 
   Download,
-  Wand2
+  Wand2,
+  Printer
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -136,7 +137,9 @@ export default function ProdutosPage() {
   const [categoriaId, setCategoriaId] = useState('')
   const [tipo, setTipo] = useState<'COMUM' | 'POR_TAMANHO'>('COMUM')
   const [tipoTamanhoId, setTipoTamanhoId] = useState('')
-  const [dispositivoId, setDispositivoId] = useState('')
+  const [dispositivoIds, setDispositivoIds] = useState<number[]>([])
+  const [impressorasModalAberto, setImpressorasModalAberto] = useState(false)
+  const [impressorasRascunho, setImpressorasRascunho] = useState<number[]>([])
   const [ordemProduto, setOrdemProduto] = useState('0')
   const [ativo, setAtivo] = useState(true)
   const [foto, setFoto] = useState<string | undefined>(undefined)
@@ -211,7 +214,7 @@ export default function ProdutosPage() {
 
       const formData = buildProductFormData({
         nome, codigo, descricao, preco, valorPromo, custo, categoriaId, tipo,
-        tipoTamanhoId, dispositivoId, ordemProduto, ativo, file, tipoOpcao,
+        tipoTamanhoId, dispositivoIds, ordemProduto, ativo, file, tipoOpcao,
         sabores, isDrink, isFood, favorito, destaque, controlaEstoque,
         autoatendimento, fiscal, ncm, cfop, cstCsosn, aliquotaIcms,
         permitirObservacao, permiteGeloLimao, gruposComplementoIds,
@@ -245,7 +248,8 @@ export default function ProdutosPage() {
     setIsAdding(false)
     setTipo('COMUM')
     setTipoTamanhoId('')
-    setDispositivoId('')
+    setDispositivoIds([])
+    setImpressorasModalAberto(false)
     setOrdemProduto('0')
     setFoto(undefined)
     setFile(null)
@@ -282,7 +286,11 @@ export default function ProdutosPage() {
     setCategoriaId(prod.categoriaId ? prod.categoriaId.toString() : (categorias[0]?.id.toString() || ''))
     setTipo(prod.tipo ?? 'COMUM')
     setTipoTamanhoId(prod.tipoTamanhoId ? String(prod.tipoTamanhoId) : '')
-    setDispositivoId(prod.dispositivoId ? String(prod.dispositivoId) : '')
+    setDispositivoIds(
+      prod.impressoras?.length
+        ? prod.impressoras.map(vinculo => vinculo.dispositivoId)
+        : prod.dispositivoId ? [prod.dispositivoId] : []
+    )
     setOrdemProduto(prod.ordem === undefined || prod.ordem === null ? '0' : String(prod.ordem))
     setAtivo(prod.ativo)
     setFoto(prod.foto)
@@ -844,17 +852,25 @@ export default function ProdutosPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-gray-500 block mb-1 uppercase tracking-wider">Impressora de Produção</label>
-                  <select
-                    value={dispositivoId}
-                    onChange={e => setDispositivoId(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2.5 text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 text-sm"
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-500">Impressoras de produção</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImpressorasRascunho(dispositivoIds)
+                      setImpressorasModalAberto(true)
+                    }}
+                    className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-left text-sm font-semibold text-gray-800 transition-colors hover:border-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
                   >
-                    <option value="">Usar roteamento por categoria/praça</option>
-                    {dispositivos.map(item => (
-                      <option key={item.id} value={item.id}>{item.nome}</option>
-                    ))}
-                  </select>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Printer className="h-4 w-4 shrink-0 text-orange-600" />
+                      <span className="truncate">
+                        {dispositivoIds.length === 0
+                          ? 'Usar roteamento por categoria/praça'
+                          : dispositivos.filter(item => dispositivoIds.includes(item.id)).map(item => item.nome).join(', ')}
+                      </span>
+                    </span>
+                    <span className="shrink-0 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">{dispositivoIds.length}</span>
+                  </button>
                 </div>
 
                 <div className="space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-200">
@@ -930,46 +946,6 @@ export default function ProdutosPage() {
                     <div>
                       <span className="text-sm font-bold text-gray-700">Disponível / Ativo?</span>
                       <p className="text-[10px] text-gray-500 leading-tight">Se desmarcar, o produto some do cardápio</p>
-                    </div>
-                  </div>
-
-                  {/* Is Drink */}
-                  <div 
-                    className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
-                    onClick={() => {
-                        setIsDrink(!isDrink)
-                        if (!isDrink) setIsFood(false)
-                    }}
-                  >
-                    <div className={clsx(
-                      "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
-                      isDrink ? "bg-blue-600 border-blue-600" : "border-gray-400 bg-white"
-                    )}>
-                      {isDrink && <Plus size={14} className="text-white rotate-45" />}
-                    </div>
-                    <div>
-                      <span className="text-sm font-bold text-gray-700">É Bebida/Drink?</span>
-                      <p className="text-[10px] text-gray-500 leading-tight">Envia para Bar</p>
-                    </div>
-                  </div>
-
-                  {/* Is Food */}
-                  <div 
-                    className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200 cursor-pointer active:bg-gray-100 transition-colors" 
-                    onClick={() => {
-                        setIsFood(!isFood)
-                        if (!isFood) setIsDrink(false)
-                    }}
-                  >
-                    <div className={clsx(
-                      "w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0",
-                      isFood ? "bg-blue-600 border-blue-600" : "border-gray-400 bg-white"
-                    )}>
-                      {isFood && <Plus size={14} className="text-white rotate-45" />}
-                    </div>
-                    <div>
-                      <span className="text-sm font-bold text-gray-700">É Comida?</span>
-                      <p className="text-[10px] text-gray-500 leading-tight">Envia para Cozinha</p>
                     </div>
                   </div>
 
@@ -1182,6 +1158,61 @@ export default function ProdutosPage() {
               >
                 {editingId ? 'Salvar Alterações' : 'Criar Produto'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {impressorasModalAberto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="impressoras-produto-title">
+          <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div className="min-w-0">
+                <h2 id="impressoras-produto-title" className="text-lg font-bold text-slate-900">Impressoras do produto</h2>
+                <p className="mt-1 text-sm text-slate-600">Selecione todas as impressoras que devem receber este item.</p>
+              </div>
+              <button type="button" onClick={() => setImpressorasModalAberto(false)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900" aria-label="Fechar">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="min-h-0 overflow-y-auto px-5 py-4">
+              {dispositivos.length === 0 ? (
+                <p className="rounded-md border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-600">Nenhuma impressora ativa cadastrada.</p>
+              ) : (
+                <div className="space-y-2">
+                  {dispositivos.map(impressora => {
+                    const marcada = impressorasRascunho.includes(impressora.id)
+                    return (
+                      <button
+                        key={impressora.id}
+                        type="button"
+                        onClick={() => setImpressorasRascunho(atuais => marcada ? atuais.filter(id => id !== impressora.id) : [...atuais, impressora.id])}
+                        className={clsx(
+                          'flex w-full items-center justify-between gap-3 rounded-md border px-4 py-3 text-left transition-colors',
+                          marcada ? 'border-orange-500 bg-orange-50 text-orange-950' : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <Printer className={clsx('h-5 w-5 shrink-0', marcada ? 'text-orange-600' : 'text-slate-500')} />
+                          <span className="truncate text-sm font-semibold">{impressora.nome}</span>
+                        </span>
+                        <span className={clsx('flex h-5 w-5 shrink-0 items-center justify-center rounded border', marcada ? 'border-orange-600 bg-orange-600' : 'border-slate-400 bg-white')}>
+                          {marcada && <Check size={14} className="text-white" />}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
+              <span className="text-sm font-medium text-slate-600">{impressorasRascunho.length} selecionada(s)</span>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setImpressorasModalAberto(false)} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100">Cancelar</button>
+                <button type="button" onClick={() => { setDispositivoIds(impressorasRascunho); setImpressorasModalAberto(false) }} className="rounded-md bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700">Confirmar</button>
+              </div>
             </div>
           </div>
         </div>
