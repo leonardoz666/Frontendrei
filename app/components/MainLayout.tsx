@@ -36,8 +36,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [user, setUser] = useState<NavUser | null>(null)
 
   const isWaiter = user?.role === 'GARCOM'
-  const sidebarOffset = isLoginPage || isWaiter ? '' : isCollapsed ? 'md:ml-[88px]' : 'md:ml-72'
-  const supportHref = isLoginPage ? null : resolveSupportHref(process.env.NEXT_PUBLIC_SUPORTE_WHATSAPP)
+  const sidebarOffset = isLoginPage || !user || isWaiter ? '' : isCollapsed ? 'md:ml-[88px]' : 'md:ml-72'
+  const supportHref = isLoginPage || !user ? null : resolveSupportHref(process.env.NEXT_PUBLIC_SUPORTE_WHATSAPP)
 
   // Estado recolhido persistido: lido após a montagem para não divergir do SSR.
   useEffect(() => {
@@ -54,14 +54,18 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   // Usuário logado: alimenta o cabeçalho e a Sidebar (uma única chamada a /api/auth/me).
   useEffect(() => {
-    if (isLoginPage) return
+    if (isLoginPage) {
+      setUser(null)
+      return
+    }
     let cancelled = false
     const loadUser = async () => {
       try {
         const data = await apiFetch<{ user?: NavUser }>('/auth/me', { redirectOn401: false })
-        if (!cancelled && data.user) setUser(data.user)
+        if (!cancelled) setUser(data.user ?? null)
       } catch {
         // Sessão indisponível: as páginas cuidam do redirecionamento para /login.
+        if (!cancelled) setUser(null)
       }
     }
     loadUser()
@@ -107,7 +111,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {!isLoginPage && (
+      {!isLoginPage && user && (
         <>
           {isWaiter ? (
             <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between gap-6 border-b border-slate-200 bg-white px-5 shadow-sm md:px-8">

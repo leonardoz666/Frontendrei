@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, use, useMemo, useCallback } from 'react'
+import { useEffect, useState, use, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, CheckCircle2, Search, CreditCard, Receipt, Lock } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, Search, CreditCard, Receipt, Lock } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
@@ -28,15 +28,46 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null)
   const [userRole, setUserRole] = useState<string>('')
-  const [isMobile, setIsMobile] = useState(false)
   const [showReviewModal, setShowReviewModal] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const submitInFlight = useRef(false)
+  const reviewCloseButton = useRef<HTMLButtonElement>(null)
+  const reviewDialog = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+    if (!showReviewModal) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    reviewCloseButton.current?.focus()
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [showReviewModal])
+
+  useEffect(() => {
+    if (!showReviewModal) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !submitting && !submitInFlight.current) {
+        setShowReviewModal(false)
+      }
+      if (event.key !== 'Tab') return
+      const buttons = reviewDialog.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
+      if (!buttons?.length) return
+      const first = buttons[0]
+      const last = buttons[buttons.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [showReviewModal, submitting])
 
   // Transfer Table State
   const [showTransferModal, setShowTransferModal] = useState(false)
@@ -318,12 +349,14 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   }
 
   const removeFromCart = (index: number) => {
+    setReviewError('')
     setCart(prev => prev.filter((_, i) => i !== index))
   }
 
   const submitOrder = async () => {
-    if (cart.length === 0) return
+    if (cart.length === 0 || tableStatus === 'FECHAMENTO' || submitInFlight.current) return
 
+    submitInFlight.current = true
     setSubmitting(true)
     try {
       await apiFetch('/orders', {
@@ -340,12 +373,15 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         },
       })
       setCart([])
+      setReviewError('')
+      setShowReviewModal(false)
       showToast('Pedido enviado com sucesso!', 'success')
       void fetchTableData()
     } catch (error) {
       console.error(error)
-      showToast(error instanceof Error ? error.message : 'Erro ao enviar pedido', 'error')
+      setReviewError(error instanceof Error ? error.message : 'Erro ao lançar pedido')
     } finally {
+      submitInFlight.current = false
       setSubmitting(false)
     }
   }
@@ -353,9 +389,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const cartTotal = useMemo(() => {
     return cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0)
   }, [cart])
+  const cartItemCount = useMemo(() => cart.reduce((total, item) => total + item.quantidade, 0), [cart])
 
   const groupedByProduct = useMemo(() => {
-    const products: { [nome: string]: { nome: string, variations: { [key: string]: SubmittedItem & { quantidade: number, ids: number[] } } } } = {}
+    const products: { [nome: string]: { nome: string, variations: { [key: string]: SubmittedItem & { quantidade: number } } } } = {}
     
     submittedItems.forEach((item) => {
       if (item.status === 'CANCELADO') return
@@ -364,12 +401,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         products[item.nome] = { nome: item.nome, variations: {} }
       }
       
-      const varKey = `${item.observacao || ''}-${item.preco}-${item.status}`
+      const varKey = `${item.observacao || ''}-${item.preco}`
       if (!products[item.nome].variations[varKey]) {
-        products[item.nome].variations[varKey] = { ...item, quantidade: 0, ids: [] }
+        products[item.nome].variations[varKey] = { ...item, quantidade: 0 }
       }
       products[item.nome].variations[varKey].quantidade += item.quantidade
-      products[item.nome].variations[varKey].ids.push(item.id)
     })
     
     return Object.values(products).map(p => ({
@@ -378,201 +414,91 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }))
   }, [submittedItems])
 
-  const handleCloseItem = async (ids: number[]) => {
-    try {
-      for (const id of ids) {
-        await apiFetch(`/orders/items/${id}/status`, {
-          method: 'PATCH',
-          body: { status: 'FECHADO' },
-        });
-      }
-      showToast('Item(ns) fechado(s) com sucesso!', 'success');
-      fetchTableData();
-    } catch {
-      showToast('Erro ao fechar item', 'error');
-    }
-  }
-
-
-
-
   if (loading) {
     return <div className="p-8 text-center">Carregando cardápio...</div>
   }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">Mesa {mesaNumero}</h1>
-          {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
-            <button
-              onClick={() => setShowTransferModal(true)}
-              className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-200 transition-colors"
-              title="Trocar de Mesa"
-            >
-              <ArrowRightLeft size={18} />
-              <span className="hidden sm:inline">Trocar Mesa</span>
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Payment Button - Only for authorized roles */}
-          {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && submittedItems.length > 0 && (
-            <button
-              onClick={() => setShowPaymentModal(true)}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
-              title="Fechar Conta"
-            >
-              <CreditCard size={18} />
-              <span className="hidden sm:inline">Fechar Conta</span>
-              </button>
-          )}
-          {userRole === 'GARCOM' && tableStatus !== 'FECHAMENTO' && (
-            <button
-              type="button"
-              onClick={handleRequestBill}
-              className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 font-bold text-white shadow-lg shadow-orange-200 transition-colors hover:bg-orange-700"
-              title="Solicitar Conta"
-            >
-              <Receipt size={18} />
-              <span className="hidden sm:inline">Solicitar Conta</span>
-            </button>
-          )}
-        </div>
-      </header>
-
-      {tableStatus === 'FECHAMENTO' && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mx-6 mt-4 rounded shadow-sm flex items-center justify-between">
-          <div>
-            <p className="flex items-center gap-2 font-bold">
-              <Lock size={18} aria-hidden="true" />
-              Conta em Fechamento
-            </p>
-            <p className="text-sm">Não é possível adicionar novos itens. Solicite a reabertura no mapa de mesas se necessário.</p>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="flex flex-col p-6 gap-6 max-w-7xl mx-auto w-full">
+        <div className="flex flex-col gap-4 p-3 md:p-6 max-w-7xl mx-auto w-full">
 
-          {/* Pedido Atual (Top) */}
-          <section className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-auto">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl">
-              <div className="flex items-center gap-2">
-                <ListOrdered className="text-orange-500" size={20} />
-                <h2 className="font-bold text-lg text-gray-900">
-                  Pedido Atual <span className="text-gray-400 text-sm font-normal">({cart.length})</span>
-                </h2>
-              </div>
-              <div className="bg-gray-200 px-2 py-1 rounded text-xs font-bold text-gray-700">
-                Total: R$ {cartTotal.toFixed(2).replace('.', ',')}
+          {tableStatus === 'FECHAMENTO' && (
+            <div className="flex items-start gap-2 border-l-4 border-red-500 bg-red-50 p-3 text-red-700">
+              <Lock size={18} aria-hidden="true" className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Conta em Fechamento</p>
+                <p className="text-sm">Não é possível adicionar novos itens. Solicite a reabertura no mapa de mesas se necessário.</p>
               </div>
             </div>
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {cart.length === 0 ? (
-                <div className="col-span-full text-center py-4 text-gray-400">
-                  Nenhum item adicionado ao pedido atual.
-                </div>
-              ) : (
-                cart.map((item, index) => {
-                  let displayName = item.nome
-                  let displayObs = item.observacao || ''
-                  const optionMatch = displayObs.match(/^\(\s*(.+?)\s*\)\s*(.*)/)
-                  if (optionMatch) {
-                    displayName += ` ( ${optionMatch[1]} )`
-                    displayObs = optionMatch[2]
-                  }
+          )}
 
-                  return (
-                    <div key={`cart-${index}`} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm relative">
-                      <div className="flex items-start gap-2 mb-2">
-                        <span className="text-orange-600 font-bold text-sm">{item.quantidade}x</span>
-                        <div className="flex-1">
-                          <span className="font-bold text-gray-900 text-sm block leading-tight">{displayName}</span>
-                          {displayObs && <span className="text-xs text-gray-500 block mt-0.5">{displayObs}</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-2">
-                        <span className="font-bold text-sm text-gray-900">R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
-                        <button onClick={() => removeFromCart(index)} className="text-gray-300 hover:text-red-500 transition-colors">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </section>
-
-          {/* Left Side - Comanda + Produtos */}
+          {/* Comanda + Produtos */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Comanda Section */}
-            <section className="mb-6">
-              <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl border-x border-t">
+            <section className="mb-4 overflow-hidden rounded-md border border-gray-200 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2.5">
+                <div className="flex items-baseline gap-2">
+                  <h1 className="text-lg font-bold text-gray-900">Mesa {mesaNumero}</h1>
+                  <span className="text-xs font-medium text-gray-500">Comanda</span>
+                </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="text-green-500" size={20} />
-                  <h2 className="font-bold text-lg text-gray-900">Comanda (Mesa)</h2>
+                  {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && (
+                    <button type="button" onClick={() => setShowTransferModal(true)} title="Trocar de mesa" aria-label="Trocar de mesa" className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-100">
+                      <ArrowRightLeft size={16} />
+                      <span className="hidden sm:inline">Trocar mesa</span>
+                    </button>
+                  )}
+                  {['CAIXA', 'GERENTE', 'DONO', 'ADMIN'].includes(userRole) && submittedItems.length > 0 && (
+                    <button type="button" onClick={() => setShowPaymentModal(true)} title="Fechar conta" aria-label="Fechar conta" className="flex items-center gap-1.5 rounded-md bg-green-600 px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-green-700">
+                      <CreditCard size={16} />
+                      <span className="hidden sm:inline">Fechar conta</span>
+                    </button>
+                  )}
+                  {userRole === 'GARCOM' && tableStatus !== 'FECHAMENTO' && (
+                    <button type="button" onClick={handleRequestBill} title="Solicitar conta" aria-label="Solicitar conta" className="flex items-center gap-1.5 rounded-md bg-orange-600 px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-orange-700">
+                      <Receipt size={16} />
+                      <span className="hidden sm:inline">Solicitar conta</span>
+                    </button>
+                  )}
                 </div>
               </div>
               
-              <div className="p-4 border-x border-b border-gray-100 bg-white rounded-b-xl max-h-[500px] overflow-y-auto">
+              <div className="max-h-[500px] overflow-y-auto p-3">
                 {groupedByProduct.length === 0 ? (
-                  <div className="p-8 text-center bg-gray-50 rounded-xl border border-gray-200 text-gray-400">
+                  <div className="py-3 text-center text-sm text-gray-500">
                     Nenhum item lançado nesta mesa.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div className="flex flex-wrap items-start gap-2.5">
                     {groupedByProduct.map((productGroup, idx) => {
                       const originalProduct = allProducts.find(p => p.nome === productGroup.nome)
                       
                       return (
-                        <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
-                          <div className="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                             <h3 className="font-bold text-md text-gray-900">{productGroup.nome}</h3>
+                        <div key={idx} className="w-[150px] max-w-full bg-white rounded-md border border-gray-200 flex flex-col">
+                          <div className="px-2.5 py-2 border-b border-gray-100 bg-gray-50 flex justify-between items-center gap-1.5">
+                             <h3 className="min-w-0 break-words font-semibold text-sm leading-tight text-gray-900">{productGroup.nome}</h3>
                              {originalProduct && originalProduct.ativo !== false && (
                                 <button
                                   onClick={() => addToCart(originalProduct)}
-                                  className="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center hover:bg-orange-200 transition-colors"
+                                  className="w-6 h-6 shrink-0 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center hover:bg-orange-200 transition-colors"
                                   title="Adicionar Produto"
+                                  aria-label={`Adicionar ${productGroup.nome}`}
                                 >
-                                  <PlusCircle size={16} />
+                                  <PlusCircle size={14} />
                                 </button>
                              )}
                           </div>
-                          <div className="p-2 space-y-2">
+                          <div className="px-2.5 py-1.5 divide-y divide-gray-100">
                             {productGroup.variations.map((v, vIdx) => {
-                               const isFechado = v.status === 'FECHADO' || v.status === 'CANCELADO';
                                return (
-                                 <div key={vIdx} className={`p-2 rounded-lg border ${isFechado ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-white border-gray-100'} flex items-start justify-between`}>
-                                    <div className="flex gap-2 items-start">
-                                      <span className={`font-bold text-sm ${isFechado ? 'text-gray-400' : 'text-orange-600'}`}>{v.quantidade}x</span>
-                                      <div>
-                                        {v.observacao ? (
-                                           <span className={`text-sm block leading-tight ${isFechado ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{v.observacao}</span>
-                                        ) : (
-                                           <span className={`text-sm block leading-tight italic ${isFechado ? 'text-gray-400' : 'text-gray-500'}`}>Padrão</span>
-                                        )}
-                                        <span className="font-bold text-xs text-gray-500 mt-1 block">R$ {(v.preco * v.quantidade).toFixed(2).replace('.', ',')}</span>
+                                 <div key={vIdx} className="flex gap-1.5 py-1.5 text-xs leading-tight">
+                                      <span className="shrink-0 font-bold text-orange-600">{v.quantidade}x</span>
+                                      <div className="min-w-0">
+                                        {v.observacao && <span className="block break-words text-gray-700">{v.observacao}</span>}
+                                        <span className="block font-semibold text-gray-600">R$ {(v.preco * v.quantidade).toFixed(2).replace('.', ',')}</span>
                                       </div>
-                                    </div>
-                                    
-                                    {isFechado ? (
-                                      <span className="text-xs font-bold text-gray-400 flex items-center gap-1 mt-1">
-                                        ✓ Fechado
-                                      </span>
-                                    ) : (
-                                      <button 
-                                        onClick={() => handleCloseItem(v.ids)}
-                                        className="text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition-colors"
-                                      >
-                                        Fechar
-                                      </button>
-                                    )}
                                  </div>
                                );
                             })}
@@ -671,30 +597,24 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       </main>
 
       {/* Footer - Fixed Bottom Bar */}
-      <footer className="bg-white border-t border-gray-200 px-6 py-4 sticky bottom-0 z-20">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 font-medium">Total:</span>
-            <span className="text-2xl font-bold text-green-600">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
+      <footer className="sticky bottom-0 z-20 border-t border-gray-200 bg-white px-3 py-3 md:px-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between gap-3 sm:justify-start">
+            <span className="text-sm font-medium text-gray-600">{cartItemCount} {cartItemCount === 1 ? 'item selecionado' : 'itens selecionados'}</span>
+            <span className="text-lg font-bold text-gray-900">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
           </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setCart([])}
-              disabled={cart.length === 0}
-              className="px-4 py-3 text-gray-500 font-bold hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Limpar
-            </button>
-            <button
-              onClick={() => isMobile ? setShowReviewModal(true) : submitOrder()}
-              disabled={cart.length === 0 || submitting}
-              className="bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-            >
-              {submitting ? 'Enviando...' : `Enviar Pedido (${cart.length})`}
-              {!submitting && <Rocket size={20} />}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setReviewError('')
+              setShowReviewModal(true)
+            }}
+            disabled={cart.length === 0 || submitting || tableStatus === 'FECHAMENTO'}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-5 py-2.5 font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            <ListOrdered size={18} />
+            Conferir pedido
+          </button>
         </div>
       </footer>
 
@@ -766,65 +686,76 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         )
       )}
 
-      {/* Mobile Review Modal */}
+      {/* Conferência obrigatória antes do lançamento */}
       {showReviewModal && (
         createPortal(
-          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-200">
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 sm:p-4">
+            <div ref={reviewDialog} role="dialog" aria-modal="true" aria-labelledby="review-order-title" className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-md bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <ListOrdered className="text-orange-500" size={24} />
-                  <h2 className="text-xl font-bold text-gray-900">Revisar Pedido ({cart.length})</h2>
+                  <ListOrdered className="text-orange-600" size={20} />
+                  <div>
+                    <h2 id="review-order-title" className="text-lg font-semibold text-gray-900">Conferir pedido</h2>
+                    <p className="text-xs text-gray-500">Mesa {mesaNumero} · {cartItemCount} {cartItemCount === 1 ? 'item' : 'itens'}</p>
+                  </div>
                 </div>
-                <button onClick={() => setShowReviewModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                  <X size={24} className="text-gray-500" />
+                <button ref={reviewCloseButton} type="button" onClick={() => setShowReviewModal(false)} disabled={submitting} aria-label="Fechar conferência" className="rounded-md p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-50">
+                  <X size={20} />
                 </button>
               </div>
 
-              <div className="p-4 overflow-y-auto flex-1 space-y-3">
+              <div className="flex-1 overflow-y-auto px-4 py-2">
                 {cart.length === 0 ? (
-                  <p className="text-center text-gray-500 py-10">Carrinho vazio.</p>
+                  <p className="py-8 text-center text-sm text-gray-500">Nenhum item para lançar.</p>
                 ) : (
                   cart.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start bg-gray-50 p-3 rounded-lg border border-gray-100">
-                      <div className="flex gap-3">
-                        <span className="font-bold text-orange-600 px-2 py-1 bg-white rounded border border-gray-200 h-fit text-sm">
+                    <div key={index} className="flex items-start gap-3 border-b border-gray-100 py-3 last:border-0">
+                      <div className="flex min-w-0 flex-1 gap-3">
+                        <span className="shrink-0 text-sm font-bold text-orange-600">
                           {item.quantidade}x
                         </span>
-                        <div>
-                          <p className="font-bold text-gray-900">{item.nome}</p>
-                          {item.observacao && <p className="text-xs text-gray-500">{item.observacao}</p>}
-                          <p className="text-sm font-bold text-gray-700 mt-1">
+                        <div className="min-w-0">
+                          <p className="break-words text-sm font-semibold text-gray-900">{item.nome}</p>
+                          {item.observacao && <p className="mt-0.5 break-words text-xs text-gray-600">{item.observacao}</p>}
+                          <p className="mt-1 text-sm font-semibold text-gray-800">
                             R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}
                           </p>
                         </div>
                       </div>
                       <button
+                        type="button"
                         onClick={() => removeFromCart(index)}
-                        className="text-gray-400 hover:text-red-500 p-2"
+                        disabled={submitting}
+                        title="Remover item"
+                        aria-label={`Remover ${item.nome} do pedido`}
+                        className="shrink-0 rounded-md p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                       >
-                        <Trash2 size={20} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   ))
                 )}
               </div>
 
-              <div className="p-4 bg-gray-50 border-t border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-gray-600 font-medium">Total do Pedido</span>
-                  <span className="text-2xl font-bold text-green-600">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
+              <div className="border-t border-gray-200 bg-gray-50 p-4">
+                {(reviewError || tableStatus === 'FECHAMENTO') && (
+                  <p role="alert" className="mb-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+                    {reviewError || 'A conta está em fechamento. Reabra a mesa antes de lançar itens.'}
+                  </p>
+                )}
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-gray-600">Total do pedido</span>
+                  <span className="text-lg font-bold text-gray-900">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowReviewModal(false)
-                    submitOrder()
-                  }}
-                  className="w-full py-4 bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-200 flex items-center justify-center gap-2 text-lg active:scale-[0.98] transition-all"
-                >
-                  <Rocket size={24} />
-                  Confirmar Envio
-                </button>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button type="button" onClick={() => setShowReviewModal(false)} disabled={submitting} className="rounded-md border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50">
+                    Continuar escolhendo
+                  </button>
+                  <button type="button" onClick={submitOrder} disabled={cart.length === 0 || submitting || tableStatus === 'FECHAMENTO'} className="flex items-center justify-center gap-2 rounded-md bg-green-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Rocket size={18} />
+                    {submitting ? 'Lançando...' : 'Lançar pedido'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>,
