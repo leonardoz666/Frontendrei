@@ -122,11 +122,35 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
       showToast('Informe um valor maior que zero.', 'error')
       return
     }
+    if (showMovement === 'SANGRIA') {
+      try {
+        setSaving(true)
+        const response = await apiFetch<{ impressao?: { success: boolean } }>('/caixa/movimentos', {
+          method: 'POST',
+          body: { tipo: showMovement, valor: value, descricao: descricao.trim() || undefined },
+        })
+        showToast(
+          response.impressao?.success
+            ? 'Sangria registrada e comprovante impresso.'
+            : 'Sangria registrada, mas o comprovante não foi impresso.',
+          response.impressao?.success ? 'success' : 'warning'
+        )
+        setShowMovement(null)
+        setValorMovimento('')
+        setDescricao('')
+        await loadStatus()
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Erro ao registrar sangria', 'error')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
     const ok = await submit('/api/caixa/movimentos', {
       tipo: showMovement,
       valor: value,
       descricao: descricao.trim() || undefined,
-    }, showMovement === 'SANGRIA' ? 'Sangria registrada.' : 'Suprimento registrado.')
+    }, 'Suprimento registrado.')
     if (ok) {
       setShowMovement(null)
       setValorMovimento('')

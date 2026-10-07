@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Loader2, X, ListPlus } from 'lucide-react'
+import { Plus, Loader2, X, ListPlus, Lock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { TableCard, Mesa } from '@/components/TableCard'
@@ -52,6 +52,7 @@ export default function MesasPage() {
   const [user, setUser] = useState<User | null>(null)
   const [headerStatusTarget, setHeaderStatusTarget] = useState<HTMLElement | null>(null)
   const [podeCadastrar, setPodeCadastrar] = useState(false)
+  const [caixaAberto, setCaixaAberto] = useState<boolean | null>(null)
   const [pracas, setPracas] = useState<Array<{ id: number; nome: string }>>([])
   const [showLoteModal, setShowLoteModal] = useState(false)
   const [loteInicio, setLoteInicio] = useState('1')
@@ -149,6 +150,10 @@ export default function MesasPage() {
 
   const handleTableClick = (mesa: Mesa) => {
     if (mesa.status === 'LIVRE') {
+      if (!caixaAberto) {
+        showToast('Abra o caixa antes de iniciar um atendimento.', 'warning')
+        return
+      }
       setSelectedTable(mesa)
       setShowModal(true)
     } else if (mesa.status === 'FECHAMENTO') {
@@ -204,6 +209,16 @@ export default function MesasPage() {
     }
   }
 
+  const fetchEstadoCaixa = async () => {
+    try {
+      const estado = await apiFetch<{ aberto: boolean }>('/caixa/operacional')
+      setCaixaAberto(estado.aberto)
+    } catch (error) {
+      console.error('Erro ao consultar disponibilidade do caixa:', error)
+      setCaixaAberto(false)
+    }
+  }
+
   useEffect(() => {
     const init = async () => {
         try {
@@ -220,7 +235,7 @@ export default function MesasPage() {
             void carregarPracas()
 
             // Initial fetch
-            await fetchMesas()
+            await Promise.all([fetchMesas(), fetchEstadoCaixa()])
             setLoading(false)
         } catch (error) {
             console.error(error)
@@ -244,9 +259,15 @@ export default function MesasPage() {
 
     socket.on('tables-updated', handleUpdate)
     socket.on('table:updated', handleUpdate)
+    const handleCashUpdate = (estado?: { aberto?: boolean }) => {
+      if (typeof estado?.aberto === 'boolean') setCaixaAberto(estado.aberto)
+      else void fetchEstadoCaixa()
+    }
+    socket.on('caixa:updated', handleCashUpdate)
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer)
+      socket.off('caixa:updated', handleCashUpdate)
       socket.disconnect()
     }
   }, [router])
@@ -298,6 +319,12 @@ export default function MesasPage() {
         )}
 
       <div className="mx-auto w-full max-w-7xl">
+        {caixaAberto === false && (
+          <div className="mb-5 flex items-start gap-3 border-l-4 border-red-600 bg-red-50 px-4 py-3 text-red-800">
+            <Lock size={20} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <div><p className="font-bold">Caixa fechado</p><p className="text-sm">Abra o caixa para iniciar mesas e lançar pedidos.</p></div>
+          </div>
+        )}
         {!isWaiter && (
           <section className="mb-8 flex flex-col gap-5 border-b border-slate-200 pb-5 lg:flex-row lg:items-center lg:justify-between">
             <div>

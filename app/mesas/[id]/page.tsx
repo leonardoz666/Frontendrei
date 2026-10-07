@@ -26,6 +26,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [submitting, setSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [tableStatus, setTableStatus] = useState<string>('')
+  const [caixaAberto, setCaixaAberto] = useState<boolean | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null)
   const [userPermissions, setUserPermissions] = useState<string[]>([])
@@ -118,6 +119,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }
   }, [mesaId])
 
+  const fetchEstadoCaixa = useCallback(async () => {
+    try {
+      const estado = await apiFetch<{ aberto: boolean }>('/caixa/operacional')
+      setCaixaAberto(estado.aberto)
+    } catch (error) {
+      console.error('Erro ao consultar disponibilidade do caixa:', error)
+      setCaixaAberto(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (showTransferModal || showItemTransferModal) {
       apiFetch<Array<{ id: number; numero: number; status: string }>>('/tables')
@@ -167,7 +178,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         // de lançamento de pedido — o coração da operação. Ver lib/legacyArray.ts.
         const [categoriesResponse] = await Promise.all([
           apiFetch('/categories'),
-          fetchTableData()
+          fetchTableData(),
+          fetchEstadoCaixa()
         ])
         const productsData = unwrapList<Categoria>(categoriesResponse)
 
@@ -195,7 +207,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     return () => {
       cancelled = true
     }
-  }, [router, fetchTableData])
+  }, [router, fetchTableData, fetchEstadoCaixa])
 
   // Real-time updates via Socket.io
   useEffect(() => {
@@ -208,11 +220,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }
 
     socket.on('table:updated', handleTableUpdate)
+    const handleCashUpdate = (estado?: { aberto?: boolean }) => {
+      if (typeof estado?.aberto === 'boolean') setCaixaAberto(estado.aberto)
+      else void fetchEstadoCaixa()
+    }
+    socket.on('caixa:updated', handleCashUpdate)
 
     return () => {
+      socket.off('caixa:updated', handleCashUpdate)
       socket.disconnect()
     }
-  }, [mesaId, fetchTableData])
+  }, [mesaId, fetchTableData, fetchEstadoCaixa])
 
   // Flatten products for search
   const allProducts = useMemo(() => {
@@ -227,6 +245,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const canTransferTable = tableStatus === 'OCUPADA' && userPermissions.includes('mesas.transferir')
   const canRegisterPayment = userPermissions.includes('pagamentos.abrir') && userPermissions.includes('pagamentos.registrar')
   const canApplyDiscount = userPermissions.includes('pagamentos.desconto')
+  const lancamentoBloqueado = caixaAberto !== true || tableStatus === 'FECHAMENTO' || !canCreateOrder
 
   useEffect(() => {
     if (paymentEntryHandled.current || !canRegisterPayment || !tableStatus) return
@@ -400,6 +419,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   }
 
   const submitOrder = async () => {
+    if (caixaAberto !== true) {
+      setReviewError('Abra o caixa antes de lançar pedidos.')
+      return
+    }
     if (cart.length === 0 || tableStatus === 'FECHAMENTO' || !canCreateOrder || submitInFlight.current) return
 
     submitInFlight.current = true
@@ -484,6 +507,13 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 <p className="font-semibold">Conta em Fechamento</p>
                 <p className="text-sm">Não é possível adicionar novos itens. Solicite a reabertura no mapa de mesas se necessário.</p>
               </div>
+            </div>
+          )}
+
+          {caixaAberto === false && (
+            <div className="flex items-start gap-2 border-l-4 border-red-600 bg-red-50 p-3 text-red-800">
+              <Lock size={18} aria-hidden="true" className="mt-0.5 shrink-0" />
+              <div><p className="font-semibold">Caixa fechado</p><p className="text-sm">A comanda está disponível para consulta, mas novos pedidos só podem ser lançados após a abertura do caixa.</p></div>
             </div>
           )}
 
@@ -604,7 +634,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   className="w-full p-3 pl-12 rounded-xl border border-gray-200 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 bg-white placeholder-gray-400"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={tableStatus === 'FECHAMENTO' || !canCreateOrder}
+                  disabled={lancamentoBloqueado}
                 />
               </div>
 
@@ -638,7 +668,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 <div className="grid grid-cols-2 gap-3 pb-4 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
                   {filteredProducts.map(produto => {
                     const isInactive = produto.ativo === false
-                    const isDisabled = isInactive || tableStatus === 'FECHAMENTO' || !canCreateOrder
+                    const isDisabled = isInactive || lancamentoBloqueado
                     const quantity = cartQuantities.get(produto.id) ?? 0
                     return (
                       <article
@@ -711,7 +741,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               setReviewError('')
               setShowReviewModal(true)
             }}
-            disabled={cart.length === 0 || submitting || tableStatus === 'FECHAMENTO' || !canCreateOrder}
+            disabled={cart.length === 0 || submitting || lancamentoBloqueado}
             className="flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-5 py-2.5 font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             <ListOrdered size={18} />
@@ -945,7 +975,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   <button type="button" onClick={() => setShowReviewModal(false)} disabled={submitting} className="rounded-md border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50">
                     Continuar escolhendo
                   </button>
-                  <button type="button" onClick={submitOrder} disabled={cart.length === 0 || submitting || tableStatus === 'FECHAMENTO' || !canCreateOrder} className="flex items-center justify-center gap-2 rounded-md bg-green-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  <button type="button" onClick={submitOrder} disabled={cart.length === 0 || submitting || lancamentoBloqueado} className="flex items-center justify-center gap-2 rounded-md bg-green-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50">
                     <Rocket size={18} />
                     {submitting ? 'Lançando...' : 'Lançar pedido'}
                   </button>
