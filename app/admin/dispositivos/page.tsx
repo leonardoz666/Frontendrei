@@ -40,8 +40,22 @@ const LIST_RESOURCE = '/dispositivos?tipo=IMPRESSORA'
 // The Vercel app runs in the cloud, while the Windows agent runs on the
 // operator's computer. In the browser, loopback is therefore the default
 // production bridge; the env var remains available for a custom local URL.
-const PRINTER_AGENT_URL = (process.env.NEXT_PUBLIC_PRINTER_AGENT_URL || 'http://127.0.0.1:4100').replace(/\/$/, '')
+const CONFIGURED_PRINTER_AGENT_URL = (process.env.NEXT_PUBLIC_PRINTER_AGENT_URL || '').trim()
+const PRINTER_AGENT_URL = (CONFIGURED_PRINTER_AGENT_URL || 'http://127.0.0.1:4100').replace(/\/$/, '')
 const PRINTER_AGENT_TOKEN = process.env.NEXT_PUBLIC_PRINTER_AGENT_TOKEN || ''
+
+function deveUsarAgenteLocal(): boolean {
+  if (CONFIGURED_PRINTER_AGENT_URL) return true
+  if (typeof window === 'undefined') return true
+  return !['localhost', '127.0.0.1'].includes(window.location.hostname)
+}
+
+function erroDoAgente(error: unknown): Error {
+  if (error instanceof TypeError) {
+    return new Error('Rei Printer Agent não está em execução. Abra o agente neste computador e tente novamente.')
+  }
+  return error instanceof Error ? error : new Error('Erro ao comunicar com o Rei Printer Agent')
+}
 
 const CONEXOES = ['TCP', 'USB'] as const
 const LARGURAS_MM = [58, 80] as const
@@ -150,17 +164,21 @@ export default function DispositivosPage() {
   const carregarWindowsPrinters = async () => {
     setCarregandoWindows(true)
     try {
-      const body = PRINTER_AGENT_URL
+      const body = deveUsarAgenteLocal()
         ? await (async () => {
-            const res = await fetch(`${PRINTER_AGENT_URL}/printers`, {
-              cache: 'no-store',
-              headers: PRINTER_AGENT_TOKEN ? { 'X-Printer-Agent-Token': PRINTER_AGENT_TOKEN } : undefined,
-            })
-            const data = await res.json().catch(() => ({}))
-            if (!res.ok) throw new Error(data.error || 'Erro ao reconhecer impressoras')
-            return data
+            try {
+              const res = await fetch(`${PRINTER_AGENT_URL}/printers`, {
+                cache: 'no-store',
+                headers: PRINTER_AGENT_TOKEN ? { 'X-Printer-Agent-Token': PRINTER_AGENT_TOKEN } : undefined,
+              })
+              const data = await res.json().catch(() => ({}))
+              if (!res.ok) throw new Error(data.error || 'Erro ao reconhecer impressoras')
+              return data as { data?: WindowsPrinter[] }
+            } catch (error) {
+              throw erroDoAgente(error)
+            }
           })()
-        : await apiFetch<{ data?: string[] }>('/dispositivos/windows-printers')
+        : await apiFetch<{ data?: WindowsPrinter[] }>('/dispositivos/windows-printers')
       setWindowsPrinters(Array.isArray(body.data) ? body.data : [])
       setMostraWindows(true)
       showToast('Impressoras do Windows reconhecidas.', 'success')
@@ -288,23 +306,27 @@ export default function DispositivosPage() {
   const testarImpressora = async (dispositivo: Dispositivo) => {
     setTestandoId(dispositivo.id)
     try {
-      const usandoAgente = Boolean(PRINTER_AGENT_URL && dispositivo.conexao === 'USB')
+      const usandoAgente = deveUsarAgenteLocal() && dispositivo.conexao === 'USB'
       const body = usandoAgente
         ? await (async () => {
-            const res = await fetch(`${PRINTER_AGENT_URL}/print-test`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(PRINTER_AGENT_TOKEN ? { 'X-Printer-Agent-Token': PRINTER_AGENT_TOKEN } : {}),
-              },
-              body: JSON.stringify({
-                printerName: dispositivo.ip,
-                modoTexto: dispositivo.descricao?.includes('[MODO_TEXTO]') ?? false,
-              }),
-            })
-            const data = await res.json().catch(() => ({}))
-            if (!res.ok) throw new Error(data.error || 'Falha ao testar impressora')
-            return data
+            try {
+              const res = await fetch(`${PRINTER_AGENT_URL}/print-test`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(PRINTER_AGENT_TOKEN ? { 'X-Printer-Agent-Token': PRINTER_AGENT_TOKEN } : {}),
+                },
+                body: JSON.stringify({
+                  printerName: dispositivo.ip,
+                  modoTexto: dispositivo.descricao?.includes('[MODO_TEXTO]') ?? false,
+                }),
+              })
+              const data = await res.json().catch(() => ({}))
+              if (!res.ok) throw new Error(data.error || 'Falha ao testar impressora')
+              return data
+            } catch (error) {
+              throw erroDoAgente(error)
+            }
           })()
         : await apiFetch<{ message?: string }>(`/printers/${dispositivo.id}/test`, { method: 'POST' })
       showToast(body.message || 'Teste enviado para a impressora', 'success')
