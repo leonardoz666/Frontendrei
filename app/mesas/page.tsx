@@ -11,6 +11,7 @@ import { apiFetch } from '@/app/lib/api'
 
 type User = {
   role: string
+  permissions?: string[]
 }
 
 function MesaStatusSummary({ livres, ocupadas }: { livres: number; ocupadas: number }) {
@@ -152,8 +153,12 @@ export default function MesasPage() {
       setSelectedTable(mesa)
       setShowModal(true)
     } else if (mesa.status === 'FECHAMENTO') {
-      setSelectedTable(mesa)
-      setShowReopenModal(true)
+      if (canReopen || canClose) {
+        setSelectedTable(mesa)
+        setShowReopenModal(true)
+      } else {
+        router.push(`/mesas/${mesa.id}`)
+      }
     } else {
       router.push(`/mesas/${mesa.id}`)
     }
@@ -288,13 +293,15 @@ export default function MesasPage() {
 
   const livres = mesas.filter(m => m.status === 'LIVRE').length
   const ocupadas = mesas.filter(m => m.status !== 'LIVRE').length
+  const isWaiter = user?.role === 'GARCOM'
   const canCreate = user?.role === 'ADMIN' || user?.role === 'DONO'
-  const canClose = user?.role === 'ADMIN' || user?.role === 'DONO' || user?.role === 'GERENTE' || user?.role === 'CAIXA'
+  const canReopen = Boolean(user?.permissions?.includes('mesas.reabrir'))
+  const canClose = Boolean(user?.permissions?.includes('mesas.fechar'))
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 pb-4 pt-6 sm:px-6 md:pt-12 lg:px-8 lg:pt-24">
+    <div className={`min-h-screen bg-gray-50 px-4 pb-4 sm:px-6 lg:px-8 ${isWaiter ? 'pt-6 md:pt-12 lg:pt-24' : 'pt-6 lg:pt-8'}`}>
       {headerStatusTarget &&
         createPortal(
           <MesaStatusSummary livres={livres} ocupadas={ocupadas} />,
@@ -302,34 +309,54 @@ export default function MesasPage() {
         )}
 
       <div className="mx-auto w-full max-w-7xl">
-        {(user?.role !== 'GARCOM' || canCreate || podeCadastrar) && (
-          <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
-            {user?.role !== 'GARCOM' && (
-              <MesaStatusSummary livres={livres} ocupadas={ocupadas} />
-            )}
+        {!isWaiter && (
+          <section className="mb-8 flex flex-col gap-5 border-b border-slate-200 pb-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-950">Mapa de Mesas</h1>
+              <p className="mt-1 text-sm text-slate-500">Acompanhe os atendimentos e gerencie o cadastro das mesas.</p>
+            </div>
 
-            {canCreate && (
+            <div className="flex flex-wrap items-center gap-3">
+              <MesaStatusSummary livres={livres} ocupadas={ocupadas} />
+
+              {canCreate && (
                 <button 
                   onClick={openAddModal}
                   disabled={creating}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white w-14 h-14 rounded-2xl shadow-lg shadow-blue-600/20 transition-all active:scale-95 flex items-center justify-center"
+                  title="Nova mesa"
+                  aria-label="Nova mesa"
+                  className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-600 text-white shadow-sm transition-colors hover:bg-orange-700 disabled:opacity-50"
                 >
                   {creating ? <Loader2 className="animate-spin" size={24} /> : <Plus size={24} strokeWidth={2.5} />}
                 </button>
-            )}
+              )}
 
-            {/* Geração em lote (RF-MES-02/03). Visível para quem tem a permissão
-                que o backend realmente exige para criar mesa. */}
-            {podeCadastrar && (
-              <button
-                onClick={abrirLote}
-                title="Gerar mesas em lote (ex.: 1 a 300)"
-                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 h-14 px-5 rounded-2xl shadow-sm transition-all active:scale-95 flex items-center gap-2 font-semibold"
-              >
-                <ListPlus size={22} />
-                <span className="hidden sm:inline">Em lote</span>
-              </button>
-            )}
+              {/* Geração em lote (RF-MES-02/03). Visível para quem tem a permissão
+                  que o backend realmente exige para criar mesa. */}
+              {podeCadastrar && (
+                <button
+                  onClick={abrirLote}
+                  title="Gerar mesas em lote (ex.: 1 a 300)"
+                  className="flex h-12 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                >
+                  <ListPlus size={20} />
+                  <span>Em lote</span>
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {isWaiter && podeCadastrar && (
+          <div className="mb-4 flex justify-end">
+            <button
+              onClick={abrirLote}
+              title="Gerar mesas em lote (ex.: 1 a 300)"
+              className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+            >
+              <ListPlus size={20} />
+              <span>Em lote</span>
+            </button>
           </div>
         )}
 
@@ -445,13 +472,15 @@ export default function MesasPage() {
             </div>
             
             <div className="flex flex-col gap-3">
-              <button 
-                onClick={confirmReopenTable} 
-                disabled={tableActionPending}
-                className="w-full py-3 px-4 rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors"
-              >
-                🔄 Reabrir Conta
-              </button>
+              {canReopen && (
+                <button
+                  onClick={confirmReopenTable}
+                  disabled={tableActionPending}
+                  className="w-full py-3 px-4 rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors"
+                >
+                  🔄 Reabrir Conta
+                </button>
+              )}
 
               {canClose && (
                 <button 

@@ -14,6 +14,7 @@ import {
   ClipboardList,
   Clock,
   Contact,
+  Eye,
   FileSpreadsheet,
   FileText,
   HardDrive,
@@ -50,9 +51,13 @@ import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { apiFetch } from '@/app/lib/api'
 import {
+  buildSidebarVisualSections,
   findActiveNavItem,
   readStoredCollapsed,
   readStoredGroupState,
+  readStoredSidebarVisibility,
+  SIDEBAR_VISIBILITY_EVENT,
+  sidebarVisibilityStorageKey,
   visibleNavGroups,
   writeStoredCollapsed,
   writeStoredGroupState,
@@ -97,6 +102,7 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   MapPin,
   HardDrive,
   QrCode,
+  Eye,
 }
 
 interface SidebarProps {
@@ -126,6 +132,7 @@ export default function Sidebar({
   const [mounted, setMounted] = useState(false)
   const [selfCollapsed, setSelfCollapsed] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+  const [visibility, setVisibility] = useState(() => readStoredSidebarVisibility(null))
   const activeSectionRef = useRef<string | undefined>(undefined)
 
   // Close sidebar on route change (mobile)
@@ -183,54 +190,35 @@ export default function Sidebar({
   }, [normalizedSearch, visibleGroups])
   const visualSections = useMemo(() => {
     const sourceGroups = normalizedSearch ? filteredGroups : visibleGroups
-    const sectionDefinitions = [
-      {
-        id: 'atendimento',
-        label: 'ATENDIMENTO',
-        groupIds: ['inicio', 'mesas'],
-        itemFilter: (item: NavItem) => !['/', '/dashboard', '/mesas'].includes(item.href),
-      },
-      { id: 'cardapio-estoque', label: 'CARDÁPIO E ESTOQUE', groupIds: ['cardapio', 'estoque'] },
-      {
-        id: 'caixa',
-        label: 'CAIXA',
-        groupIds: ['caixa'],
-        itemFilter: (item: NavItem) => ['/caixa', '/caixa/fechamento'].includes(item.href),
-      },
-      {
-        id: 'nota-fiscal',
-        label: 'NOTA FISCAL',
-        groupIds: ['caixa', 'administracao'],
-        itemFilter: (item: NavItem) => ['/fiscal/notas', '/fiscal/radar-xml', '/admin/fiscal'].includes(item.href),
-      },
-    ]
-    const sections = sectionDefinitions
+    const hiddenSections = new Set(visibility.hiddenSectionIds)
+    const hiddenItems = new Set(visibility.hiddenItemHrefs)
+
+    return buildSidebarVisualSections(sourceGroups, isWaiter)
+      .filter(section => !hiddenSections.has(section.id))
       .map(section => {
-        const groups = section.groupIds
-          .map(groupId => {
-            const source = sourceGroups.find(({ group }) => group.id === groupId)
-            return source && {
-              id: groupId,
-              label: source.group.label,
-              items: source.items.filter(item => !section.itemFilter || section.itemFilter(item)),
-            }
-          })
-          .filter((group): group is NonNullable<typeof group> => Boolean(group && group.items.length))
+        const groups = section.groups
+          .map(group => ({ ...group, items: group.items.filter(item => !hiddenItems.has(item.href)) }))
+          .filter(group => group.items.length > 0)
         return { ...section, groups, items: groups.flatMap(group => group.items) }
       })
       .filter(section => section.items.length > 0)
-    const assigned = new Set(sectionDefinitions.flatMap(section => section.groupIds))
-    sourceGroups
-      .filter(({ group }) => !assigned.has(group.id))
-      .forEach(({ group, items }) => sections.push({
-        id: group.id,
-        label: group.label.toUpperCase(),
-        groupIds: [group.id],
-        groups: [{ id: group.id, label: group.label, items }],
-        items,
-      }))
-    return isWaiter ? sections.filter(section => section.id !== 'atendimento') : sections
-  }, [filteredGroups, isWaiter, normalizedSearch, visibleGroups])
+  }, [filteredGroups, isWaiter, normalizedSearch, visibility, visibleGroups])
+
+  useEffect(() => {
+    if (!user) return
+    const syncVisibility = () => setVisibility(readStoredSidebarVisibility(user))
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === sidebarVisibilityStorageKey(user)) syncVisibility()
+    }
+
+    syncVisibility()
+    window.addEventListener(SIDEBAR_VISIBILITY_EVENT, syncVisibility)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener(SIDEBAR_VISIBILITY_EVENT, syncVisibility)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [user])
 
   const visualSectionForActive = useMemo(
     () => visualSections.find(section => section.items.some(item => item.href === activeHref)),
@@ -354,8 +342,8 @@ export default function Sidebar({
         aria-current={isActive ? 'page' : undefined}
         className={`group relative flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] font-medium leading-5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
           isActive
-            ? 'bg-orange-50 font-semibold text-orange-800 before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-orange-500'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            ? 'bg-orange-600 font-semibold text-white shadow-sm'
+            : 'text-slate-800 hover:bg-orange-600 hover:text-white'
         } ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
       >
         <Icon size={19} className={`hidden shrink-0 ${isCollapsed ? 'md:block' : ''}`} aria-hidden="true" />
@@ -363,7 +351,7 @@ export default function Sidebar({
         {item.shortcut && (
           <kbd
             className={`rounded-full border px-2 py-0.5 font-mono text-[10px] ${
-              isActive ? 'border-orange-200 bg-white/70 text-orange-700' : 'border-slate-200 text-slate-400'
+              isActive ? 'border-white/40 bg-white/15 text-white' : 'border-slate-200 text-slate-400 group-hover:border-white/40 group-hover:text-white'
             } ${isCollapsed ? 'md:hidden' : ''}`}
           >
             {item.shortcut}
@@ -384,7 +372,7 @@ export default function Sidebar({
       )}
 
       <aside className={`
-        fixed inset-y-0 left-0 z-[70] w-72 bg-white flex flex-col transition-all duration-300 ease-in-out border-r border-slate-200 shadow-[18px_0_17px_rgba(15,20,31,0.06)]
+        fixed inset-y-0 left-0 z-[70] w-72 bg-[#e8eef5] flex flex-col transition-all duration-300 ease-in-out border-r border-slate-300 shadow-[18px_0_17px_rgba(15,20,31,0.08)]
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         ${isCollapsed ? 'md:w-[88px]' : 'md:w-72'}
         md:translate-x-0
@@ -491,15 +479,15 @@ export default function Sidebar({
                   />
                 </button>
 
-                <div className={isGroupOpen ? 'mt-1 pl-3' : 'hidden'}>
+                <div className={isGroupOpen ? 'mt-2 rounded-lg border border-slate-200 bg-white/90 p-2 shadow-sm' : 'hidden'}>
                   {section.groups.map((group, index) => (
-                    <div key={group.id} className={index > 0 ? 'mt-2 border-t border-slate-100 pt-2' : ''}>
+                    <div key={group.id} className={index > 0 ? 'mt-2 border-t border-slate-200 pt-2' : ''}>
                       {section.id === 'cardapio-estoque' && (
-                        <div className="px-3 pb-1 text-[11px] font-semibold text-slate-500">
+                        <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
                           {group.label}
                         </div>
                       )}
-                      <div className="space-y-0.5 border-l border-slate-200 pl-1">
+                      <div className="space-y-0.5 border-l-2 border-slate-300 pl-1.5">
                         {group.items.map(renderItem)}
                       </div>
                     </div>
@@ -522,7 +510,7 @@ export default function Sidebar({
           )}
         </nav>
 
-        <div className="border-t border-slate-100 bg-gradient-to-t from-slate-50 to-white p-3">
+        <div className="border-t border-slate-300 bg-[#e8eef5] p-3">
           {isTablePage && (
             <button
               onClick={() => setShowBillModal(true)}

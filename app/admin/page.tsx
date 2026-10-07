@@ -5,7 +5,8 @@ import {
   UtensilsCrossed, 
   Users, 
   Tags, 
-  Printer
+  Printer,
+  Eye,
 } from 'lucide-react'
 
 export default function AdminDashboard() {
@@ -37,6 +38,13 @@ export default function AdminDashboard() {
       description: 'Configurar impressão de pedidos',
       icon: Printer,
       color: 'bg-purple-500'
+    },
+    {
+      href: '/admin/visibilidade',
+      label: 'Visibilidade',
+      description: 'Escolher o que aparece na barra lateral',
+      icon: Eye,
+      color: 'bg-slate-700'
     }
   ]
 
@@ -44,7 +52,7 @@ export default function AdminDashboard() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Painel Administrativo</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
         {adminLinks.map((link) => {
           const Icon = link.icon
           return (

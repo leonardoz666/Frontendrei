@@ -18,6 +18,7 @@
 export type NavPermission =
   | 'mesas.visualizar'
   | 'mesas.abrir'
+  | 'mesas.reabrir'
   | 'mesas.fechar'
   | 'mesas.transferir'
   | 'pedidos.criar'
@@ -105,6 +106,7 @@ export type NavIconName =
   | 'MapPin'
   | 'HardDrive'
   | 'QrCode'
+  | 'Eye'
 
 export type NavShortcut = 'F8'
 
@@ -464,6 +466,12 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ['ADMIN', 'DONO', 'GERENTE'],
       },
       {
+        href: '/admin/visibilidade',
+        label: 'Visibilidade',
+        icon: 'Eye',
+        roles: ['ADMIN', 'DONO'],
+      },
+      {
         href: '/admin/fiscal',
         label: 'Configuração Fiscal',
         icon: 'FileText',
@@ -485,6 +493,69 @@ export const ROUTE_SHORTCUTS: ReadonlyArray<{
 
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = 'rei.sidebar.collapsed'
 export const SIDEBAR_GROUPS_STORAGE_KEY = 'rei.sidebar.groups'
+export const SIDEBAR_VISIBILITY_EVENT = 'rei:sidebar-visibility-change'
+
+export interface SidebarVisibilityState {
+  hiddenSectionIds: string[]
+  hiddenItemHrefs: string[]
+}
+
+export interface SidebarVisualSectionGroup {
+  id: string
+  label: string
+  items: NavItem[]
+}
+
+export interface SidebarVisualSection {
+  id: string
+  label: string
+  groupIds: string[]
+  groups: SidebarVisualSectionGroup[]
+  items: NavItem[]
+}
+
+const EMPTY_SIDEBAR_VISIBILITY: SidebarVisibilityState = {
+  hiddenSectionIds: [],
+  hiddenItemHrefs: [],
+}
+
+export function sidebarVisibilityStorageKey(user: NavUser | null | undefined): string {
+  return `rei.sidebar.visibility:${user?.id ?? user?.role ?? 'default'}`
+}
+
+export function readStoredSidebarVisibility(user: NavUser | null | undefined): SidebarVisibilityState {
+  if (typeof window === 'undefined') return EMPTY_SIDEBAR_VISIBILITY
+  try {
+    const raw = window.localStorage.getItem(sidebarVisibilityStorageKey(user))
+    if (!raw) return EMPTY_SIDEBAR_VISIBILITY
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return EMPTY_SIDEBAR_VISIBILITY
+    const state = parsed as Partial<SidebarVisibilityState>
+    return {
+      hiddenSectionIds: Array.isArray(state.hiddenSectionIds)
+        ? state.hiddenSectionIds.filter((value): value is string => typeof value === 'string')
+        : [],
+      hiddenItemHrefs: Array.isArray(state.hiddenItemHrefs)
+        ? state.hiddenItemHrefs.filter((value): value is string => typeof value === 'string')
+        : [],
+    }
+  } catch {
+    return EMPTY_SIDEBAR_VISIBILITY
+  }
+}
+
+export function writeStoredSidebarVisibility(
+  user: NavUser | null | undefined,
+  state: SidebarVisibilityState
+): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(sidebarVisibilityStorageKey(user), JSON.stringify(state))
+    window.dispatchEvent(new CustomEvent(SIDEBAR_VISIBILITY_EVENT))
+  } catch {
+    // localStorage indisponível: a preferência deixa de persistir, sem quebrar o menu.
+  }
+}
 
 /** Estado recolhido da sidebar, persistido pelo MainLayout. */
 export function readStoredCollapsed(): boolean {
@@ -580,6 +651,68 @@ export function visibleNavGroups(user: NavUser | null | undefined): VisibleNavGr
   }
 
   return visible
+}
+
+/** Seções exibidas pela sidebar, compartilhadas com a tela de personalização. */
+export function buildSidebarVisualSections(
+  sourceGroups: VisibleNavGroup[],
+  isWaiter: boolean
+): SidebarVisualSection[] {
+  const sectionDefinitions: Array<{
+    id: string
+    label: string
+    groupIds: string[]
+    itemFilter?: (item: NavItem) => boolean
+  }> = [
+    {
+      id: 'atendimento',
+      label: 'ATENDIMENTO',
+      groupIds: ['inicio', 'mesas'],
+      itemFilter: item => !['/', '/dashboard', '/mesas'].includes(item.href),
+    },
+    { id: 'cardapio-estoque', label: 'CARDÁPIO E ESTOQUE', groupIds: ['cardapio', 'estoque'] },
+    {
+      id: 'caixa',
+      label: 'CAIXA',
+      groupIds: ['caixa'],
+      itemFilter: item => ['/caixa', '/caixa/fechamento'].includes(item.href),
+    },
+    {
+      id: 'nota-fiscal',
+      label: 'NOTA FISCAL',
+      groupIds: ['caixa', 'administracao'],
+      itemFilter: item => ['/fiscal/notas', '/fiscal/radar-xml', '/admin/fiscal'].includes(item.href),
+    },
+  ]
+
+  const sections = sectionDefinitions
+    .map(section => {
+      const groups = section.groupIds
+        .map(groupId => {
+          const source = sourceGroups.find(({ group }) => group.id === groupId)
+          return source && {
+            id: groupId,
+            label: source.group.label,
+            items: source.items.filter(item => !section.itemFilter || section.itemFilter(item)),
+          }
+        })
+        .filter((group): group is NonNullable<typeof group> => Boolean(group && group.items.length))
+      return { ...section, groups, items: groups.flatMap(group => group.items) }
+    })
+    .filter(section => section.items.length > 0)
+
+  const assigned = new Set(sectionDefinitions.flatMap(section => section.groupIds))
+  sourceGroups
+    .filter(({ group }) => !assigned.has(group.id))
+    .forEach(({ group, items }) => sections.push({
+      id: group.id,
+      label: group.label.toUpperCase(),
+      groupIds: [group.id],
+      groups: [{ id: group.id, label: group.label, items }],
+      items,
+    }))
+
+  return isWaiter ? sections.filter(section => section.id !== 'atendimento') : sections
 }
 
 /** A rota casa com o `href` do item (`/` só casa exato). */
