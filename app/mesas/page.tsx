@@ -199,14 +199,20 @@ export default function MesasPage() {
     // Socket connection for real-time updates
     const socket = connectTableSocket()
 
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined
     const handleUpdate = () => {
-      fetchMesas()
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(() => {
+        refreshTimer = undefined
+        void fetchMesas()
+      }, 50)
     }
 
     socket.on('tables-updated', handleUpdate)
     socket.on('table:updated', handleUpdate)
 
     return () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
       socket.disconnect()
     }
   }, [router])

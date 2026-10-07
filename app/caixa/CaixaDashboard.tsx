@@ -76,7 +76,7 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
   const loadStatus = useCallback(async () => {
     try {
       setLoading(true)
-      setData(await apiFetch<CashStatus>('/caixa/status'))
+      setData(await apiFetch<CashStatus>('/caixa/status?resumo=true'))
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao consultar o caixa', 'error')
     } finally {

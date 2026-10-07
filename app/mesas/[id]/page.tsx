@@ -138,7 +138,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         // (contrato paginado novo). Sem isso, no dia em que a rota passar a ser
         // paginada, `productsData.sort` estoura "sort is not a function" na tela
         // de lançamento de pedido — o coração da operação. Ver lib/legacyArray.ts.
-        const productsData = unwrapList<Categoria>(await apiFetch('/categories'))
+        const [categoriesResponse] = await Promise.all([
+          apiFetch('/categories'),
+          fetchTableData()
+        ])
+        const productsData = unwrapList<Categoria>(categoriesResponse)
 
         if (!cancelled) {
           const order = ['Entradas', 'Pratos Principais', 'Bebidas', 'Drinks']
@@ -152,7 +156,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             return valA - valB || a.nome.localeCompare(b.nome)
           })
           setCategories(sortedCategories)
-          await fetchTableData()
         }
       } catch (err) {
         console.error('Erro ao carregar pedido:', err)
@@ -178,7 +181,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }
 
     socket.on('table:updated', handleTableUpdate)
-    socket.on('tables-updated', () => fetchTableData())
 
     return () => {
       socket.disconnect()
