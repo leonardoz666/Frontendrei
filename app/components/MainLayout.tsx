@@ -153,7 +153,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                     <p className="max-w-36 truncate text-sm font-semibold text-slate-900">{user?.name ?? 'Garçom'}</p>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">GARÇOM</p>
                   </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+                  <div className="hidden h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white sm:flex">
                     {user?.name?.charAt(0).toUpperCase() || 'G'}
                   </div>
                   <button
@@ -161,7 +161,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                     onClick={handleLogout}
                     title="Sair"
                     aria-label="Sair"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100 sm:h-9 sm:w-9 sm:border-transparent sm:bg-transparent sm:text-slate-400 sm:shadow-none sm:hover:bg-red-50 sm:hover:text-red-600"
                   >
                     <LogOut size={17} />
                   </button>
