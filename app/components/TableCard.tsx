@@ -39,19 +39,28 @@ export function TableCard({ mesa, onClick, fallbackUsuarioNome }: TableCardProps
   let backgroundColor = "bg-green-50"
   let numColor = "text-green-600"
   let badgeClass = "bg-green-100 text-green-700"
+  let footerColor = ""
+  let userColor = "text-gray-700"
+  let timeColor = "text-gray-500"
   let statusText: string = mesa.status
 
   if (isOcupada) {
-    borderColor = "border-yellow-200"
-    backgroundColor = "bg-yellow-50"
-    numColor = "text-yellow-500"
-    badgeClass = "bg-yellow-100 text-yellow-700"
+    borderColor = "border-amber-300"
+    backgroundColor = "bg-amber-300"
+    numColor = "text-black"
+    badgeClass = "text-black"
+    footerColor = "bg-amber-400"
+    userColor = "text-black"
+    timeColor = "text-black"
     statusText = "Em Andamento"
   } else if (isFechamento) {
-    borderColor = "border-red-200"
-    backgroundColor = "bg-red-50"
-    numColor = "text-red-600"
-    badgeClass = "bg-red-100 text-red-700"
+    borderColor = "border-red-500"
+    backgroundColor = "bg-red-500"
+    numColor = "text-white"
+    badgeClass = "text-white"
+    footerColor = "bg-red-600"
+    userColor = "text-white"
+    timeColor = "text-red-100"
     statusText = "FECHANDO"
   }
 
@@ -59,31 +68,34 @@ export function TableCard({ mesa, onClick, fallbackUsuarioNome }: TableCardProps
     <div
       onClick={() => onClick(mesa)}
       className={clsx(
-        "rounded-2xl p-3 flex min-h-[148px] flex-col items-center justify-center gap-2 shadow-[0_2px_14px_rgba(0,0,0,0.04)] border transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg",
+        "flex min-h-[148px] cursor-pointer flex-col overflow-hidden rounded-2xl border shadow-[0_2px_14px_rgba(0,0,0,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-lg",
         borderColor,
         backgroundColor
       )}
     >
-      <span className={clsx(
-        "text-4xl font-bold tracking-tight",
-        numColor
-      )}>
-        {mesa.numero.toString().padStart(2, '0')}
-      </span>
-      
-      <div className={clsx(
-        "px-3 py-1 rounded-full text-[9px] font-bold tracking-wider uppercase",
-        badgeClass
-      )}>
-        {statusText}
+      <div className="flex flex-1 flex-col items-center justify-center gap-1.5 p-3">
+        <span className={clsx(
+          "text-4xl font-bold tracking-tight",
+          numColor
+        )}>
+          {mesa.numero.toString().padStart(2, '0')}
+        </span>
+
+        <div className={clsx(
+          "text-[10px] font-bold uppercase",
+          !isOcupada && !isFechamento && "rounded-full px-3 py-1",
+          badgeClass
+        )}>
+          {statusText}
+        </div>
       </div>
 
       {(isOcupada || isFechamento) && mesa.comandas?.[0] && (
-        <div className="mt-1 flex flex-col items-center animate-in fade-in slide-in-from-bottom-2">
-          <span className="max-w-[120px] truncate text-[11px] font-bold text-gray-600">
+        <div className={clsx("flex min-h-12 w-full animate-in flex-col items-center justify-center px-3 py-2 fade-in slide-in-from-bottom-2", footerColor)}>
+          <span className={clsx("max-w-[120px] truncate text-[11px] font-bold", userColor)}>
             {mesa.comandas[0].usuario?.nome?.split(' ')[0] || fallbackUsuarioNome || 'Desconhecido'}
           </span>
-          <span className="mt-0.5 text-[10px] font-medium text-gray-400">
+          <span className={clsx("mt-0.5 text-[10px] font-medium", timeColor)}>
             {formatTime(mesa.comandas[0].abertaEm)}
           </span>
         </div>

@@ -23,6 +23,7 @@ export type NavPermission =
   | 'mesas.transferir'
   | 'pedidos.criar'
   | 'pedidos.editar'
+  | 'pedidos.transferir'
   | 'pedidos.cancelar'
   | 'pedidos.itens.fechar'
   | 'pagamentos.abrir'

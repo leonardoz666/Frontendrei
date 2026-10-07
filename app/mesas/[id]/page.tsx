@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, Minus, Plus, Search, CreditCard, Receipt, Lock, Printer, Loader2 } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, ListPlus, Trash2, Rocket, PlusCircle, Minus, Plus, Search, CreditCard, Receipt, Lock, Printer, Loader2 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
@@ -76,6 +76,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [availableTables, setAvailableTables] = useState<{ id: number, numero: number, status: string }[]>([])
   const [targetTableId, setTargetTableId] = useState<number | null>(null)
   const [isTransferring, setIsTransferring] = useState(false)
+  const [showItemTransferModal, setShowItemTransferModal] = useState(false)
+  const [selectedTransferItemIds, setSelectedTransferItemIds] = useState<number[]>([])
+  const [itemTransferTargetId, setItemTransferTargetId] = useState<number | null>(null)
+  const [isTransferringItems, setIsTransferringItems] = useState(false)
 
   // Payment Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -141,15 +145,14 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   }
 
   useEffect(() => {
-    if (showTransferModal) {
+    if (showTransferModal || showItemTransferModal) {
       apiFetch<Array<{ id: number; numero: number; status: string }>>('/tables')
         .then(data => {
-          // Filter out current table
-          setAvailableTables(data.filter(t => t.id !== mesaId && t.status === 'LIVRE'))
+          setAvailableTables(data.filter(t => t.id !== mesaId))
         })
         .catch(err => console.error('Error fetching tables:', err))
     }
-  }, [showTransferModal, mesaId])
+  }, [showTransferModal, showItemTransferModal, mesaId])
 
   const handleTransferTable = async () => {
     if (!targetTableId) return
@@ -246,6 +249,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   const canCreateOrder = userPermissions.includes('pedidos.criar')
   const canRequestBill = userPermissions.includes('pedidos.editar')
+  const canTransferItems = userPermissions.includes('pedidos.transferir')
   const canTransferTable = userPermissions.includes('mesas.transferir')
   const canRegisterPayment = userPermissions.includes('pagamentos.registrar')
 
@@ -294,6 +298,28 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       }]
     })
     setSearchTerm('') // Clear search after adding
+  }
+
+  const handleTransferItems = async () => {
+    if (!itemTransferTargetId || selectedTransferItemIds.length === 0) return
+
+    setIsTransferringItems(true)
+    try {
+      const result = await apiFetch<{ sourceEmptied: boolean; targetTableId: number }>(`/tables/${mesaId}/transfer-items`, {
+        method: 'POST',
+        body: { targetTableId: itemTransferTargetId, itemIds: selectedTransferItemIds }
+      })
+      showToast(`${selectedTransferItemIds.length} lançamento(s) transferido(s) com sucesso!`, 'success')
+      setShowItemTransferModal(false)
+      setSelectedTransferItemIds([])
+      setItemTransferTargetId(null)
+      if (result.sourceEmptied) router.push(`/mesas/${result.targetTableId}`)
+      else await fetchTableData()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Erro ao transferir itens', 'error')
+    } finally {
+      setIsTransferringItems(false)
+    }
   }
 
   const decreaseCartQuantity = (produtoId: number) => {
@@ -488,8 +514,23 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   <span className="text-xs font-medium text-gray-500">Comanda</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  {canTransferItems && submittedItems.some(item => item.status !== 'CANCELADO') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTransferItemIds([])
+                        setItemTransferTargetId(null)
+                        setShowItemTransferModal(true)
+                      }}
+                      title="Transferir itens individualmente"
+                      className="flex items-center gap-1.5 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-sm font-semibold text-orange-700 hover:bg-orange-100"
+                    >
+                      <ListPlus size={16} />
+                      <span>Transferir itens</span>
+                    </button>
+                  )}
                   {canTransferTable && (
-                    <button type="button" onClick={() => setShowTransferModal(true)} title="Trocar de mesa" aria-label="Trocar de mesa" className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-100">
+                    <button type="button" onClick={() => { setTargetTableId(null); setShowTransferModal(true) }} title="Trocar de mesa" aria-label="Trocar de mesa" className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-100">
                       <ArrowRightLeft size={16} />
                       <span className="hidden sm:inline">Trocar mesa</span>
                     </button>
@@ -766,6 +807,98 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         document.body
       )}
 
+      {showItemTransferModal && (
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="transfer-items-title" className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-5">
+                <div>
+                  <h2 id="transfer-items-title" className="text-lg font-bold text-slate-950">Transferir itens</h2>
+                  <p className="text-sm text-slate-500">Escolha os lançamentos e a mesa que irá recebê-los.</p>
+                </div>
+                <button type="button" onClick={() => setShowItemTransferModal(false)} disabled={isTransferringItems} aria-label="Fechar" className="rounded-md p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="grid min-h-0 flex-1 overflow-y-auto md:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)] md:overflow-hidden">
+                <section className="border-b border-slate-200 p-4 md:overflow-y-auto md:border-b-0 md:border-r sm:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="font-semibold text-slate-900">Itens da mesa {mesaNumero}</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const itemIds = submittedItems.filter(item => item.status !== 'CANCELADO').map(item => item.id)
+                        setSelectedTransferItemIds(selectedTransferItemIds.length === itemIds.length ? [] : itemIds)
+                      }}
+                      className="text-xs font-semibold text-orange-700 hover:text-orange-800"
+                    >
+                      {selectedTransferItemIds.length === submittedItems.filter(item => item.status !== 'CANCELADO').length ? 'Limpar seleção' : 'Selecionar todos'}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {submittedItems.filter(item => item.status !== 'CANCELADO').map(item => {
+                      const selected = selectedTransferItemIds.includes(item.id)
+                      return (
+                        <label key={item.id} className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${selected ? 'border-orange-400 bg-orange-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => setSelectedTransferItemIds(current => current.includes(item.id) ? current.filter(id => id !== item.id) : [...current, item.id])}
+                            className="mt-0.5 h-4 w-4 accent-orange-600"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-start justify-between gap-3">
+                              <span className="font-semibold text-slate-900">{item.quantidade}x {item.nome}</span>
+                              <span className="shrink-0 text-sm font-semibold text-slate-700">R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
+                            </span>
+                            {item.observacao && <span className="mt-1 block break-words text-xs text-slate-500">{item.observacao}</span>}
+                            <span className="mt-1 block text-xs text-slate-400">Lançado às {item.horario}</span>
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </section>
+
+                <section className="p-4 md:overflow-y-auto sm:p-5">
+                  <h3 className="mb-1 font-semibold text-slate-900">Mesa de destino</h3>
+                  <p className="mb-3 text-xs text-slate-500">Somente mesas abertas podem receber itens.</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableTables.filter(table => table.status === 'OCUPADA').map(table => (
+                      <button
+                        key={table.id}
+                        type="button"
+                        onClick={() => setItemTransferTargetId(table.id)}
+                        className={`rounded-md border px-3 py-2.5 text-left text-slate-950 transition-colors ${itemTransferTargetId === table.id ? 'border-orange-500 bg-orange-50' : 'border-slate-200 bg-white hover:border-orange-300 hover:bg-orange-50/40'}`}
+                      >
+                        <span className="block font-bold">Mesa {table.numero}</span>
+                        <span className="mt-0.5 block text-xs font-semibold text-amber-700">Ocupada</span>
+                      </button>
+                    ))}
+                  </div>
+                  {availableTables.filter(table => table.status === 'OCUPADA').length === 0 && (
+                    <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">Nenhuma outra mesa aberta para receber itens.</p>
+                  )}
+                </section>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <p className="text-sm text-slate-600">{selectedTransferItemIds.length} lançamento(s) selecionado(s)</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowItemTransferModal(false)} disabled={isTransferringItems} className="h-10 flex-1 rounded-md border border-slate-300 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 sm:flex-none">Cancelar</button>
+                  <button type="button" onClick={handleTransferItems} disabled={!itemTransferTargetId || selectedTransferItemIds.length === 0 || isTransferringItems} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-md bg-orange-600 px-4 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
+                    {isTransferringItems && <Loader2 size={17} className="animate-spin" />}
+                    Transferir itens
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      )}
+
       {showTransferModal && (
         createPortal(
           <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
@@ -787,7 +920,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-3 max-h-60 overflow-y-auto">
-                    {availableTables.map(table => (
+                    {availableTables.filter(table => table.status === 'LIVRE').map(table => (
                       <button
                         key={table.id}
                         onClick={() => setTargetTableId(table.id)}
