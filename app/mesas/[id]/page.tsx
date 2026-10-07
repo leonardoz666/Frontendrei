@@ -963,7 +963,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         onClose={() => {
           setShowPaymentModal(false)
           if (new URLSearchParams(window.location.search).get('recebimento') === '1') {
-            router.replace(`/mesas/${mesaId}`)
+            router.replace('/mesas')
           }
         }}
         items={submittedItems.filter(i => i.status !== 'CANCELADO')}
