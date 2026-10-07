@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from 'lucide-react'
+import { apiFetch } from '@/app/lib/api'
 
 type Mesa = {
   id: number
@@ -25,20 +26,20 @@ export default function MesasAbertasPage() {
 
     const run = async () => {
       try {
-        const meRes = await fetch('/api/auth/me')
-        const meData = await meRes.json()
+        const meData = await apiFetch<{ user?: unknown }>('/auth/me')
         if (!meData.user) {
           router.replace('/login')
           return
         }
 
-        const tablesRes = await fetch('/api/tables', { cache: 'no-store' })
-        const tables = await tablesRes.json()
+        const tables = await apiFetch<Mesa[]>('/tables')
         if (!cancelled) {
           // Filter only open tables
-          const openTables = tables.filter((t: Mesa) => t.status !== 'LIVRE')
+          const openTables = tables.filter(t => t.status !== 'LIVRE')
           setMesas(openTables)
         }
+      } catch (error) {
+        console.error('Erro ao carregar mesas abertas:', error)
       } finally {
         if (!cancelled) setLoading(false)
       }

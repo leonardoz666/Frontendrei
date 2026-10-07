@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import { apiFetch } from '@/app/lib/api'
 
 type MovementType = 'SANGRIA' | 'SUPRIMENTO' | 'AJUSTE'
 
@@ -75,9 +76,7 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
   const loadStatus = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/caixa/status', { cache: 'no-store' })
-      if (!response.ok) throw new Error('Não foi possível consultar o caixa')
-      setData(await response.json() as CashStatus)
+      setData(await apiFetch<CashStatus>('/caixa/status'))
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao consultar o caixa', 'error')
     } finally {
@@ -90,13 +89,10 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
   const submit = async (url: string, body: Record<string, unknown>, successMessage: string) => {
     try {
       setSaving(true)
-      const response = await fetch(url, {
+      await apiFetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body,
       })
-      const payload = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(payload?.error || 'Não foi possível concluir a operação')
       showToast(successMessage, 'success')
       await loadStatus()
       return true

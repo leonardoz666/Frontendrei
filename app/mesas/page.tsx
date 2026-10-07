@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Loader2, X, ListPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { io } from 'socket.io-client'
 import { useToast } from '@/contexts/ToastContext'
 import { TableCard, Mesa } from '@/components/TableCard'
-import { getSocketUrl } from '@/app/lib/socket-url'
+import { connectTableSocket } from '@/app/lib/table-socket'
+import { apiFetch } from '@/app/lib/api'
 
 type User = {
   role: string
@@ -24,6 +24,8 @@ export default function MesasPage() {
   const [showModal, setShowModal] = useState(false)
   const [showReopenModal, setShowReopenModal] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
+  const [tableActionPending, setTableActionPending] = useState(false)
+  const tableActionInFlight = useRef(false)
   const [user, setUser] = useState<User | null>(null)
   const [podeCadastrar, setPodeCadastrar] = useState(false)
   const [pracas, setPracas] = useState<Array<{ id: number; nome: string }>>([])
@@ -38,9 +40,7 @@ export default function MesasPage() {
 
   const carregarPracas = async () => {
     try {
-      const res = await fetch('/api/pracas?page=1&pageSize=100')
-      if (!res.ok) return
-      const corpo = (await res.json()) as { data?: Array<{ id: number; nome: string }> }
+      const corpo = await apiFetch<{ data?: Array<{ id: number; nome: string }> }>('/pracas?page=1&pageSize=100')
       setPracas(corpo.data ?? [])
     } catch {
       // Praças são opcionais aqui: sem elas a geração continua (mesa fica "Não definida").
@@ -65,18 +65,15 @@ export default function MesasPage() {
     setLotePrevia(null)
     setLoteCarregando(true)
     try {
-      const res = await fetch('/api/tables/gerar', {
+      const corpo = await apiFetch<{ criadas: number; ignoradas: number; numerosIgnorados?: number[] }>('/tables/gerar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           inicio: Number(loteInicio),
           fim: Number(loteFim),
           ...(lotePracaId ? { pracaId: Number(lotePracaId) } : {}),
           previa: true,
-        }),
+        },
       })
-      const corpo = await res.json()
-      if (!res.ok) throw new Error(corpo?.error || 'Falha ao conferir a faixa')
       setLotePrevia({ criadas: corpo.criadas, ignoradas: corpo.ignoradas, numerosIgnorados: corpo.numerosIgnorados ?? [] })
     } catch (erro) {
       setLoteErro(erro instanceof Error ? erro.message : 'Falha ao conferir a faixa')
@@ -89,17 +86,14 @@ export default function MesasPage() {
     setLoteErro('')
     setLoteCarregando(true)
     try {
-      const res = await fetch('/api/tables/gerar', {
+      const corpo = await apiFetch<{ criadas: number; ignoradas: number }>('/tables/gerar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           inicio: Number(loteInicio),
           fim: Number(loteFim),
           ...(lotePracaId ? { pracaId: Number(lotePracaId) } : {}),
-        }),
+        },
       })
-      const corpo = await res.json()
-      if (!res.ok) throw new Error(corpo?.error || 'Falha ao gerar as mesas')
       showToast(`${corpo.criadas} mesa(s) criada(s), ${corpo.ignoradas} já existia(m).`, 'success')
       setShowLoteModal(false)
       await fetchMesas()
@@ -122,70 +116,57 @@ export default function MesasPage() {
     }
   }
 
-  const confirmOpenTable = async () => {
-    if (!selectedTable) return
+  const executeTableAction = async (action: 'open' | 'reopen' | 'close'): Promise<boolean> => {
+    if (!selectedTable || tableActionInFlight.current) return false
+    tableActionInFlight.current = true
+    setTableActionPending(true)
     try {
-      await fetch(`/api/tables/${selectedTable.id}/open`, { method: 'POST' })
-      router.push(`/mesas/${selectedTable.id}`)
+      await apiFetch(`/tables/${selectedTable.id}/${action}`, { method: 'POST' })
+      return true
     } catch (error) {
-      console.error('Error opening table:', error)
-      router.push(`/mesas/${selectedTable.id}`)
+      showToast(error instanceof Error ? error.message : 'Não foi possível atualizar a mesa', 'error')
+      return false
+    } finally {
+      tableActionInFlight.current = false
+      setTableActionPending(false)
     }
   }
 
+  const confirmOpenTable = async () => {
+    const table = selectedTable
+    if (table && await executeTableAction('open')) router.push(`/mesas/${table.id}`)
+  }
+
   const confirmReopenTable = async () => {
-    if (!selectedTable) return
-    try {
-      await fetch(`/api/tables/${selectedTable.id}/reopen`, { method: 'POST' })
+    const table = selectedTable
+    if (table && await executeTableAction('reopen')) {
       setShowReopenModal(false)
-      fetchMesas()
-      router.push(`/mesas/${selectedTable.id}`)
-    } catch (error) {
-      console.error('Error reopening table:', error)
+      await fetchMesas()
+      router.push(`/mesas/${table.id}`)
     }
   }
 
   const confirmCloseTable = () => {
-    if (!selectedTable) return
+    if (!selectedTable || tableActionPending) return
     setShowCloseModal(true)
   }
 
   const executeCloseTable = async () => {
-    if (!selectedTable) return
-
-    try {
-      const res = await fetch(`/api/tables/${selectedTable.id}/close`, { method: 'POST' })
-      if (res.ok) {
-        setShowReopenModal(false) // Close the actions modal
-        setShowCloseModal(false) // Close the confirmation modal
-        fetchMesas()
-      } else {
-        showToast('Erro ao fechar mesa', 'error')
-      }
-    } catch (error) {
-      console.error('Error closing table:', error)
-      showToast('Erro ao fechar mesa', 'error')
+    if (await executeTableAction('close')) {
+      setShowReopenModal(false)
+      setShowCloseModal(false)
+      await fetchMesas()
     }
   }
 
   const fetchMesas = async () => {
     try {
-      console.log('[DEBUG] fetching /api/tables');
-      const res = await fetch('/api/tables')
-      console.log(`[DEBUG] /api/tables status: ${res.status}`);
-      if (res.ok) {
-        const data = await res.json()
-        console.log('[DEBUG] /api/tables success, count:', data.length);
-        // O mapa representa somente atendimento em andamento. Mesas livres
-        // continuam cadastradas no banco, mas não ocupam o mapa até serem abertas.
-        setMesas(data.filter((mesa: Mesa) => mesa.status !== 'LIVRE'))
-      } else {
-         console.error(`[DEBUG] /api/tables failed: ${res.status}`);
-         const txt = await res.text();
-         console.error(`[DEBUG] /api/tables error text: ${txt}`);
-      }
+      const data = await apiFetch<Mesa[]>('/tables')
+      // O mapa representa somente atendimento em andamento. Mesas livres
+      // continuam cadastradas no banco, mas não ocupam o mapa até serem abertas.
+      setMesas(data.filter(mesa => mesa.status !== 'LIVRE'))
     } catch (error) {
-      console.error('[DEBUG] Error fetching tables:', error)
+      console.error('Erro ao carregar mesas:', error)
     }
   }
 
@@ -193,8 +174,7 @@ export default function MesasPage() {
     const init = async () => {
         try {
             // Auth check
-            const meRes = await fetch('/api/auth/me')
-            const meData = await meRes.json()
+            const meData = await apiFetch<{ user?: User & { permissions?: string[] } }>('/auth/me')
             if (!meData.user) {
                 router.replace('/login')
                 return
@@ -217,14 +197,9 @@ export default function MesasPage() {
     init()
     
     // Socket connection for real-time updates
-    const socket = io(getSocketUrl())
-
-    socket.on('connect', () => {
-      console.log('[DEBUG] Socket connected')
-    })
+    const socket = connectTableSocket()
 
     const handleUpdate = () => {
-      console.log('[DEBUG] Socket update received, fetching mesas...')
       fetchMesas()
     }
 
@@ -242,23 +217,16 @@ export default function MesasPage() {
     setError('')
     
     try {
-      const res = await fetch('/api/tables', { 
+      await apiFetch('/tables', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numero: newMesaNumero || undefined })
+        body: { numero: newMesaNumero || undefined },
       })
-      
-      if (res.ok) {
-        fetchMesas()
-        setShowAddModal(false)
-        setNewMesaNumero('')
-      } else {
-        const data = await res.json()
-        setError(data.error || 'Erro ao criar mesa')
-      }
+      await fetchMesas()
+      setShowAddModal(false)
+      setNewMesaNumero('')
     } catch (error) {
       console.error('Error creating table:', error)
-      setError('Erro de conexão')
+      setError(error instanceof Error ? error.message : 'Erro ao criar mesa')
     } finally {
       setCreating(false)
     }
@@ -416,12 +384,14 @@ export default function MesasPage() {
             <div className="flex gap-3">
               <button 
                 onClick={() => setShowModal(false)} 
+                disabled={tableActionPending}
                 className="flex-1 py-3 px-4 rounded-xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
               <button 
                 onClick={confirmOpenTable} 
+                disabled={tableActionPending}
                 className="flex-1 py-3 px-4 rounded-xl bg-green-600 font-bold text-white hover:bg-green-700 shadow-lg shadow-green-200 transition-colors"
               >
                 Sim, Abrir
@@ -446,6 +416,7 @@ export default function MesasPage() {
             <div className="flex flex-col gap-3">
               <button 
                 onClick={confirmReopenTable} 
+                disabled={tableActionPending}
                 className="w-full py-3 px-4 rounded-xl bg-blue-600 font-bold text-white hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors"
               >
                 🔄 Reabrir Conta
@@ -454,6 +425,7 @@ export default function MesasPage() {
               {canClose && (
                 <button 
                   onClick={confirmCloseTable} 
+                  disabled={tableActionPending}
                   className="w-full py-3 px-4 rounded-xl bg-red-600 font-bold text-white hover:bg-red-700 shadow-lg shadow-red-200 transition-colors"
                 >
                   💰 Baixar Conta / Liberar Mesa
@@ -464,6 +436,7 @@ export default function MesasPage() {
                 onClick={() => {
                     router.push(`/mesas/${selectedTable.id}`)
                 }}
+                disabled={tableActionPending}
                 className="w-full py-3 px-4 rounded-xl bg-green-600 font-bold text-white hover:bg-green-700 shadow-lg shadow-green-200 transition-colors"
               >
                 📄 Ver Comanda
@@ -471,6 +444,7 @@ export default function MesasPage() {
 
               <button 
                 onClick={() => setShowReopenModal(false)} 
+                disabled={tableActionPending}
                 className="w-full py-3 px-4 rounded-xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 ❌ Cancelar
@@ -493,12 +467,14 @@ export default function MesasPage() {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setShowCloseModal(false)}
+                  disabled={tableActionPending}
                   className="flex-1 py-3 px-4 rounded-xl bg-gray-100 font-bold text-gray-700 hover:bg-gray-200 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={executeCloseTable}
+                  disabled={tableActionPending}
                   className="flex-1 py-3 px-4 rounded-xl bg-red-600 font-bold text-white hover:bg-red-700 shadow-lg shadow-red-200 transition-colors"
                 >
                   Confirmar

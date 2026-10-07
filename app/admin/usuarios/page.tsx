@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { Plus, Edit, Trash2, Save, X, Check } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import { ApiError, apiFetch } from '@/app/lib/api'
 
 interface User {
   id: number
@@ -18,12 +19,14 @@ interface User {
   ativo: boolean
   email: string | null
   foto: string | null
+  permissions: string[]
 }
 
 export default function AdminUsersPage() {
   const { showToast } = useToast()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [actor, setActor] = useState<{ id: number; role: string; permissions: string[] } | null>(null)
   
   // Form states
   const [nome, setNome] = useState('')
@@ -45,26 +48,12 @@ export default function AdminUsersPage() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch('/api/users', {
-        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-      })
-      if (res.status === 401) {
-        router.replace('/login')
-        return
-      }
-      if (res.status === 403) {
-        router.replace('/')
-        return
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        showToast(data.error || 'Erro ao carregar usuários', 'error')
-        return
-      }
-      const data = await res.json()
+      const data = await apiFetch<User[]>('/users')
       setUsers(data)
-    } catch {
-      showToast('Erro ao conectar com o servidor', 'error')
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) router.replace('/login')
+      else if (error instanceof ApiError && error.status === 403) router.replace('/')
+      else showToast(error instanceof Error ? error.message : 'Erro ao carregar usuários', 'error')
     } finally {
       setLoading(false)
     }
@@ -72,26 +61,32 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     const run = async () => {
-      const meRes = await fetch('/api/auth/me')
-      const meData = await meRes.json()
-      if (!meData.user) {
-        router.replace('/login')
-        return
+      try {
+        const meData = await apiFetch<{ user: { id: number; role: string; permissions: string[] } }>('/auth/me')
+        if (!meData.user) {
+          router.replace('/login')
+          return
+        }
+        const permissoes: string[] = meData.user.permissions ?? []
+        if (!permissoes.includes('usuarios.visualizar')) {
+          router.replace('/')
+          return
+        }
+        setActor(meData.user)
+        await fetchUsers()
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Erro ao carregar sessão', 'error')
+        setLoading(false)
       }
-      // Espelha o gate REAL do backend: `/api/users` exige `usuarios.visualizar`
-      // (que GERENTE tem por padrão). Antes esta tela aceitava só DONO/ADMIN, então
-      // um GERENTE via o item no menu e era devolvido para a home — link quebrado.
-      const permissoes: string[] = meData.user.permissions ?? []
-      const podeVer = permissoes.includes('usuarios.visualizar')
-      if (!podeVer) {
-        router.replace('/')
-        return
-      }
-      await fetchUsers()
     }
 
     run()
-  }, [fetchUsers, router])
+  }, [fetchUsers, router, showToast])
+
+  const isAdmin = actor?.role === 'DONO' || actor?.role === 'ADMIN'
+  const canManage = (user: User) => isAdmin || (
+    !['DONO', 'ADMIN'].includes(user.role) && user.permissions.every(p => actor?.permissions.includes(p))
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -115,26 +110,18 @@ export default function AdminUsersPage() {
     else if (foto !== null) body.append('foto', foto)
 
     try {
-      const res = await fetch(url, {
+      const data = await apiFetch<{ user: User }>(url, {
         method,
         body,
       })
-
-      const data = await res.json()
-
-      if (res.ok) {
-        setUsers(editingId 
-          ? users.map(u => u.id === editingId ? data.user : u)
-          : [...users, data.user]
-        )
-
-        showToast(editingId ? 'Usuário atualizado!' : 'Usuário criado!', 'success')
-        resetForm()
-      } else {
-        showToast(data.error || 'Erro ao salvar usuário', 'error')
-      }
-    } catch {
-      showToast('Erro ao conectar com o servidor', 'error')
+      setUsers(editingId
+        ? users.map(u => u.id === editingId ? data.user : u)
+        : [...users, data.user]
+      )
+      showToast(editingId ? 'Usuário atualizado!' : 'Usuário criado!', 'success')
+      resetForm()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Erro ao salvar usuário', 'error')
     }
   }
 
@@ -169,14 +156,13 @@ export default function AdminUsersPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return
 
-    const res = await fetch(`/api/users/${deleteTarget.id}`, { method: 'DELETE' })
-    if (res.ok) {
+    try {
+      await apiFetch(`/users/${deleteTarget.id}`, { method: 'DELETE' })
       setUsers(users.map(u => u.id === deleteTarget.id ? { ...u, ativo: false } : u))
       showToast('Usuário desativado com sucesso!', 'success')
       setDeleteTarget(null)
-    } else {
-      const data = await res.json()
-      showToast(data.error || 'Erro ao excluir usuário', 'error')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Erro ao excluir usuário', 'error')
     }
   }
 
@@ -267,10 +253,12 @@ export default function AdminUsersPage() {
                   className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="GARCOM">Garçom</option>
+                  <option value="ATENDENTE">Atendente</option>
+                  <option value="COZINHA">Cozinha</option>
                   <option value="CAIXA">Caixa</option>
                   <option value="GERENTE">Gerente</option>
-                  <option value="DONO">Dono</option>
-                  <option value="ADMIN">Admin</option>
+                  {isAdmin && <option value="DONO">Dono</option>}
+                  {isAdmin && <option value="ADMIN">Admin</option>}
                 </select>
               </div>
 
@@ -295,9 +283,9 @@ export default function AdminUsersPage() {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Usuários</h1>
           <p className="text-gray-500 mt-1">Gerencie o acesso ao sistema</p>
         </div>
-        <Button onClick={() => setIsCreating(true)}>
+        {(isAdmin || actor?.permissions.includes('usuarios.criar')) && <Button onClick={() => setIsCreating(true)}>
           <Plus size={18} className="mr-2" /> Novo Usuário
-        </Button>
+        </Button>}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -328,12 +316,12 @@ export default function AdminUsersPage() {
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(user)}>
+                {(isAdmin || actor?.permissions.includes('usuarios.editar')) && canManage(user) && <Button variant="ghost" size="icon" title="Editar usuário" className="h-8 w-8" onClick={() => handleEdit(user)}>
                   <Edit size={16} className="text-gray-400 hover:text-blue-600" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDeleteTarget(user)}>
+                </Button>}
+                {isAdmin && user.id !== actor?.id && actor?.permissions.includes('usuarios.excluir') && <Button variant="ghost" size="icon" title="Desativar usuário" className="h-8 w-8" onClick={() => setDeleteTarget(user)}>
                   <Trash2 size={16} className="text-gray-400 hover:text-red-600" />
-                </Button>
+                </Button>}
               </div>
             </CardContent>
           </Card>

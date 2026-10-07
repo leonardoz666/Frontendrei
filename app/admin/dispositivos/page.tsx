@@ -150,13 +150,17 @@ export default function DispositivosPage() {
   const carregarWindowsPrinters = async () => {
     setCarregandoWindows(true)
     try {
-      const endpoint = PRINTER_AGENT_URL ? `${PRINTER_AGENT_URL}/printers` : '/api/dispositivos/windows-printers'
-      const res = await fetch(endpoint, {
-        cache: 'no-store',
-        headers: PRINTER_AGENT_URL && PRINTER_AGENT_TOKEN ? { 'X-Printer-Agent-Token': PRINTER_AGENT_TOKEN } : undefined,
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error || 'Erro ao reconhecer impressoras')
+      const body = PRINTER_AGENT_URL
+        ? await (async () => {
+            const res = await fetch(`${PRINTER_AGENT_URL}/printers`, {
+              cache: 'no-store',
+              headers: PRINTER_AGENT_TOKEN ? { 'X-Printer-Agent-Token': PRINTER_AGENT_TOKEN } : undefined,
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(data.error || 'Erro ao reconhecer impressoras')
+            return data
+          })()
+        : await apiFetch<{ data?: string[] }>('/dispositivos/windows-printers')
       setWindowsPrinters(Array.isArray(body.data) ? body.data : [])
       setMostraWindows(true)
       showToast('Impressoras do Windows reconhecidas.', 'success')
@@ -285,10 +289,9 @@ export default function DispositivosPage() {
     setTestandoId(dispositivo.id)
     try {
       const usandoAgente = Boolean(PRINTER_AGENT_URL && dispositivo.conexao === 'USB')
-      const res = await fetch(
-        usandoAgente ? `${PRINTER_AGENT_URL}/print-test` : `/api/printers/${dispositivo.id}/test`,
-        usandoAgente
-          ? {
+      const body = usandoAgente
+        ? await (async () => {
+            const res = await fetch(`${PRINTER_AGENT_URL}/print-test`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -298,11 +301,12 @@ export default function DispositivosPage() {
                 printerName: dispositivo.ip,
                 modoTexto: dispositivo.descricao?.includes('[MODO_TEXTO]') ?? false,
               }),
-            }
-          : { method: 'POST' },
-      )
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error || 'Falha ao testar impressora')
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) throw new Error(data.error || 'Falha ao testar impressora')
+            return data
+          })()
+        : await apiFetch<{ message?: string }>(`/printers/${dispositivo.id}/test`, { method: 'POST' })
       showToast(body.message || 'Teste enviado para a impressora', 'success')
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao testar impressora', 'error')

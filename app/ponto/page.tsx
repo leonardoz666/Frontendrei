@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, Clock, Download, Power, PowerOff } from 'lucide-react'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
-import { apiFetch, fetchList } from '@/app/lib/api'
+import { apiFetch, apiRequest, fetchList } from '@/app/lib/api'
 import { usePagedQuery } from '@/app/lib/pagination'
 import { paginaAtual, useListaCrud } from '@/app/lib/crud-client'
 import { useToast } from '@/contexts/ToastContext'
@@ -341,11 +341,7 @@ export default function PontoPage() {
 
     setBaixandoAfd(true)
     try {
-      const res = await fetch(`/api/ponto/afd${query.toString() ? `?${query.toString()}` : ''}`)
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}))
-        throw new Error(payload.error || 'Erro ao baixar AFD')
-      }
+      const res = await apiRequest(`/ponto/afd${query.toString() ? `?${query.toString()}` : ''}`)
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -369,11 +365,7 @@ export default function PontoPage() {
 
     setBaixandoAej(true)
     try {
-      const res = await fetch(`/api/ponto/aej?${query.toString()}`)
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}))
-        throw new Error(payload.error || 'Erro ao baixar AEJ')
-      }
+      const res = await apiRequest(`/ponto/aej?${query.toString()}`)
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { apiFetch } from '@/app/lib/api'
 
 type Mesa = {
   id: number
@@ -14,6 +15,7 @@ export default function Home() {
   const { showToast } = useToast()
   const [input, setInput] = useState('')
   const [tables, setTables] = useState<Mesa[]>([])
+  const [canCreateTable, setCanCreateTable] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [targetTable, setTargetTable] = useState<Mesa | null>(null)
@@ -33,18 +35,14 @@ export default function Home() {
     // Auth check and fetch tables
     const init = async () => {
       try {
-        const meRes = await fetch('/api/auth/me')
-        const meData = await meRes.json()
+        const meData = await apiFetch<{ user?: { permissions?: string[] } }>('/auth/me')
         if (!meData.user) {
           router.replace('/login')
           return
         }
+        setCanCreateTable(Array.isArray(meData.user.permissions) && meData.user.permissions.includes('cadastros.editar'))
 
-        const tablesRes = await fetch('/api/tables')
-        if (tablesRes.ok) {
-          const tablesData = await tablesRes.json()
-          setTables(tablesData)
-        }
+        setTables(await apiFetch<Mesa[]>('/tables'))
       } catch (err) {
         console.error('Home init error:', err)
       } finally {
@@ -79,6 +77,10 @@ export default function Home() {
     let table = tables.find(t => t.numero === tableNum)
 
     if (!table) {
+      if (!canCreateTable) {
+        showToast(`Mesa ${tableNum} não cadastrada`, 'error')
+        return
+      }
       table = { id: -1, numero: tableNum, status: 'LIVRE' }
     }
 
@@ -88,7 +90,7 @@ export default function Home() {
     } else {
       router.push(`/mesas/${table.id}`)
     }
-  }, [input, tables, router, triggerHaptic])
+  }, [input, tables, canCreateTable, router, showToast, triggerHaptic])
 
   // Real-time matching table status preview
   const matchingTable = useMemo(() => {
@@ -123,31 +125,19 @@ export default function Home() {
       let tableId = targetTable.id
       if (tableId === -1) {
         // Create table first
-        const createRes = await fetch('/api/tables', {
+        const newTable = await apiFetch<Mesa>('/tables', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ numero: targetTable.numero })
+          body: { numero: targetTable.numero },
         })
-        if (!createRes.ok) {
-          const data = await createRes.json().catch(() => ({}))
-          showToast(data.error || 'Erro ao criar mesa', 'error')
-          return
-        }
-        const newTable = await createRes.json()
         tableId = newTable.id
       }
 
-      const res = await fetch(`/api/tables/${tableId}/open`, { method: 'POST' })
-      if (res.ok) {
-        showToast(`Mesa ${targetTable.numero} aberta com sucesso!`, 'success')
-        router.push(`/mesas/${tableId}`)
-      } else {
-        const data = await res.json().catch(() => ({}))
-        showToast(data.error || 'Erro ao abrir mesa', 'error')
-      }
+      await apiFetch(`/tables/${tableId}/open`, { method: 'POST' })
+      showToast(`Mesa ${targetTable.numero} aberta com sucesso!`, 'success')
+      router.push(`/mesas/${tableId}`)
     } catch (error) {
       console.error('Error opening table:', error)
-      showToast('Erro de conexão ao abrir mesa', 'error')
+      showToast(error instanceof Error ? error.message : 'Erro ao abrir mesa', 'error')
     } finally {
       setOpeningTable(false)
       setShowConfirmModal(false)

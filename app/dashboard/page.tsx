@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { apiFetch } from '@/app/lib/api'
 import {
     TrendingUp,
     DollarSign,
@@ -56,24 +57,19 @@ export default function DashboardPage() {
     useEffect(() => {
         const init = async () => {
             try {
-                const meRes = await fetch('/api/auth/me')
-                const meData = await meRes.json()
+                const meData = await apiFetch<{ user?: { permissions?: string[] } }>('/auth/me')
                 if (!meData.user) {
                     router.replace('/login')
                     return
                 }
 
-                // Only allow managers and above
-                if (!['GERENTE', 'DONO', 'ADMIN', 'CAIXA'].includes(meData.user.role)) {
+                if (!meData.user.permissions?.includes('relatorios.visualizar')) {
                     router.replace('/')
                     return
                 }
 
-                const res = await fetch('/api/dashboard/stats')
-                if (res.ok) {
-                    const data = await res.json()
-                    setStats(data)
-                }
+                const data = await apiFetch<DashboardStats>('/dashboard/stats')
+                setStats(data)
             } catch (err) {
                 console.error('Error loading dashboard:', err)
             } finally {

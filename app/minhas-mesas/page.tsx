@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from 'lucide-react'
+import { apiFetch } from '@/app/lib/api'
 
 type Mesa = {
   id: number
@@ -19,11 +20,8 @@ export default function MinhasMesasPage() {
   useEffect(() => {
     const fetchMyTables = async () => {
       try {
-        const res = await fetch('/api/tables/my/opened', { cache: 'no-store' })
-        if (res.ok) {
-          const data = await res.json()
-          setMesas(data)
-        }
+        const data = await apiFetch<Mesa[]>('/tables/my/opened')
+        setMesas(data)
       } catch (error) {
         console.error('Error fetching my tables:', error)
       } finally {

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { LogOut, MessageCircle } from 'lucide-react'
 import Sidebar from './Sidebar'
+import { apiFetch } from '@/app/lib/api'
 import { useToast } from '@/contexts/ToastContext'
 import {
   ROUTE_SHORTCUTS,
@@ -57,9 +58,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     let cancelled = false
     const loadUser = async () => {
       try {
-        const res = await fetch('/api/auth/me')
-        if (!res.ok) return
-        const data = (await res.json()) as { user?: NavUser }
+        const data = await apiFetch<{ user?: NavUser }>('/auth/me', { redirectOn401: false })
         if (!cancelled && data.user) setUser(data.user)
       } catch {
         // Sessão indisponível: as páginas cuidam do redirecionamento para /login.
@@ -101,7 +100,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }, [isLoginPage, router, showToast])
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await apiFetch('/auth/logout', { method: 'POST' })
     router.push('/login')
     router.refresh()
   }

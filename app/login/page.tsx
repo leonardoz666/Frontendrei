@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ChefHat } from 'lucide-react'
+import { ApiError, apiFetch } from '@/app/lib/api'
 
 export default function LoginPage() {
   const [login, setLogin] = useState('')
@@ -16,36 +17,31 @@ export default function LoginPage() {
 
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
 
     const run = async () => {
       // Short timeout to avoid blocking if backend is down
-      const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
 
       try {
-        console.log('[DEBUG] Login check auth/me');
-        const res = await fetch('/api/auth/me', { 
-            signal: controller.signal,
-            cache: 'no-store' 
+        const data = await apiFetch<{ user?: unknown }>('/auth/me', {
+          signal: controller.signal,
+          redirectOn401: false,
         })
-        clearTimeout(timeoutId);
-        
-        console.log(`[DEBUG] Login auth/me status: ${res.status}`);
-        if (res.ok) {
-            const data = await res.json()
-            if (!cancelled && data.user) {
-              console.log('[DEBUG] User already logged in, redirecting');
-              router.replace('/')
-            }
+        if (!cancelled && data.user) {
+          router.replace('/')
         }
-      } catch (e) {
-        console.error('[DEBUG] Login check error or timeout:', e);
+      } catch {
+        // Login continua disponível quando a verificação da sessão falha.
+      } finally {
+        clearTimeout(timeoutId)
       }
     }
 
     run()
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [router])
 
@@ -55,22 +51,15 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/auth/login', {
+      await apiFetch('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login, senha }),
+        body: { login, senha },
+        redirectOn401: false,
       })
-
-      if (res.ok) {
-        router.push('/')
-        router.refresh()
-      } else {
-        const data = await res.json()
-        setError(data.error || 'Credenciais inválidas')
-      }
+      router.push('/')
+      router.refresh()
     } catch (err) {
-      console.error(err)
-      setError('Erro ao conectar ao servidor')
+      setError(err instanceof ApiError ? err.message : 'Erro ao conectar ao servidor')
     } finally {
       setLoading(false)
     }

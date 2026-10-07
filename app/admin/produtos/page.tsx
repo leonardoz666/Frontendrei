@@ -9,8 +9,10 @@ import { Pagination } from '@/components/ui/Pagination'
 import { useToast } from '@/contexts/ToastContext'
 import Skeleton from '@/components/ui/Skeleton'
 import { ProductCard, Produto, Categoria } from '@/components/ProductCard'
-import { fetchList } from '@/app/lib/api'
+import { apiFetch, apiRequest, ApiError, fetchList } from '@/app/lib/api'
 import { usePagedQuery, type SortOrder } from '@/app/lib/pagination'
+import { correctProductSectors, fetchAllProducts } from '@/app/lib/product-catalog'
+import { buildProductFormData } from '@/app/lib/product-form'
 import { 
   ArrowLeft, 
   Plus, 
@@ -105,104 +107,23 @@ export default function ProdutosPage() {
   const [fixStatus, setFixStatus] = useState<string | null>(null)
   const [confirmarFixSetores, setConfirmarFixSetores] = useState(false)
 
-  /**
-   * Ação em LOTE sobre TODO o cardápio.
-   *
-   * Importante: com a listagem paginada, `produtos` contém só a página visível.
-   * Iterar sobre ela silenciosamente corrigiria 25 itens e daria a impressão de
-   * ter corrigido tudo — por isso a função busca a base completa de propósito
-   * (pageSize=100 em laço) antes de aplicar. É uma operação de manutenção, não
-   * uma ação por linha, então pagar o custo da leitura total aqui é correto.
-   */
   const handleFixSectors = async () => {
     setConfirmarFixSetores(false)
     setFixStatus('Carregando todos os produtos...')
-
-    let todos: Produto[]
     try {
-      todos = []
-      let pagina = 1
-      let total = Infinity
-      while (todos.length < total && pagina <= 50) {
-        const resposta = await fetch(`/api/products?page=${pagina}&pageSize=100&ativo=all`, {
-          cache: 'no-store',
-        })
-        if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`)
-        const corpo = (await resposta.json()) as {
-          data?: Produto[]
-          meta?: { total: number }
-        }
-        const lote = corpo.data ?? []
-        todos = todos.concat(lote)
-        total = corpo.meta?.total ?? lote.length
-        if (lote.length === 0) break
-        pagina += 1
-      }
+      const { updated, failed } = await correctProductSectors(total => {
+        setFixStatus(`Corrigindo setores de ${total} produtos...`)
+      })
+      setFixStatus(`Correção concluída: ${updated} atualizados, ${failed} falhas`)
+      if (updated > 0) showToast(`${updated} produtos corrigidos com sucesso!`, 'success')
+      if (failed > 0) showToast(`${failed} falhas durante a correção.`, 'warning')
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      void refetchProdutos()
+      setTimeout(() => setFixStatus(null), 5000)
     } catch {
       setFixStatus(null)
-      showToast('Falha ao carregar os produtos para a correção.', 'error')
-      return
+      showToast('Falha ao corrigir os setores dos produtos.', 'error')
     }
-
-    setFixStatus(`Corrigindo setores de ${todos.length} produtos...`)
-    let updated = 0
-    let failed = 0
-
-    for (const p of todos) {
-        if (!p.categoria) continue
-        
-        let shouldBeDrink = false
-        let shouldBeFood = false
-        const catNome = p.categoria.nome.toLowerCase()
-        
-        if (catNome.includes('bebida') || catNome.includes('drink') || catNome.includes('cerveja') || catNome.includes('refrigerante') || catNome.includes('suco') || catNome.includes('água') || catNome.includes('vinho') || catNome.includes('dose') || catNome.includes('bar')) {
-            shouldBeDrink = true
-            shouldBeFood = false
-        } else if (catNome.includes('prato') || catNome.includes('entrada') || catNome.includes('comida') || catNome.includes('lanche') || catNome.includes('sobremesa') || catNome.includes('porção') || catNome.includes('petisco') || catNome.includes('hambúrguer') || catNome.includes('pizza') || catNome.includes('salada') || catNome.includes('cozinha')) {
-            shouldBeFood = true
-            shouldBeDrink = false
-        } else {
-            continue
-        }
-
-        if (p.isDrink === shouldBeDrink && p.isFood === shouldBeFood) continue
-
-        try {
-            const formData = new FormData()
-            formData.append('nome', p.nome)
-            formData.append('preco', String(p.preco))
-            if (p.categoriaId) formData.append('categoriaId', String(p.categoriaId))
-            formData.append('ativo', String(p.ativo))
-            if (p.foto) formData.append('foto', p.foto)
-            formData.append('tipoOpcao', p.tipoOpcao || 'padrao')
-            formData.append('sabores', p.sabores || '[]')
-            formData.append('isDrink', String(shouldBeDrink))
-            formData.append('isFood', String(shouldBeFood))
-            formData.append('favorito', String(!!p.favorito))
-
-            const res = await fetch(`/api/products/${p.id}`, {
-                method: 'PUT',
-                body: formData
-            })
-
-            if (res.ok) {
-                updated++
-            } else {
-                failed++
-            }
-        } catch (e) {
-            console.error(e)
-            failed++
-        }
-    }
-    
-    setFixStatus(`Correção concluída: ${updated} atualizados, ${failed} falhas`)
-    if (updated > 0) showToast(`${updated} produtos corrigidos com sucesso!`, 'success')
-    if (failed > 0) showToast(`${failed} falhas durante a correção.`, 'warning')
-    
-    queryClient.invalidateQueries({ queryKey: ['products'] })
-    void refetchProdutos()
-    setTimeout(() => setFixStatus(null), 5000)
   }
 
   // Form States
@@ -279,65 +200,27 @@ export default function ProdutosPage() {
     setSabores(sabores.filter(s => s !== saborToRemove))
   }
 
-  const appendText = (formData: FormData, field: string, value: string) => {
-    formData.append(field, value.trim())
-  }
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     if (!nome) return
 
     try {
-      const url = editingId ? `/api/products/${editingId}` : '/api/products'
+      const url = editingId ? `/products/${editingId}` : '/products'
       const method = editingId ? 'PUT' : 'POST'
 
-      const formData = new FormData()
-      formData.append('nome', nome)
-      appendText(formData, 'codigo', codigo)
-      appendText(formData, 'descricao', descricao)
-      formData.append('preco', preco || '0')
-      appendText(formData, 'valorPromo', valorPromo)
-      formData.append('custo', custo || '0')
-      if (categoriaId) formData.append('categoriaId', categoriaId)
-      formData.append('tipo', tipo)
-      appendText(formData, 'tipoTamanhoId', tipo === 'POR_TAMANHO' ? tipoTamanhoId : '')
-      appendText(formData, 'dispositivoId', dispositivoId)
-      formData.append('ordem', ordemProduto || '0')
-      formData.append('ativo', String(ativo))
-      if (file) formData.append('foto', file)
-      formData.append('tipoOpcao', tipoOpcao)
-      formData.append('sabores', JSON.stringify(sabores))
-      formData.append('isDrink', String(isDrink))
-      formData.append('isFood', String(isFood))
-      formData.append('favorito', String(favorito))
-      formData.append('destaque', String(destaque))
-      formData.append('controlaEstoque', String(controlaEstoque))
-      formData.append('autoatendimento', String(autoatendimento))
-      formData.append('fiscal', String(fiscal))
-      appendText(formData, 'ncm', ncm)
-      appendText(formData, 'cfop', cfop)
-      appendText(formData, 'cstCsosn', cstCsosn)
-      appendText(formData, 'aliquotaIcms', aliquotaIcms)
-      formData.append('permitirObservacao', String(permitirObservacao))
-      formData.append('permiteGeloLimao', String(permiteGeloLimao))
+      const formData = buildProductFormData({
+        nome, codigo, descricao, preco, valorPromo, custo, categoriaId, tipo,
+        tipoTamanhoId, dispositivoId, ordemProduto, ativo, file, tipoOpcao,
+        sabores, isDrink, isFood, favorito, destaque, controlaEstoque,
+        autoatendimento, fiscal, ncm, cfop, cstCsosn, aliquotaIcms,
+        permitirObservacao, permiteGeloLimao, gruposComplementoIds,
+      })
 
-      const res = await fetch(url, {
+      await apiFetch(url, {
         method,
         body: formData
       })
-
-      if (!res.ok) throw new Error('Erro ao salvar produto')
-      const produtoSalvo = await res.json() as Produto
-
-      const gruposRes = await fetch(`/api/products/${produtoSalvo.id}/grupos-complemento`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grupos: gruposComplementoIds.map((grupoId, index) => ({ grupoId, ordem: index }))
-        })
-      })
-      if (!gruposRes.ok) throw new Error('Erro ao salvar complementos do produto')
 
       showToast(editingId ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!', 'success')
       resetForm()
@@ -436,7 +319,7 @@ export default function ProdutosPage() {
   const confirmDelete = async () => {
     if (deleteConfirmationId) {
       try {
-        const res = await fetch(`/api/products/${deleteConfirmationId}`, { method: 'DELETE' })
+        const res = await apiRequest(`/products/${deleteConfirmationId}`, { method: 'DELETE' })
         
         if (res.status === 200) {
           const data = await res.json()
@@ -457,24 +340,33 @@ export default function ProdutosPage() {
     }
   }
 
-  const handleExport = () => {
-    const payload = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      items: produtos.map(p => ({
-        ...p,
-        sabores: p.sabores ? JSON.parse(p.sabores) : undefined
-      }))
+  const handleExport = async () => {
+    try {
+      setImportStatus('Carregando todo o cardápio...')
+      const allProducts = await fetchAllProducts()
+      const payload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        items: allProducts.map(p => ({
+          ...p,
+          sabores: p.sabores ? JSON.parse(p.sabores) : undefined
+        }))
+      }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'cardapio.json'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error(error)
+      showToast('Falha ao exportar o cardápio.', 'error')
+    } finally {
+      setImportStatus(null)
     }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'cardapio.json'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
   }
 
   const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -493,13 +385,16 @@ export default function ProdutosPage() {
         return
       }
 
+      const existingProducts = await fetchAllProducts()
+      const existingByName = new Map(existingProducts.map(product => [product.nome.toLowerCase(), product.id]))
+
       let added = 0
       let updated = 0
       let failed = 0
 
       for (const i of items) {
         try {
-          const existing = produtos.find(p => p.nome.toLowerCase() === i.nome.toLowerCase())
+          const existingId = existingByName.get(i.nome.toLowerCase())
           
           const formData = new FormData()
           formData.append('nome', i.nome)
@@ -526,24 +421,21 @@ export default function ProdutosPage() {
           formData.append('permitirObservacao', String(i.permitirObservacao !== undefined ? i.permitirObservacao : true))
           formData.append('permiteGeloLimao', String(!!i.permiteGeloLimao))
 
-          const url = existing ? `/api/products/${existing.id}` : '/api/products'
-          const method = existing ? 'PUT' : 'POST'
+          const url = existingId ? `/products/${existingId}` : '/products'
+          const method = existingId ? 'PUT' : 'POST'
 
-          const res = await fetch(url, {
+          const saved = await apiFetch<{ id: number }>(url, {
             method,
             body: formData
           })
-
-          if (res.ok) {
-            if (existing) {
-              updated++
-            } else {
-              added++
-            }
+          if (existingId) {
+            updated++
           } else {
-            failed++
+            added++
+            existingByName.set(i.nome.toLowerCase(), saved.id)
           }
         } catch (e) {
+          if (e instanceof ApiError && e.isUnauthorized) throw e
           console.error(e)
           failed++
         }

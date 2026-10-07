@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
+import { apiFetch } from '@/app/lib/api'
 import {
   findActiveNavItem,
   readStoredCollapsed,
@@ -65,9 +66,8 @@ export default function Sidebar({
   useEffect(() => {
     if (userProp !== undefined) return
     let cancelled = false
-    fetch('/api/auth/me')
-      .then(res => res.json())
-      .then((data: { user?: NavUser }) => {
+    apiFetch<{ user?: NavUser }>('/auth/me', { redirectOn401: false })
+      .then(data => {
         if (!cancelled && data?.user) setFetchedUser(data.user)
       })
       .catch(() => {})
@@ -202,7 +202,7 @@ export default function Sidebar({
   }
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await apiFetch('/auth/logout', { method: 'POST' })
     router.push('/login')
     router.refresh()
   }
@@ -213,11 +213,9 @@ export default function Sidebar({
   const handleRequestBill = async () => {
     if (!currentMesaId) return
     try {
-      const res = await fetch(`/api/tables/${currentMesaId}/request-bill`, { method: 'POST' })
-      if (res.ok) {
-        setShowBillModal(false)
-        router.push('/mesas')
-      }
+      await apiFetch(`/tables/${currentMesaId}/request-bill`, { method: 'POST' })
+      setShowBillModal(false)
+      router.push('/mesas')
     } catch (error) {
       console.error('Error requesting bill:', error)
     }
@@ -226,16 +224,12 @@ export default function Sidebar({
   const handlePrintPartialBill = async () => {
     if (!currentMesaId) return
     try {
-      const res = await fetch(`/api/tables/${currentMesaId}/print-partial`, { method: 'POST' })
-      if (res.ok) {
-        setShowBillModal(false)
-        showToast('Conta parcial enviada para a impressora!', 'success')
-      } else {
-        showToast('Erro ao imprimir conta parcial', 'error')
-      }
+      await apiFetch(`/tables/${currentMesaId}/print-partial`, { method: 'POST' })
+      setShowBillModal(false)
+      showToast('Conta parcial enviada para a impressora!', 'success')
     } catch (error) {
       console.error('Error printing partial bill:', error)
-      showToast('Erro ao conectar com o servidor', 'error')
+      showToast(error instanceof Error ? error.message : 'Erro ao imprimir conta parcial', 'error')
     }
   }
 

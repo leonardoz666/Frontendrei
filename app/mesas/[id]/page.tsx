@@ -2,14 +2,14 @@
 
 import { useEffect, useState, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { io } from 'socket.io-client'
-import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, CheckCircle2, Search, CreditCard, Receipt } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, Trash2, Rocket, PlusCircle, CheckCircle2, Search, CreditCard, Receipt, Lock } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
 import { PaymentModal } from '@/components/PaymentModal'
 import { unwrapList } from '@/app/lib/legacyArray'
-import { getSocketUrl } from '@/app/lib/socket-url'
+import { connectTableSocket } from '@/app/lib/table-socket'
+import { apiFetch } from '@/app/lib/api'
 import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -50,12 +50,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   const fetchTableData = useCallback(async () => {
     try {
-      console.log(`[DEBUG] Fetching table data for mesaId: ${mesaId}`);
-      const res = await fetch(`/api/tables/${mesaId}`, { cache: 'no-store' })
-      console.log(`[DEBUG] fetchTableData response status: ${res.status}`);
-      if (res.ok) {
-        const data = await res.json()
-        console.log(`[DEBUG] fetchTableData success:`, data);
+      const data = await apiFetch<{ status: string; numero: number; comandas?: Array<{ pedidos: APIPedido[] }> }>(`/tables/${mesaId}`)
         setTableStatus(data.status)
         setMesaNumero(data.numero || mesaId)
         if (data.comandas && data.comandas.length > 0) {
@@ -67,7 +62,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 id: item.id,
                 nome: item.produto.nome,
                 quantidade: item.quantidade,
-                preco: Number(item.precoUnitario ?? item.produto.preco) + (item.complementos ?? []).reduce((acc, complemento) => acc + Number(complemento.valorCobrado), 0),
+                preco: item.precoUnitario != null
+                  ? Number(item.precoUnitario)
+                  : Number(item.produto.preco) + (item.complementos ?? []).reduce((acc, complemento) => acc + Number(complemento.valorCobrado), 0),
                 observacao: item.observacao,
                 status: item.status,
                 horario: new Date(pedido.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -75,24 +72,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             })
           })
           setSubmittedItems(items)
+        } else {
+          setSubmittedItems([])
         }
-      } else {
-        console.error(`[DEBUG] fetchTableData failed with status: ${res.status}`);
-        const errorText = await res.text();
-        console.error(`[DEBUG] fetchTableData error text: ${errorText}`);
-      }
     } catch (error) {
-      console.error('[DEBUG] Error fetching table data:', error)
+      console.error(`Erro ao carregar mesa ${mesaId}:`, error)
     }
   }, [mesaId])
 
   const handleRequestBill = async () => {
     try {
-      const res = await fetch(`/api/tables/${mesaId}/request-bill`, { method: 'POST' })
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        throw new Error(data?.error || 'Não foi possível solicitar a conta')
-      }
+      await apiFetch(`/tables/${mesaId}/request-bill`, { method: 'POST' })
       showToast('Conta enviada para baixa.', 'success')
       await fetchTableData()
     } catch (error) {
@@ -102,11 +92,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   useEffect(() => {
     if (showTransferModal) {
-      fetch('/api/tables')
-        .then(res => res.json())
+      apiFetch<Array<{ id: number; numero: number; status: string }>>('/tables')
         .then(data => {
           // Filter out current table
-          setAvailableTables(data.filter((t: { id: number }) => t.id !== mesaId))
+          setAvailableTables(data.filter(t => t.id !== mesaId && t.status === 'LIVRE'))
         })
         .catch(err => console.error('Error fetching tables:', err))
     }
@@ -117,23 +106,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
     setIsTransferring(true)
     try {
-      const res = await fetch(`/api/tables/${mesaId}/transfer`, {
+      await apiFetch(`/tables/${mesaId}/transfer`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetTableId })
+        body: { targetTableId }
       })
 
-      if (res.ok) {
-        showToast('Mesa transferida com sucesso!', 'success')
-        setShowTransferModal(false)
-        router.push(`/mesas/${targetTableId}`)
-      } else {
-        const errorText = await res.text()
-        showToast(`Erro ao transferir: ${errorText}`, 'error')
-      }
+      showToast('Mesa transferida com sucesso!', 'success')
+      setShowTransferModal(false)
+      router.push(`/mesas/${targetTableId}`)
     } catch (error) {
       console.error('Error transferring table:', error)
-      showToast('Erro ao conectar com o servidor', 'error')
+      showToast(error instanceof Error ? error.message : 'Erro ao conectar com o servidor', 'error')
     } finally {
       setIsTransferring(false)
     }
@@ -144,25 +127,18 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
     const run = async () => {
       try {
-        console.log('[DEBUG] Starting init run in OrderPage');
-        const meRes = await fetch('/api/auth/me')
-        console.log(`[DEBUG] auth/me status: ${meRes.status}`);
-        const meData = await meRes.json()
+        const meData = await apiFetch<{ user?: { role: string } }>('/auth/me')
         if (!meData.user) {
-          console.warn('[DEBUG] No user found, redirecting to login');
           router.replace('/login')
           return
         }
         setUserRole(meData.user.role)
 
-        console.log('[DEBUG] Fetching categories');
-        const productsRes = await fetch('/api/categories', { cache: 'no-store' })
-        console.log(`[DEBUG] categories status: ${productsRes.status}`);
         // `unwrapList` aceita array puro (contrato antigo) OU `{ data, meta }`
         // (contrato paginado novo). Sem isso, no dia em que a rota passar a ser
         // paginada, `productsData.sort` estoura "sort is not a function" na tela
         // de lançamento de pedido — o coração da operação. Ver lib/legacyArray.ts.
-        const productsData = unwrapList<Categoria>(await productsRes.json())
+        const productsData = unwrapList<Categoria>(await apiFetch('/categories'))
 
         if (!cancelled) {
           const order = ['Entradas', 'Pratos Principais', 'Bebidas', 'Drinks']
@@ -179,7 +155,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           await fetchTableData()
         }
       } catch (err) {
-        console.error('[DEBUG] Error in OrderPage init:', err);
+        console.error('Erro ao carregar pedido:', err)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -193,15 +169,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   // Real-time updates via Socket.io
   useEffect(() => {
-    const socket = io(getSocketUrl())
-
-    socket.on('connect', () => {
-      console.log(`[DEBUG] Socket connected for table ${mesaId}`)
-    })
+    const socket = connectTableSocket()
 
     const handleTableUpdate = (data?: { mesaId: number }) => {
       if (!data || Number(data.mesaId) === Number(mesaId)) {
-        console.log(`[DEBUG] Update for table ${mesaId} received`)
         fetchTableData()
       }
     }
@@ -353,10 +324,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/orders', {
+      await apiFetch('/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           mesaId,
           itens: cart.map(item => ({
             produtoId: item.produtoId,
@@ -365,19 +335,14 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             complementos: item.complementos,
             observacao: item.observacao
           }))
-        })
+        },
       })
-
-      if (res.ok) {
-        setCart([])
-        showToast('Pedido enviado com sucesso!', 'success')
-        fetchTableData()
-      } else {
-        showToast('Erro ao enviar pedido', 'error')
-      }
+      setCart([])
+      showToast('Pedido enviado com sucesso!', 'success')
+      void fetchTableData()
     } catch (error) {
       console.error(error)
-      showToast('Erro ao enviar pedido', 'error')
+      showToast(error instanceof Error ? error.message : 'Erro ao enviar pedido', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -414,10 +379,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const handleCloseItem = async (ids: number[]) => {
     try {
       for (const id of ids) {
-        await fetch(`/api/orders/items/${id}/status`, {
+        await apiFetch(`/orders/items/${id}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'FECHADO' })
+          body: { status: 'FECHADO' },
         });
       }
       showToast('Item(ns) fechado(s) com sucesso!', 'success');
@@ -431,7 +395,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
 
   if (loading) {
-    return <div className="p-8 text-center">Carregando cardÃ¡pio...</div>
+    return <div className="p-8 text-center">Carregando cardápio...</div>
   }
 
   return (
@@ -480,8 +444,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       {tableStatus === 'FECHAMENTO' && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mx-6 mt-4 rounded shadow-sm flex items-center justify-between">
           <div>
-            <p className="font-bold">ðŸ”’ Conta em Fechamento</p>
-            <p className="text-sm">NÃ£o Ã© possÃ­vel adicionar novos itens. Solicite a reabertura no mapa de mesas se necessÃ¡rio.</p>
+            <p className="flex items-center gap-2 font-bold">
+              <Lock size={18} aria-hidden="true" />
+              Conta em Fechamento
+            </p>
+            <p className="text-sm">Não é possível adicionar novos itens. Solicite a reabertura no mapa de mesas se necessário.</p>
           </div>
         </div>
       )}
@@ -867,7 +834,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        total={submittedItems.filter(i => i.status !== 'CANCELADO').reduce((acc, i) => acc + (i.preco * i.quantidade), 0)}
         items={submittedItems.filter(i => i.status !== 'CANCELADO')}
         mesaId={mesaId}
         mesaNumero={mesaNumero}

@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { X, CreditCard, Smartphone, Banknote, Calculator, Check, Loader2, Users, Receipt, AlertCircle } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
+import { apiFetch } from '@/app/lib/api'
+import { amountForItems, amountPerPerson, roundMoney, type PaymentSummary } from '@/app/lib/payment'
 
 type PaymentMethod = 'DINHEIRO' | 'PIX' | 'CARTAO_CREDITO' | 'CARTAO_DEBITO' | 'VALE_REFEICAO'
 
@@ -17,51 +19,56 @@ type PaymentItem = {
 interface PaymentModalProps {
     isOpen: boolean
     onClose: () => void
-    total: number
     mesaId: number
     mesaNumero: number
     onSuccess: () => void
     items?: PaymentItem[]
 }
 
-export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuccess, items = [] }: PaymentModalProps) {
+export function PaymentModal({ isOpen, onClose, mesaId, mesaNumero, onSuccess, items = [] }: PaymentModalProps) {
     const { showToast } = useToast()
     const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null)
     const [amountPaid, setAmountPaid] = useState('')
     const [splitCount, setSplitCount] = useState(1)
     const [processing, setProcessing] = useState(false)
-    const [pagoParcialInfo, setPagoParcialInfo] = useState<{ saldoRestante: number; pagoAteAgora: number } | null>(null)
+    const [summary, setSummary] = useState<PaymentSummary | null>(null)
+    const [summaryLoading, setSummaryLoading] = useState(true)
+    const [summaryError, setSummaryError] = useState('')
+    const paymentInFlight = useRef(false)
     const [emitirNfce, setEmitirNfce] = useState(true)
 
     const [splitMode, setSplitMode] = useState<'PEOPLE' | 'ITEMS'>('PEOPLE')
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string | number>>(new Set())
 
-    const calculateTotals = () => {
-        const rawFullTotal = total
-        const serviceFeeFull = rawFullTotal * 0.10
-        const fullFinalTotal = rawFullTotal + serviceFeeFull
+    const fullFinalTotal = summary?.totalFinal ?? 0
+    const balance = summary?.saldoRestante ?? 0
+    const selectedSubtotal = items.reduce((sum, item) =>
+        sum + (selectedItemIds.has(item.id) ? item.preco * item.quantidade : 0), 0)
+    const rawTotal = splitMode === 'PEOPLE' ? (summary?.subtotal ?? 0) : selectedSubtotal
+    const serviceFee = splitMode === 'PEOPLE' ? (summary?.servico ?? 0) : roundMoney(selectedSubtotal * 0.1)
+    const valueToPay = splitMode === 'PEOPLE'
+        ? amountPerPerson(balance, splitCount)
+        : amountForItems(balance, selectedSubtotal)
+    const received = Number(amountPaid)
+    const cashValid = amountPaid.trim() !== '' && Number.isFinite(received) && received >= valueToPay
+    const change = Number.isFinite(received) ? roundMoney(received - valueToPay) : 0
+    const pagoParcialInfo = summary && summary.pagoAteAgora > 0 ? summary : null
 
-        if (splitMode === 'PEOPLE') {
-            const perPerson = fullFinalTotal / splitCount
-            return { rawTotal: rawFullTotal, serviceFee: serviceFeeFull, finalTotal: fullFinalTotal, perPerson, fullFinalTotal }
-        } else {
-            let itemsTotal = 0
-            items.forEach(item => {
-                if (selectedItemIds.has(item.id)) {
-                    itemsTotal += item.preco * item.quantidade
-                }
-            })
-            const serviceFee = itemsTotal * 0.10
-            const finalTotal = itemsTotal + serviceFee
-            return { rawTotal: itemsTotal, serviceFee, finalTotal, perPerson: finalTotal, fullFinalTotal }
+    const loadSummary = useCallback(async (signal?: AbortSignal) => {
+        setSummaryLoading(true)
+        setSummaryError('')
+        try {
+            const data = await apiFetch<PaymentSummary>(`/tables/${mesaId}/payment-summary`, { signal })
+            if (!signal?.aborted) setSummary(data)
+        } catch (error) {
+            if (!signal?.aborted) {
+                setSummary(null)
+                setSummaryError(error instanceof Error ? error.message : 'Erro ao consultar saldo')
+            }
+        } finally {
+            if (!signal?.aborted) setSummaryLoading(false)
         }
-    }
-
-    const totals = calculateTotals()
-    const { rawTotal, serviceFee, finalTotal, perPerson } = totals
-    const fullFinalTotal = ('fullFinalTotal' in totals) ? totals.fullFinalTotal : (total * 1.1)
-
-    const change = amountPaid ? parseFloat(amountPaid) - (splitMode === 'PEOPLE' ? perPerson : finalTotal) : 0
+    }, [mesaId])
 
     const paymentMethods = [
         { id: 'DINHEIRO' as PaymentMethod, label: 'Dinheiro', icon: Banknote, color: 'bg-green-500' },
@@ -72,57 +79,63 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
     ]
 
     const handleConfirmPayment = async () => {
-        if (!selectedMethod) return
+        if (!selectedMethod || paymentInFlight.current || summaryLoading || !summary || valueToPay <= 0) return
+        if (selectedMethod === 'DINHEIRO' && !cashValid) return
 
-        const valueToPay = splitMode === 'PEOPLE' && splitCount > 1 ? perPerson : finalTotal
-
+        paymentInFlight.current = true
         setProcessing(true)
         try {
-            const res = await fetch(`/api/tables/${mesaId}/payment`, {
+            const data = await apiFetch<{
+                fechado: boolean; totalFinal: number; pagoAteAgora: number; saldoRestante: number
+                nfce?: { status: string; serie: string; numero: number; motivoRejeicao?: string }
+            }>(`/tables/${mesaId}/payment`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+                body: {
                     tipo: selectedMethod,
                     valor: valueToPay,
                     troco: selectedMethod === 'DINHEIRO' ? Math.max(0, change) : 0,
                     emitirNfce
-                })
+                }
             })
 
-            const data = await res.json().catch(() => ({}))
-
-            if (res.ok) {
-                if (data.fechado) {
-                    if (data.nfce) {
-                        const autorizada = data.nfce.status === 'AUTORIZADA'
-                        showToast(
-                            autorizada
-                                ? `Conta fechada e NFC-e ${data.nfce.serie}/${data.nfce.numero} autorizada`
-                                : `Conta fechada. NFC-e pendente/rejeitada: ${data.nfce.motivoRejeicao || data.nfce.status}`,
-                            autorizada ? 'success' : 'warning'
-                        )
-                    } else {
-                        showToast('Conta fechada com sucesso!', 'success')
-                    }
-                    onSuccess()
-                    onClose()
+            if (data.fechado) {
+                if (data.nfce) {
+                    const autorizada = data.nfce.status === 'AUTORIZADA'
+                    showToast(
+                        autorizada
+                            ? `Conta fechada e NFC-e ${data.nfce.serie}/${data.nfce.numero} autorizada`
+                            : `Conta fechada. NFC-e pendente/rejeitada: ${data.nfce.motivoRejeicao || data.nfce.status}`,
+                        autorizada ? 'success' : 'warning'
+                    )
                 } else {
-                    showToast(`Pagamento de R$ ${valueToPay.toFixed(2)} registrado! Restam R$ ${(data.saldoRestante || 0).toFixed(2)}`, 'success')
-                    setPagoParcialInfo({
-                        saldoRestante: data.saldoRestante || 0,
-                        pagoAteAgora: data.pagoAteAgora || valueToPay
-                    })
-                    setSelectedItemIds(new Set())
-                    setAmountPaid('')
-                    setSelectedMethod(null)
+                    showToast('Conta fechada com sucesso!', 'success')
                 }
+                onSuccess()
+                onClose()
             } else {
-                showToast(data.error || 'Erro ao processar pagamento. Verifique o valor.', 'error')
+                showToast(`Pagamento de R$ ${valueToPay.toFixed(2)} registrado! Restam R$ ${data.saldoRestante.toFixed(2)}`, 'success')
+                setSummary(previous => previous ? {
+                    ...previous,
+                    totalFinal: data.totalFinal,
+                    saldoRestante: data.saldoRestante,
+                    pagoAteAgora: data.pagoAteAgora
+                } : null)
+                if (splitMode === 'PEOPLE') setSplitCount(count => Math.max(1, count - 1))
+                setSelectedItemIds(new Set())
+                setAmountPaid('')
+                setSelectedMethod(null)
             }
         } catch (error) {
             console.error('Error processing payment:', error)
-            showToast('Erro de conexão. Tente novamente.', 'error')
+            showToast(error instanceof Error ? error.message : 'Erro de conexão. Tente novamente.', 'error')
+            // A response may be lost after the payment commits; reload before allowing another attempt.
+            await loadSummary()
+            setSelectedMethod(null)
+            setAmountPaid('')
+            setSplitCount(1)
+            setSelectedItemIds(new Set())
         } finally {
+            paymentInFlight.current = false
             setProcessing(false)
         }
     }
@@ -140,15 +153,18 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
 
     useEffect(() => {
         if (isOpen) {
-            setPagoParcialInfo(null)
+            const controller = new AbortController()
+            setSummary(null)
+            void loadSummary(controller.signal)
             setSelectedMethod(null)
             setAmountPaid('')
             setSelectedItemIds(new Set())
             setSplitCount(1)
             setSplitMode('PEOPLE')
             setEmitirNfce(true)
+            return () => controller.abort()
         }
-    }, [isOpen])
+    }, [isOpen, loadSummary])
 
     if (!isOpen) return null
 
@@ -162,13 +178,21 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                             <h2 className="text-2xl font-bold">Fechar Conta</h2>
                             <p className="text-green-100 mt-1">Mesa {mesaNumero}</p>
                         </div>
-                        <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
+                        <button onClick={onClose} disabled={processing} aria-label="Fechar" className="text-white/70 hover:text-white transition-colors disabled:opacity-50">
                             <X size={28} />
                         </button>
                     </div>
                 </div>
 
                 <div className="p-0 flex-1 overflow-y-auto">
+                    {summaryLoading && <p role="status" className="p-4 text-gray-600">Consultando saldo...</p>}
+                    {summaryError && (
+                        <div role="alert" className="p-4 text-red-700">
+                            <p>{summaryError}</p>
+                            <button onClick={() => void loadSummary()} className="mt-2 underline">Tentar novamente</button>
+                        </div>
+                    )}
+                    <fieldset disabled={processing || summaryLoading || !summary} className="min-w-0">
                     {/* Mode Switcher */}
                     <div className="flex border-b border-gray-200">
                         <button
@@ -290,14 +314,14 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                             {splitMode === 'PEOPLE' && splitCount > 1 && (
                                 <div className="border-t border-gray-200 pt-2 flex justify-between text-blue-600 font-bold">
                                     <span>Total (Mesa)</span>
-                                    <span>R$ {(total * 1.1).toFixed(2).replace('.', ',')}</span>
+                                    <span>R$ {fullFinalTotal.toFixed(2).replace('.', ',')}</span>
                                 </div>
                             )}
 
                             <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t border-gray-200">
                                 <span>Valor a Pagar {splitMode === 'PEOPLE' && splitCount > 1 ? '(Por Pessoa)' : ''}</span>
                                 <span className="text-green-600">R$ {
-                                    (splitMode === 'PEOPLE' ? perPerson : finalTotal).toFixed(2).replace('.', ',')
+                                    valueToPay.toFixed(2).replace('.', ',')
                                 }</span>
                             </div>
                         </div>
@@ -350,6 +374,8 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">R$</span>
                                     <input
                                         type="number"
+                                        min="0"
+                                        step="0.01"
                                         value={amountPaid}
                                         onChange={(e) => setAmountPaid(e.target.value)}
                                         className="w-full p-4 pl-12 text-2xl font-bold text-gray-900 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none"
@@ -388,19 +414,21 @@ export function PaymentModal({ isOpen, onClose, total, mesaId, mesaNumero, onSuc
                             </div>
                         )}
                     </div>
+                    </fieldset>
                 </div>
 
                 {/* Footer Actions */}
                 <div className="p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0 flex gap-3">
                     <button
                         onClick={onClose}
+                        disabled={processing}
                         className="flex-1 py-4 px-4 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl font-bold transition-colors shadow-sm"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleConfirmPayment}
-                        disabled={!selectedMethod || processing || (selectedMethod === 'DINHEIRO' && change < 0) || (splitMode === 'ITEMS' && selectedItemIds.size === 0)}
+                        disabled={!selectedMethod || processing || summaryLoading || !summary || valueToPay <= 0 || (selectedMethod === 'DINHEIRO' && !cashValid)}
                         className="flex-[2] py-4 px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-green-200"
                     >
                         {processing ? (
