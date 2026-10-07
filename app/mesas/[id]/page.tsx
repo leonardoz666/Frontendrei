@@ -222,7 +222,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   const canCreateOrder = userPermissions.includes('pedidos.criar')
   const canRequestBill = userPermissions.includes('pedidos.editar')
-  const canTransferItems = userPermissions.includes('mesas.transferir_itens')
+  const canTransferItems = tableStatus === 'OCUPADA' && userPermissions.includes('mesas.transferir_itens')
   const canTransferTable = userPermissions.includes('mesas.transferir')
   const canRegisterPayment = userPermissions.includes('pagamentos.registrar')
 

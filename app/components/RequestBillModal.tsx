@@ -105,7 +105,7 @@ export function RequestBillModal({ isOpen, mesaId, onClose, onRequestSuccess }: 
           <div className="grid gap-3">
             <button type="button" onClick={handleRequestBill} disabled={Boolean(pendingAction)} className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-4 font-bold text-white shadow-lg shadow-green-200 transition-colors hover:bg-green-700 disabled:opacity-50">
               {pendingAction === 'request' ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
-              Fechar conta
+              Solicitar fechamento
             </button>
             <button type="button" onClick={handlePrintPartialBill} disabled={Boolean(pendingAction)} className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 font-bold text-white shadow-lg shadow-blue-200 transition-colors hover:bg-blue-700 disabled:opacity-50">
               {pendingAction === 'print' ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
