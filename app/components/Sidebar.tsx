@@ -3,11 +3,47 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  Armchair,
+  BedDouble,
+  Bike,
+  Boxes,
+  CalendarDays,
+  ChartColumn,
   ChevronDown,
+  ClipboardCheck,
+  ClipboardList,
+  Clock,
+  Contact,
+  FileSpreadsheet,
+  FileText,
+  HardDrive,
+  History,
+  Landmark,
+  LayoutDashboard,
+  ListTree,
   LogOut,
+  MapPin,
+  Package,
+  PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
+  Printer,
+  QrCode,
   Receipt,
+  Settings,
+  Shield,
+  Sparkles,
+  Tags,
+  Target,
+  Truck,
+  UserCheck,
+  UserCog,
+  Users,
+  UtensilsCrossed,
+  Wallet,
+  Warehouse,
+  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -20,9 +56,48 @@ import {
   visibleNavGroups,
   writeStoredCollapsed,
   writeStoredGroupState,
+  type NavIconName,
   type NavItem,
   type NavUser,
 } from '@/app/lib/navigation'
+
+const NAV_ICONS: Record<NavIconName, LucideIcon> = {
+  LayoutDashboard,
+  ChartColumn,
+  Armchair,
+  ClipboardList,
+  Users,
+  Tags,
+  Contact,
+  Wallet,
+  Truck,
+  UtensilsCrossed,
+  Package,
+  FileSpreadsheet,
+  Boxes,
+  History,
+  ClipboardCheck,
+  PackageSearch,
+  Clock,
+  CalendarDays,
+  Pencil,
+  Shield,
+  BedDouble,
+  UserCheck,
+  Sparkles,
+  Landmark,
+  Bike,
+  FileText,
+  Settings,
+  UserCog,
+  Printer,
+  Target,
+  Warehouse,
+  ListTree,
+  MapPin,
+  HardDrive,
+  QrCode,
+}
 
 interface SidebarProps {
   isOpen: boolean
@@ -244,7 +319,7 @@ export default function Sidebar({
   }
 
   const renderItem = (item: NavItem) => {
-    if (isCollapsed) return null
+    const Icon = NAV_ICONS[item.icon]
 
     if (item.disabled) {
       return (
@@ -256,6 +331,7 @@ export default function Sidebar({
             isCollapsed ? 'md:justify-center md:px-0' : ''
           }`}
         >
+          <Icon size={19} className={`hidden shrink-0 ${isCollapsed ? 'md:block' : ''}`} aria-hidden="true" />
           <span className={`flex-1 truncate ${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
           <span
             className={`rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 ${
@@ -282,6 +358,7 @@ export default function Sidebar({
             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
         } ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
       >
+        <Icon size={19} className={`hidden shrink-0 ${isCollapsed ? 'md:block' : ''}`} aria-hidden="true" />
         <span className={`flex-1 truncate ${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
         {item.shortcut && (
           <kbd
@@ -342,7 +419,7 @@ export default function Sidebar({
             </button>
           </div>
 
-          <div className={`mt-3 ${isWaiter || isCollapsed ? 'hidden' : ''}`}>
+          <div className={`mt-3 ${isWaiter ? 'hidden' : isCollapsed ? 'md:hidden' : ''}`}>
             <label className="flex h-10 items-center gap-2 rounded-[10px] border border-slate-200 bg-slate-50 px-3 focus-within:border-orange-300 focus-within:ring-4 focus-within:ring-orange-100">
               <span className="shrink-0 text-[15px] font-semibold text-slate-400">/</span>
               <input
@@ -387,12 +464,18 @@ export default function Sidebar({
             </div>
           )}
 
-          {!isCollapsed && visualSections.map(section => {
+          {isCollapsed && (
+            <div className="hidden space-y-1 md:block">
+              {visualSections.flatMap(section => section.items).map(renderItem)}
+            </div>
+          )}
+
+          {visualSections.map(section => {
             const isGroupActive = section.id === activeSectionId
             const isGroupOpen = Boolean(normalizedSearch) || (openGroups[section.id] ?? isGroupActive)
 
             return (
-              <div key={section.id} className="mb-2 border-b border-slate-100 pb-2">
+              <div key={section.id} className={`mb-2 border-b border-slate-100 pb-2 ${isCollapsed ? 'md:hidden' : ''}`}>
                 <button
                   type="button"
                   onClick={() => toggleGroup(section.id)}

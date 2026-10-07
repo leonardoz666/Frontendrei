@@ -114,7 +114,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       {!isLoginPage && user && (
         <>
           {isWaiter ? (
-            <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between gap-6 border-b border-slate-200 bg-white px-5 shadow-sm md:px-8">
+            <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between gap-6 border-b border-slate-200 bg-white px-5 shadow-sm md:px-8 xl:grid xl:grid-cols-[1fr_auto_1fr]">
               <div className="flex shrink-0 items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-600 text-xl font-bold text-white">R</div>
                 <div className="hidden sm:block">
@@ -123,7 +123,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
 
-              <nav className="flex min-w-0 flex-1 items-center justify-center gap-2" aria-label="Navegação do garçom">
+              <nav className="flex min-w-0 flex-1 items-center justify-center gap-2 xl:flex-none" aria-label="Navegação do garçom">
                 {[
                   { href: '/', label: 'Início' },
                   { href: '/mesas', label: 'Mapa de Mesas' },
@@ -140,23 +140,31 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 ))}
               </nav>
 
-              <div className="flex shrink-0 items-center gap-3">
-                <div className="hidden text-right sm:block">
-                  <p className="max-w-36 truncate text-sm font-semibold text-slate-900">{user?.name ?? 'Garçom'}</p>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">GARÇOM</p>
+              <div className="flex shrink-0 items-center justify-end gap-6 xl:justify-self-end">
+                <div
+                  id="waiter-header-status"
+                  className="hidden min-w-[250px] shrink-0 items-center justify-center xl:flex"
+                  aria-live="polite"
+                />
+
+                <div className="flex shrink-0 items-center gap-3">
+                  <div className="hidden text-right sm:block">
+                    <p className="max-w-36 truncate text-sm font-semibold text-slate-900">{user?.name ?? 'Garçom'}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">GARÇOM</p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+                    {user?.name?.charAt(0).toUpperCase() || 'G'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    title="Sair"
+                    aria-label="Sair"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  >
+                    <LogOut size={17} />
+                  </button>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
-                  {user?.name?.charAt(0).toUpperCase() || 'G'}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  title="Sair"
-                  aria-label="Sair"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                >
-                  <LogOut size={17} />
-                </button>
               </div>
             </header>
           ) : (

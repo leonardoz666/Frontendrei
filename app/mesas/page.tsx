@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, Loader2, X, ListPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
@@ -10,6 +11,28 @@ import { apiFetch } from '@/app/lib/api'
 
 type User = {
   role: string
+}
+
+function MesaStatusSummary({ livres, ocupadas }: { livres: number; ocupadas: number }) {
+  return (
+    <div className="flex h-12 items-center gap-6 rounded-lg border border-slate-200 bg-slate-50 px-5 shadow-sm">
+      <div className="min-w-[70px] text-center">
+        <p className="text-[10px] font-bold uppercase text-slate-500">Livres</p>
+        <div className="mt-0.5 flex items-center justify-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+          <span className="text-lg font-bold leading-none text-slate-900">{livres}</span>
+        </div>
+      </div>
+      <div className="h-7 w-px bg-slate-200" aria-hidden="true" />
+      <div className="min-w-[70px] text-center">
+        <p className="text-[10px] font-bold uppercase text-slate-500">Ocupadas</p>
+        <div className="mt-0.5 flex items-center justify-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
+          <span className="text-lg font-bold leading-none text-slate-900">{ocupadas}</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function MesasPage() {
@@ -27,6 +50,7 @@ export default function MesasPage() {
   const [tableActionPending, setTableActionPending] = useState(false)
   const tableActionInFlight = useRef(false)
   const [user, setUser] = useState<User | null>(null)
+  const [headerStatusTarget, setHeaderStatusTarget] = useState<HTMLElement | null>(null)
   const [podeCadastrar, setPodeCadastrar] = useState(false)
   const [pracas, setPracas] = useState<Array<{ id: number; nome: string }>>([])
   const [showLoteModal, setShowLoteModal] = useState(false)
@@ -37,6 +61,25 @@ export default function MesasPage() {
   const [loteCarregando, setLoteCarregando] = useState(false)
   const [loteErro, setLoteErro] = useState('')
   const router = useRouter()
+
+  useEffect(() => {
+    const existingTarget = document.getElementById('waiter-header-status')
+    if (existingTarget) {
+      setHeaderStatusTarget(existingTarget)
+      return
+    }
+
+    const observer = new MutationObserver(() => {
+      const target = document.getElementById('waiter-header-status')
+      if (!target) return
+
+      setHeaderStatusTarget(target)
+      observer.disconnect()
+    })
+
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [])
 
   const carregarPracas = async () => {
     try {
@@ -251,38 +294,20 @@ export default function MesasPage() {
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Mapa de Mesas</h1>
-            <p className="text-gray-500 mt-1">Gerencie o layout e status em tempo real.</p>
-          </div>
+    <div className="min-h-screen bg-gray-50 px-4 pb-4 pt-6 sm:px-6 md:pt-12 lg:px-8 lg:pt-24">
+      {headerStatusTarget &&
+        createPortal(
+          <MesaStatusSummary livres={livres} ocupadas={ocupadas} />,
+          headerStatusTarget
+        )}
 
-          <div className="flex items-center gap-4">
-            {/* Status Widget */}
-            <div className="bg-white rounded-2xl px-8 py-3 shadow-sm border border-gray-100 flex items-center gap-8">
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-[10px] text-gray-400 font-bold tracking-widest uppercase">Livres</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
-                  <span className="text-xl font-bold text-gray-900">{livres}</span>
-                </div>
-              </div>
-              
-              <div className="w-px h-10 bg-gray-100"></div>
-              
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-[10px] text-gray-400 font-bold tracking-widest uppercase">Ocupadas</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
-                  <span className="text-xl font-bold text-gray-900">{ocupadas}</span>
-                </div>
-              </div>
-            </div>
+      <div className="mx-auto w-full max-w-7xl">
+        {(user?.role !== 'GARCOM' || canCreate || podeCadastrar) && (
+          <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
+            {user?.role !== 'GARCOM' && (
+              <MesaStatusSummary livres={livres} ocupadas={ocupadas} />
+            )}
 
-            {/* Add Button - Only for Admin/Dono */}
             {canCreate && (
                 <button 
                   onClick={openAddModal}
@@ -306,7 +331,7 @@ export default function MesasPage() {
               </button>
             )}
           </div>
-        </div>
+        )}
 
         {/* O mapa exibe apenas mesas abertas; mesas livres não aparecem como cartões. */}
         {mesas.length === 0 ? (
@@ -315,7 +340,7 @@ export default function MesasPage() {
             <p className="mt-1 text-sm text-gray-500">As mesas aparecerão aqui quando um atendimento for iniciado.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+          <div className="mx-auto grid max-w-[1111px] grid-cols-[repeat(auto-fit,minmax(136px,145px))] justify-center gap-4">
             {mesas.map((mesa) => (
               <TableCard
                 key={mesa.id}
