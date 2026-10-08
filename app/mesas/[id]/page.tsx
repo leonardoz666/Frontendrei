@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRightLeft, X, ListOrdered, ListPlus, Trash2, Rocket, PlusCircle, Minus, Plus, Search, CreditCard, Receipt, Lock, Loader2 } from 'lucide-react'
+import { ArrowRightLeft, X, ListOrdered, ListPlus, Trash2, Rocket, PlusCircle, Minus, Plus, Search, CreditCard, Receipt, Lock, Loader2, Ban } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
@@ -80,6 +80,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [selectedTransferItemIds, setSelectedTransferItemIds] = useState<number[]>([])
   const [itemTransferTargetId, setItemTransferTargetId] = useState<number | null>(null)
   const [isTransferringItems, setIsTransferringItems] = useState(false)
+  const [showCancelItemsModal, setShowCancelItemsModal] = useState(false)
+  const [selectedCancelItemIds, setSelectedCancelItemIds] = useState<number[]>([])
+  const [cancellationReason, setCancellationReason] = useState('')
+  const [isCancellingItems, setIsCancellingItems] = useState(false)
 
   // Payment Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -243,6 +247,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const canRequestBill = userPermissions.includes('pedidos.editar')
   const canTransferItems = tableStatus === 'OCUPADA' && userPermissions.includes('mesas.transferir_itens')
   const canTransferTable = tableStatus === 'OCUPADA' && userPermissions.includes('mesas.transferir')
+  const canCancelItems = tableStatus === 'OCUPADA' && userPermissions.includes('pedidos.cancelar')
   const canRegisterPayment = userPermissions.includes('pagamentos.abrir') && userPermissions.includes('pagamentos.registrar')
   const canApplyDiscount = userPermissions.includes('pagamentos.desconto')
   const lancamentoBloqueado = caixaAberto !== true || tableStatus === 'FECHAMENTO' || !canCreateOrder
@@ -321,6 +326,28 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       showToast(error instanceof Error ? error.message : 'Erro ao transferir itens', 'error')
     } finally {
       setIsTransferringItems(false)
+    }
+  }
+
+  const handleCancelItems = async () => {
+    const motivo = cancellationReason.trim()
+    if (selectedCancelItemIds.length === 0 || motivo.length < 3) return
+
+    setIsCancellingItems(true)
+    try {
+      await apiFetch('/orders/items/cancel', {
+        method: 'POST',
+        body: { itemIds: selectedCancelItemIds, motivo }
+      })
+      showToast(`${selectedCancelItemIds.length} lançamento(s) cancelado(s) e devolvido(s) ao estoque.`, 'success')
+      setShowCancelItemsModal(false)
+      setSelectedCancelItemIds([])
+      setCancellationReason('')
+      await fetchTableData()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Erro ao cancelar itens', 'error')
+    } finally {
+      setIsCancellingItems(false)
     }
   }
 
@@ -552,6 +579,21 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                     >
                       <ListPlus size={16} />
                       <span>Transferir itens</span>
+                    </button>
+                  )}
+                  {canCancelItems && submittedItems.some(item => item.status !== 'CANCELADO') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCancelItemIds([])
+                        setCancellationReason('')
+                        setShowCancelItemsModal(true)
+                      }}
+                      title="Cancelar itens da comanda"
+                      className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-red-600 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700"
+                    >
+                      <Ban size={16} />
+                      <span>Cancelar itens</span>
                     </button>
                   )}
                   {canRegisterPayment && submittedItems.length > 0 && (
@@ -843,6 +885,97 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   <button type="button" onClick={handleTransferItems} disabled={!itemTransferTargetId || selectedTransferItemIds.length === 0 || isTransferringItems} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-md bg-orange-600 px-4 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
                     {isTransferringItems && <Loader2 size={17} className="animate-spin" />}
                     Transferir itens
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      )}
+
+      {showCancelItemsModal && (
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="cancel-items-title" className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-red-200 bg-red-600 px-4 py-3 text-white sm:px-5">
+                <div>
+                  <h2 id="cancel-items-title" className="text-lg font-bold">Cancelar itens</h2>
+                  <p className="text-sm text-red-50">Os itens selecionados serão retirados da conta e devolvidos ao estoque.</p>
+                </div>
+                <button type="button" onClick={() => setShowCancelItemsModal(false)} disabled={isCancellingItems} aria-label="Fechar" className="rounded-md p-2 text-white hover:bg-red-700 disabled:opacity-50">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Itens da mesa {mesaNumero}</h3>
+                    <p className="text-xs text-slate-500">Selecione um ou vários lançamentos.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const itemIds = submittedItems.filter(item => item.status !== 'CANCELADO').map(item => item.id)
+                      setSelectedCancelItemIds(selectedCancelItemIds.length === itemIds.length ? [] : itemIds)
+                    }}
+                    className="text-xs font-semibold text-red-700 hover:text-red-800"
+                  >
+                    {selectedCancelItemIds.length === submittedItems.filter(item => item.status !== 'CANCELADO').length ? 'Limpar seleção' : 'Selecionar todos'}
+                  </button>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {submittedItems.filter(item => item.status !== 'CANCELADO').map(item => {
+                    const selected = selectedCancelItemIds.includes(item.id)
+                    return (
+                      <label key={item.id} className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${selected ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => setSelectedCancelItemIds(current => current.includes(item.id) ? current.filter(id => id !== item.id) : [...current, item.id])}
+                          className="mt-0.5 h-4 w-4 accent-red-600"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-start justify-between gap-3">
+                            <span className="break-words font-semibold text-slate-900">{item.quantidade}x {item.nome}</span>
+                            <span className="shrink-0 text-sm font-semibold text-slate-700">R$ {(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
+                          </span>
+                          {item.observacao && <span className="mt-1 block break-words text-xs text-slate-500">{item.observacao}</span>}
+                          <span className="mt-1 block text-xs text-slate-400">Lançado às {item.horario}</span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-5">
+                  <label htmlFor="cancellation-reason" className="mb-1.5 block text-sm font-semibold text-slate-900">Motivo do cancelamento</label>
+                  <textarea
+                    id="cancellation-reason"
+                    value={cancellationReason}
+                    onChange={event => setCancellationReason(event.target.value.slice(0, 500))}
+                    placeholder="Ex.: cliente desistiu do item"
+                    rows={3}
+                    maxLength={500}
+                    autoFocus
+                    className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                  />
+                  <div className="mt-1 flex justify-between gap-3 text-xs">
+                    <span className={cancellationReason.trim().length > 0 && cancellationReason.trim().length < 3 ? 'text-red-600' : 'text-slate-500'}>Obrigatório, mínimo de 3 caracteres.</span>
+                    <span className="text-slate-400">{cancellationReason.length}/500</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <p className="text-sm text-slate-600">{selectedCancelItemIds.length} lançamento(s) selecionado(s)</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowCancelItemsModal(false)} disabled={isCancellingItems} className="h-10 flex-1 rounded-md border border-slate-300 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 sm:flex-none">Voltar</button>
+                  <button type="button" onClick={handleCancelItems} disabled={selectedCancelItemIds.length === 0 || cancellationReason.trim().length < 3 || isCancellingItems} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-md bg-red-600 px-4 font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
+                    {isCancellingItems ? <Loader2 size={17} className="animate-spin" /> : <Ban size={17} />}
+                    Confirmar cancelamento
                   </button>
                 </div>
               </div>
