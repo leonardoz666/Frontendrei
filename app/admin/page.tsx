@@ -7,6 +7,7 @@ import {
   Tags, 
   Printer,
   Eye,
+  History,
 } from 'lucide-react'
 
 export default function AdminDashboard() {
@@ -45,6 +46,13 @@ export default function AdminDashboard() {
       description: 'Escolher o que aparece na barra lateral',
       icon: Eye,
       color: 'bg-slate-700'
+    },
+    {
+      href: '/admin/historico',
+      label: 'Histórico',
+      description: 'Consultar pedidos e cancelamentos por dia',
+      icon: History,
+      color: 'bg-red-600'
     }
   ]
 
@@ -52,7 +60,7 @@ export default function AdminDashboard() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Painel Administrativo</h1>
       
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {adminLinks.map((link) => {
           const Icon = link.icon
           return (

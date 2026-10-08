@@ -13,6 +13,13 @@ import { connectTableSocket } from '@/app/lib/table-socket'
 import { apiFetch } from '@/app/lib/api'
 import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
+const CUSTOM_CANCELLATION_REASON = '__CUSTOM__'
+const CANCELLATION_REASONS = [
+  'Erro de lançamento',
+  'Desistência',
+  'Falta do produto'
+] as const
+
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const unwrappedParams = use(params)
@@ -82,7 +89,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [isTransferringItems, setIsTransferringItems] = useState(false)
   const [showCancelItemsModal, setShowCancelItemsModal] = useState(false)
   const [selectedCancelItemIds, setSelectedCancelItemIds] = useState<number[]>([])
-  const [cancellationReason, setCancellationReason] = useState('')
+  const [selectedCancellationReason, setSelectedCancellationReason] = useState('')
+  const [customCancellationReason, setCustomCancellationReason] = useState('')
   const [isCancellingItems, setIsCancellingItems] = useState(false)
 
   // Payment Modals
@@ -251,6 +259,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const canRegisterPayment = userPermissions.includes('pagamentos.abrir') && userPermissions.includes('pagamentos.registrar')
   const canApplyDiscount = userPermissions.includes('pagamentos.desconto')
   const lancamentoBloqueado = caixaAberto !== true || tableStatus === 'FECHAMENTO' || !canCreateOrder
+  const cancellationReason = selectedCancellationReason === CUSTOM_CANCELLATION_REASON
+    ? customCancellationReason.trim()
+    : selectedCancellationReason
 
   useEffect(() => {
     if (paymentEntryHandled.current || !canRegisterPayment || !tableStatus) return
@@ -342,7 +353,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       showToast(`${selectedCancelItemIds.length} lançamento(s) cancelado(s) e devolvido(s) ao estoque.`, 'success')
       setShowCancelItemsModal(false)
       setSelectedCancelItemIds([])
-      setCancellationReason('')
+      setSelectedCancellationReason('')
+      setCustomCancellationReason('')
       await fetchTableData()
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao cancelar itens', 'error')
@@ -586,7 +598,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                       type="button"
                       onClick={() => {
                         setSelectedCancelItemIds([])
-                        setCancellationReason('')
+                        setSelectedCancellationReason('')
+                        setCustomCancellationReason('')
                         setShowCancelItemsModal(true)
                       }}
                       title="Cancelar itens da comanda"
@@ -952,20 +965,40 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
                 <div className="mt-5">
                   <label htmlFor="cancellation-reason" className="mb-1.5 block text-sm font-semibold text-slate-900">Motivo do cancelamento</label>
-                  <textarea
+                  <select
                     id="cancellation-reason"
-                    value={cancellationReason}
-                    onChange={event => setCancellationReason(event.target.value.slice(0, 500))}
-                    placeholder="Ex.: cliente desistiu do item"
-                    rows={3}
-                    maxLength={500}
+                    value={selectedCancellationReason}
+                    onChange={event => {
+                      setSelectedCancellationReason(event.target.value)
+                      if (event.target.value !== CUSTOM_CANCELLATION_REASON) setCustomCancellationReason('')
+                    }}
                     autoFocus
-                    className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
-                  />
-                  <div className="mt-1 flex justify-between gap-3 text-xs">
-                    <span className={cancellationReason.trim().length > 0 && cancellationReason.trim().length < 3 ? 'text-red-600' : 'text-slate-500'}>Obrigatório, mínimo de 3 caracteres.</span>
-                    <span className="text-slate-400">{cancellationReason.length}/500</span>
-                  </div>
+                    className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                  >
+                    <option value="">Selecione um motivo</option>
+                    {CANCELLATION_REASONS.map(reason => <option key={reason} value={reason}>{reason}</option>)}
+                    <option value={CUSTOM_CANCELLATION_REASON}>Adicionar mais motivos...</option>
+                  </select>
+
+                  {selectedCancellationReason === CUSTOM_CANCELLATION_REASON && (
+                    <div className="mt-3">
+                      <label htmlFor="custom-cancellation-reason" className="mb-1.5 block text-sm font-semibold text-slate-900">Novo motivo</label>
+                      <textarea
+                        id="custom-cancellation-reason"
+                        value={customCancellationReason}
+                        onChange={event => setCustomCancellationReason(event.target.value.slice(0, 500))}
+                        placeholder="Informe o motivo do cancelamento"
+                        rows={3}
+                        maxLength={500}
+                        autoFocus
+                        className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                      />
+                      <div className="mt-1 flex justify-between gap-3 text-xs">
+                        <span className={customCancellationReason.trim().length > 0 && customCancellationReason.trim().length < 3 ? 'text-red-600' : 'text-slate-500'}>Obrigatório, mínimo de 3 caracteres.</span>
+                        <span className="text-slate-400">{customCancellationReason.length}/500</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

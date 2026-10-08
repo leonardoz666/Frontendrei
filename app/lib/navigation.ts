@@ -44,6 +44,8 @@ export type NavPermission =
   | 'relatorios.faturamento'
   | 'relatorios.caixa'
   | 'relatorios.exportar'
+  | 'relatorios.importar'
+  | 'relatorios.excluir'
   | 'usuarios.visualizar'
   | 'usuarios.criar'
   | 'usuarios.editar'
