@@ -248,11 +248,17 @@ export function PaymentModal({ isOpen, onClose, mesaId, mesaNumero, onSuccess, c
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100">
-                    {summaryLoading && <p role="status" className="mx-auto w-full max-w-7xl px-4 py-5 text-gray-600 sm:px-6 lg:px-8">Consultando saldo...</p>}
+                    {summaryLoading && <span role="status" className="sr-only">Consultando dados do recebimento</span>}
                     {summaryError && (
                         <div role="alert" className="mx-auto w-full max-w-7xl px-4 py-5 text-red-700 sm:px-6 lg:px-8">
                             <p>{summaryError}</p>
                             <button onClick={() => void loadSummary()} className="mt-2 underline">Tentar novamente</button>
+                        </div>
+                    )}
+                    {!summaryLoading && summary && summary.totalFinal <= 0 && (
+                        <div role="alert" className="mx-auto w-full max-w-7xl border-l-4 border-amber-500 bg-amber-50 px-4 py-4 text-amber-900 sm:px-6 lg:px-8">
+                            <p className="font-bold">Conta sem valor para receber</p>
+                            <p className="mt-1 text-sm">Os itens desta comanda foram lançados com preço R$ 0,00. Configure os preços dos produtos e relance os itens antes de fechar a conta.</p>
                         </div>
                     )}
                     <fieldset disabled={processing || summaryLoading || !summary} className="mx-auto min-h-full w-full max-w-7xl bg-white shadow-sm">
