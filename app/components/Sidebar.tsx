@@ -51,13 +51,11 @@ import {
   buildSidebarVisualSections,
   findActiveNavItem,
   readStoredCollapsed,
-  readStoredGroupState,
   readStoredSidebarVisibility,
   SIDEBAR_VISIBILITY_EVENT,
   sidebarVisibilityStorageKey,
   visibleNavGroups,
   writeStoredCollapsed,
-  writeStoredGroupState,
   type NavIconName,
   type NavItem,
   type NavUser,
@@ -215,21 +213,13 @@ export default function Sidebar({
   )
   const activeSectionId = visualSectionForActive?.id
 
-  // Acordeão: preferências salvas (uma vez) + grupo da rota ativa sempre aberto.
-  useEffect(() => {
-    setOpenGroups(readStoredGroupState())
-  }, [])
-
   useEffect(() => {
     if (!activeSectionId || activeSectionRef.current === activeSectionId) return
     activeSectionRef.current = activeSectionId
     setOpenGroups(prev => {
-      // Sem preferência salva o grupo já abre pela regra padrão; se havia preferência,
-      // ela é descartada ao entrar na rota para o grupo ativo abrir automaticamente.
       if (!(activeSectionId in prev)) return prev
       const next = { ...prev }
       delete next[activeSectionId]
-      writeStoredGroupState(next)
       return next
     })
   }, [activeSectionId])
@@ -257,9 +247,7 @@ export default function Sidebar({
   const toggleGroup = (groupId: string) => {
     setOpenGroups(prev => {
       const isOpenNow = prev[groupId] ?? groupId === activeSectionId
-      const next = { ...prev, [groupId]: !isOpenNow }
-      writeStoredGroupState(next)
-      return next
+      return { ...prev, [groupId]: !isOpenNow }
     })
   }
 

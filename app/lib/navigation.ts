@@ -1,7 +1,6 @@
 import {
   persistUiPreferences,
   SIDEBAR_COLLAPSED_STORAGE_KEY,
-  SIDEBAR_GROUPS_STORAGE_KEY,
   SIDEBAR_VISIBILITY_EVENT,
   type SidebarVisibilityPreference,
   type UiPreferences,
@@ -511,7 +510,7 @@ export const ROUTE_SHORTCUTS: ReadonlyArray<{
   { key: 'F8', href: '/mesas', label: 'Mapa de Mesas', disabled: false },
 ]
 
-export { SIDEBAR_COLLAPSED_STORAGE_KEY, SIDEBAR_GROUPS_STORAGE_KEY, SIDEBAR_VISIBILITY_EVENT }
+export { SIDEBAR_COLLAPSED_STORAGE_KEY, SIDEBAR_VISIBILITY_EVENT }
 
 export type SidebarVisibilityState = SidebarVisibilityPreference
 
@@ -598,34 +597,6 @@ export function writeStoredCollapsed(collapsed: boolean): void {
     // localStorage indisponível (modo privado/quota): o estado só não é persistido.
   }
   persistUiPreferences({ sidebarCollapsed: collapsed })
-}
-
-/** Grupos abertos/fechados escolhidos pelo usuário (`id do grupo -> aberto?`). */
-export function readStoredGroupState(): Record<string, boolean> {
-  if (typeof window === 'undefined') return {}
-  try {
-    const raw = window.localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed: unknown = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    const state: Record<string, boolean> = {}
-    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof value === 'boolean') state[key] = value
-    }
-    return state
-  } catch {
-    return {}
-  }
-}
-
-export function writeStoredGroupState(state: Record<string, boolean>): void {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(SIDEBAR_GROUPS_STORAGE_KEY, JSON.stringify(state))
-  } catch {
-    // localStorage indisponível: o acordeão continua funcionando só em memória.
-  }
-  persistUiPreferences({ sidebarGroups: state })
 }
 
 /**

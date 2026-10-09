@@ -1,7 +1,7 @@
 import { apiFetch } from './api'
 
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = 'rei.sidebar.collapsed'
-export const SIDEBAR_GROUPS_STORAGE_KEY = 'rei.sidebar.groups'
+const LEGACY_SIDEBAR_GROUPS_STORAGE_KEY = 'rei.sidebar.groups'
 export const SIDEBAR_VISIBILITY_EVENT = 'rei:sidebar-visibility-change'
 export const UI_PREFERENCES_SYNC_EVENT = 'rei:ui-preferences-sync'
 const PAGE_SIZE_STORAGE_PREFIX = 'dsh:pageSize:'
@@ -17,7 +17,6 @@ export interface SidebarVisibilityPreference {
 export interface UiPreferences {
   sidebarVisibility?: SidebarVisibilityPreference
   sidebarCollapsed?: boolean
-  sidebarGroups?: Record<string, boolean>
   pageSizes?: Record<string, number>
 }
 
@@ -41,14 +40,13 @@ function collectLocalPreferences(userId: number | string): UiPreferences {
   if (typeof window === 'undefined') return {}
   const preferences: UiPreferences = {}
 
+  window.localStorage.removeItem(LEGACY_SIDEBAR_GROUPS_STORAGE_KEY)
+
   const visibility = parseObject(window.localStorage.getItem(visibilityStorageKey(userId)))
   if (visibility) preferences.sidebarVisibility = visibility as unknown as SidebarVisibilityPreference
 
   const collapsed = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)
   if (collapsed !== null) preferences.sidebarCollapsed = collapsed === '1'
-
-  const groups = parseObject(window.localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY))
-  if (groups) preferences.sidebarGroups = groups as Record<string, boolean>
 
   const pageSizes: Record<string, number> = {}
   for (let index = 0; index < window.localStorage.length; index += 1) {
@@ -78,11 +76,7 @@ function applyPreferencesLocally(userId: number | string, preferences: UiPrefere
     window.localStorage.removeItem(SIDEBAR_COLLAPSED_STORAGE_KEY)
   }
 
-  if (preferences.sidebarGroups) {
-    window.localStorage.setItem(SIDEBAR_GROUPS_STORAGE_KEY, JSON.stringify(preferences.sidebarGroups))
-  } else {
-    window.localStorage.removeItem(SIDEBAR_GROUPS_STORAGE_KEY)
-  }
+  window.localStorage.removeItem(LEGACY_SIDEBAR_GROUPS_STORAGE_KEY)
 
   const pageSizeKeys: string[] = []
   for (let index = 0; index < window.localStorage.length; index += 1) {
