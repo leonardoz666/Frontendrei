@@ -324,7 +324,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: '/admin/estoque/distribuicoes',
-        label: 'Distribuições',
+        label: 'Saídas e devoluções',
         icon: 'Truck',
         permission: 'estoque.movimentar',
       },
@@ -348,7 +348,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: '/admin/estoque/grupos',
-        label: 'Grupos',
+        label: 'Grupos e subgrupos',
         icon: 'Tags',
         permission: 'estoque.visualizar',
       },

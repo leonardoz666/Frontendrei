@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, ArrowDownToLine, ArrowRight, ClipboardList, ClipboardCheck, History, PackageSearch, RefreshCw, Tags } from 'lucide-react'
+import { AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/app/lib/api'
 
 type Meta = {
@@ -44,45 +44,6 @@ type RelatorioEstoque = {
   movimentos: number
   porTipo: Array<{ tipo: string; quantidadeMovimentos: number; quantidade: number; valor: number }>
 }
-
-const MODULOS = [
-  {
-    href: '/admin/estoque/grupos',
-    titulo: 'Grupos e subgrupos',
-    descricao: 'Classificação dos insumos.',
-    icon: Tags,
-  },
-  {
-    href: '/admin/estoque/insumos',
-    titulo: 'Insumos',
-    descricao: 'Cadastro, mínimos, máximos e custo médio.',
-    icon: PackageSearch,
-  },
-  {
-    href: '/admin/estoque/distribuicoes',
-    titulo: 'Saídas e devoluções',
-    descricao: 'Envios para cozinha e unidades, com retorno ao estoque.',
-    icon: ArrowDownToLine,
-  },
-  {
-    href: '/admin/estoque/movimentacoes',
-    titulo: 'Movimentações',
-    descricao: 'Entradas, saídas, perdas e inventário.',
-    icon: History,
-  },
-  {
-    href: '/admin/estoque/inventario',
-    titulo: 'Inventário',
-    descricao: 'Contagem e ajuste pela diferença encontrada.',
-    icon: ClipboardCheck,
-  },
-  {
-    href: '/admin/estoque/ficha-tecnica',
-    titulo: 'Ficha técnica',
-    descricao: 'Consumo automático por produto vendido.',
-    icon: ClipboardList,
-  },
-]
 
 function quantidade(valor: unknown, unidade?: string): string {
   const numero = typeof valor === 'number' ? valor : Number(String(valor ?? 0).replace(',', '.'))
@@ -194,25 +155,6 @@ export default function EstoquePage() {
           </div>
         </section>
       )}
-
-      <section className="mb-4 grid gap-4 md:grid-cols-2">
-        {MODULOS.map((modulo) => {
-          const Icon = modulo.icon
-          return (
-            <Link
-              key={modulo.href}
-              href={modulo.href}
-              className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-orange-300 hover:bg-orange-50/40"
-            >
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-700">
-                <Icon className="h-5 w-5" />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900">{modulo.titulo}</h2>
-              <p className="mt-1 text-sm text-gray-600">{modulo.descricao}</p>
-            </Link>
-          )
-        })}
-      </section>
 
       <section className="rounded-lg border border-gray-200 bg-white">
         <div className="border-b border-gray-200 px-4 py-3">
