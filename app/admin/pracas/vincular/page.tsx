@@ -5,8 +5,8 @@ import { ArrowLeft, ArrowRight, Check, Info, Search } from 'lucide-react'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
-import { toPaginated, usePagedQuery } from '@/app/lib/pagination'
-import { apiFetch } from '@/app/lib/api'
+import { usePagedQuery } from '@/app/lib/pagination'
+import { apiFetch, fetchAllList } from '@/app/lib/api'
 import { useCrud } from '@/app/lib/crud-client'
 import { useToast } from '@/contexts/ToastContext'
 
@@ -97,26 +97,6 @@ function alvoDoVinculo(vinculo: Vinculo): string {
   return 'Praça inteira'
 }
 
-async function carregarTodasPaginas<T>(resource: string): Promise<T[]> {
-  const pageSize = 100
-  const primeira = toPaginated<T>(
-    await apiFetch<unknown>(`${resource}?page=1&pageSize=${pageSize}`),
-    { page: 1, pageSize }
-  )
-  const todas = [...primeira.data]
-  const totalPages = primeira.meta.totalPages || 1
-
-  for (let page = 2; page <= totalPages; page += 1) {
-    const pagina = toPaginated<T>(
-      await apiFetch<unknown>(`${resource}?page=${page}&pageSize=${pageSize}`),
-      { page, pageSize }
-    )
-    todas.push(...pagina.data)
-  }
-
-  return todas
-}
-
 export default function VincularImpressaoPage() {
   const { showToast } = useToast()
   const crud = useCrud<Vinculo>({
@@ -167,8 +147,8 @@ export default function VincularImpressaoPage() {
     void (async () => {
       try {
         const [listaProdutos, listaCategorias] = await Promise.all([
-          carregarTodasPaginas<Produto>('/products'),
-          carregarTodasPaginas<Categoria>('/categories'),
+          fetchAllList<Produto>('/products'),
+          fetchAllList<Categoria>('/categories'),
         ])
         if (cancelado) return
         setProdutos(listaProdutos)

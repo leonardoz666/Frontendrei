@@ -377,22 +377,21 @@ export default function MesasPage() {
         )}
 
         {/* O mapa exibe apenas mesas abertas; mesas livres não aparecem como cartões. */}
-        {mesas.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
-            <p className="text-lg font-semibold text-gray-700">Nenhuma mesa aberta</p>
-            <p className="mt-1 text-sm text-gray-500">As mesas aparecerão aqui quando um atendimento for iniciado.</p>
-          </div>
-        ) : (
-          <div className="mx-auto grid max-w-[1111px] grid-cols-[repeat(auto-fit,minmax(136px,145px))] justify-center gap-4">
-            {mesas.map((mesa) => (
-              <TableCard
-                key={mesa.id}
-                mesa={mesa}
-                onClick={handleTableClick}
-              />
-            ))}
-          </div>
-        )}
+        <div className="rounded-lg bg-white p-8 text-center shadow-sm">
+          {mesas.length === 0 ? (
+            <p className="text-gray-500">Nenhuma mesa aberta no momento.</p>
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(136px,145px))] justify-start gap-4">
+              {mesas.map((mesa) => (
+                <TableCard
+                  key={mesa.id}
+                  mesa={mesa}
+                  onClick={handleTableClick}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Add Modal */}

@@ -340,11 +340,13 @@ export default function Sidebar({
         ${isCollapsed ? 'md:w-[88px]' : 'md:w-72'}
         md:translate-x-0
       `}>
+        {(!visibility.hideBrand || !visibility.hideSearch || !visibility.hideShortcuts) && (
         <div
           className={`px-4 pt-[18px] pb-0 ${
-            isCollapsed ? 'md:px-4' : ''
+            isCollapsed ? `md:px-4 ${visibility.hideBrand ? 'md:hidden' : ''}` : ''
           }`}
         >
+          {!visibility.hideBrand && (
           <div className={`flex h-[54px] items-center gap-3 ${isCollapsed ? 'md:justify-center' : ''}`}>
             <div className={`flex min-w-0 items-center gap-3 ${isCollapsed ? 'md:justify-center' : ''}`}>
               <div className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-[#f4510b] text-[22px] font-bold text-white ${isCollapsed ? 'md:h-14 md:w-14 md:rounded-[14px] md:text-2xl' : ''}`}>
@@ -369,8 +371,10 @@ export default function Sidebar({
               {isCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
             </button>
           </div>
+          )}
 
-          <div className={`mt-3 ${isWaiter ? 'hidden' : isCollapsed ? 'md:hidden' : ''}`}>
+          {!visibility.hideSearch && (
+          <div className={`${visibility.hideBrand ? '' : 'mt-3'} ${isWaiter ? 'hidden' : isCollapsed ? 'md:hidden' : ''}`}>
             <label className="flex h-10 items-center gap-2 rounded-[10px] border border-slate-200 bg-slate-50 px-3 focus-within:border-orange-300 focus-within:ring-4 focus-within:ring-orange-100">
               <span className="shrink-0 text-[15px] font-semibold text-slate-400">/</span>
               <input
@@ -385,8 +389,10 @@ export default function Sidebar({
               </span>
             </label>
           </div>
+          )}
 
-          <div className={`mt-3 ${isWaiter ? 'flex flex-col gap-1.5' : 'flex gap-1 rounded-lg bg-slate-100 p-1'} ${isCollapsed ? 'md:hidden' : ''}`}>
+          {!visibility.hideShortcuts && (
+          <div className={`${visibility.hideBrand && visibility.hideSearch ? '' : 'mt-3'} ${isWaiter ? 'flex flex-col gap-1.5' : 'flex gap-1 rounded-lg bg-slate-100 p-1'} ${isCollapsed ? 'md:hidden' : ''}`}>
             {quickShortcuts.map(shortcut => {
               const activeShortcut = pathname === shortcut.href
               return (
@@ -405,8 +411,10 @@ export default function Sidebar({
               )
             })}
           </div>
+          )}
           <div className="mt-4 h-px bg-slate-200" />
         </div>
+        )}
 
         <nav className={`flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] ${isCollapsed ? 'md:px-4' : ''}`}>
           {filteredGroups.length === 0 && (
@@ -481,14 +489,27 @@ export default function Sidebar({
               </div>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-              title="Sair"
-              aria-label="Sair"
-            >
-              <LogOut size={18} />
-            </button>
+            <div className={`flex shrink-0 items-center gap-1 ${isCollapsed ? 'md:flex-col' : ''}`}>
+              {visibility.hideBrand && (
+                <button
+                  type="button"
+                  onClick={handleToggleCollapse}
+                  aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+                  title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+                  className="hidden rounded-xl p-2 text-slate-400 transition-colors hover:bg-orange-50 hover:text-orange-700 md:flex"
+                >
+                  {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                </button>
+              )}
+              <button
+                onClick={handleLogout}
+                className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                title="Sair"
+                aria-label="Sair"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
           </div>
         </div>
 

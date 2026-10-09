@@ -92,6 +92,17 @@ export default function HistoricoPedidosPage() {
   const [senhaExclusao, setSenhaExclusao] = useState('')
   const importInputRef = useRef<HTMLInputElement>(null)
 
+  const atalhosDeData = useMemo(() => Array.from({ length: 7 }, (_, index) => {
+    const data = new Date(seteDiasAtras)
+    data.setDate(data.getDate() + index)
+    const value = dataInput(data)
+    return {
+      value,
+      label: `${value.slice(8, 10)}/${value.slice(5, 7)}`,
+      title: data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }),
+    }
+  }), [seteDiasAtras])
+
   const parametros = useCallback((page: number, pageSize: number) => new URLSearchParams({
     inicio: inicioDoDia(inicio),
     fim: fimDoDia(fim),
@@ -136,6 +147,12 @@ export default function HistoricoPedidosPage() {
 
   const alterarFiltro = (novoTipo: typeof tipo) => {
     setTipo(novoTipo)
+    setPagina(1)
+  }
+
+  const selecionarData = (data: string) => {
+    setInicio(data)
+    setFim(data)
     setPagina(1)
   }
 
@@ -266,6 +283,34 @@ export default function HistoricoPedidosPage() {
             ))}
           </div>
         </section>
+
+        <nav aria-label="Atalhos dos últimos sete dias" className="flex flex-col gap-2 border-b border-slate-200 py-3 sm:flex-row sm:items-center">
+          <span className="shrink-0 text-xs font-bold text-slate-600">Últimos 7 dias</span>
+          <div className="overflow-x-auto pb-1 sm:flex-1 sm:pb-0">
+            <div className="grid min-w-[510px] grid-cols-7 gap-2">
+              {atalhosDeData.map(data => {
+                const selecionada = inicio === data.value && fim === data.value
+                return (
+                  <button
+                    key={data.value}
+                    type="button"
+                    title={data.title}
+                    aria-pressed={selecionada}
+                    disabled={carregando}
+                    onClick={() => selecionarData(data.value)}
+                    className={`h-9 rounded-md border px-2 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${
+                      selecionada
+                        ? 'border-orange-600 bg-orange-600 text-white'
+                        : 'border-slate-300 bg-white text-slate-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700'
+                    }`}
+                  >
+                    {data.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </nav>
 
         {resultado && (
           <section aria-label="Resumo do período" className="grid grid-cols-2 border-b border-slate-200 py-4 sm:w-fit sm:min-w-[360px]">

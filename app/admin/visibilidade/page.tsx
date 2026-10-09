@@ -11,6 +11,7 @@ import {
   type NavUser,
   type SidebarVisibilityState,
 } from '@/app/lib/navigation'
+import { initializeUiPreferences } from '@/app/lib/uiPreferences'
 
 function VisibilitySwitch({
   checked,
@@ -44,6 +45,9 @@ export default function SidebarVisibilityPage() {
   const [user, setUser] = useState<NavUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [visibility, setVisibility] = useState<SidebarVisibilityState>({
+    hideBrand: false,
+    hideSearch: false,
+    hideShortcuts: false,
     hiddenSectionIds: [],
     hiddenItemHrefs: [],
   })
@@ -52,10 +56,14 @@ export default function SidebarVisibilityPage() {
   useEffect(() => {
     let cancelled = false
     apiFetch<{ user?: NavUser }>('/auth/me')
-      .then(data => {
+      .then(async data => {
         if (cancelled || !data.user) return
+        const preferences = data.user.id === undefined
+          ? data.user.uiPreferences ?? {}
+          : await initializeUiPreferences(data.user.id, data.user.uiPreferences)
+        if (cancelled) return
         setUser(data.user)
-        setVisibility(readStoredSidebarVisibility(data.user))
+        setVisibility(preferences.sidebarVisibility ?? readStoredSidebarVisibility(data.user))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -89,7 +97,13 @@ export default function SidebarVisibilityPage() {
     persist({ ...visibility, hiddenItemHrefs: [...hidden] })
   }
 
-  const resetVisibility = () => persist({ hiddenSectionIds: [], hiddenItemHrefs: [] })
+  const resetVisibility = () => persist({
+    hideBrand: false,
+    hideSearch: false,
+    hideShortcuts: false,
+    hiddenSectionIds: [],
+    hiddenItemHrefs: [],
+  })
 
   const toggleExpanded = (sectionId: string) => {
     setExpandedSections(current => {
@@ -108,7 +122,11 @@ export default function SidebarVisibilityPage() {
     )
   }
 
-  const hiddenCount = visibility.hiddenSectionIds.length + visibility.hiddenItemHrefs.length
+  const hiddenCount = Number(visibility.hideBrand)
+    + Number(visibility.hideSearch)
+    + Number(visibility.hideShortcuts)
+    + visibility.hiddenSectionIds.length
+    + visibility.hiddenItemHrefs.length
 
   const renderSection = (section: (typeof sections)[number]) => {
     const sectionVisible = !visibility.hiddenSectionIds.includes(section.id)
@@ -203,6 +221,38 @@ export default function SidebarVisibilityPage() {
           {hiddenCount > 0 ? <EyeOff size={17} /> : <Eye size={17} />}
           {hiddenCount === 0 ? 'Todos os itens disponíveis estão visíveis.' : `${hiddenCount} item(ns) oculto(s).`}
         </div>
+
+        <section className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          {[
+            {
+              key: 'hideBrand' as const,
+              title: 'Marca do restaurante',
+              description: 'Logo, nome do restaurante e identificação da operação.',
+            },
+            {
+              key: 'hideSearch' as const,
+              title: 'Campo de busca',
+              description: 'Busca rápida por módulos e ações do sistema.',
+            },
+            {
+              key: 'hideShortcuts' as const,
+              title: 'Atalhos rápidos',
+              description: 'Botões Início, Mapa de Mesas e Painel.',
+            },
+          ].map(option => (
+            <div key={option.key} className="flex min-h-20 items-center justify-between gap-4 border-t border-slate-100 px-5 py-4 first:border-t-0">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900">{option.title}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{option.description}</p>
+              </div>
+              <VisibilitySwitch
+                checked={!visibility[option.key]}
+                label={`${visibility[option.key] ? 'Exibir' : 'Ocultar'} ${option.title.toLowerCase()}`}
+                onChange={() => persist({ ...visibility, [option.key]: !visibility[option.key] })}
+              />
+            </div>
+          ))}
+        </section>
 
         <div className="space-y-4 lg:hidden">
           {sections.map(renderSection)}

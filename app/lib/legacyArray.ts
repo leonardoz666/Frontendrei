@@ -2,11 +2,9 @@
  * Ponte de compatibilidade entre o contrato de lista ANTIGO (array puro) e o
  * contrato paginado NOVO do PRD seção 3.2 (`{ data: [...], meta: {...} }`).
  *
- * Motivo: as rotas `GET /api/categories` e `GET /api/products` estão migrando
- * para o contrato paginado, mas telas de produção ainda fazem `.map()` sobre a
- * resposta assumindo array puro. `unwrapList` aceita os dois formatos e devolve
- * sempre um array, então a troca de contrato no backend não derruba nenhuma tela
- * e as telas podem ser migradas uma a uma.
+ * Algumas rotas auxiliares ainda estão migrando para o contrato paginado.
+ * `unwrapList` aceita os dois formatos e devolve sempre um array durante essa
+ * transição. Produtos e categorias já usam paginação explícita.
  *
  * Formatos aceitos:
  *   - `T[]`            -> devolve o próprio array

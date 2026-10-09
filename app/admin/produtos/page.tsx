@@ -9,7 +9,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { useToast } from '@/contexts/ToastContext'
 import Skeleton from '@/components/ui/Skeleton'
 import { ProductCard, Produto, Categoria } from '@/components/ProductCard'
-import { apiFetch, apiRequest, ApiError, fetchList } from '@/app/lib/api'
+import { apiFetch, apiRequest, ApiError, fetchAllList, fetchList } from '@/app/lib/api'
 import { usePagedQuery, type SortOrder } from '@/app/lib/pagination'
 import { correctProductSectors, fetchAllProducts } from '@/app/lib/product-catalog'
 import { buildProductFormData } from '@/app/lib/product-form'
@@ -83,7 +83,7 @@ export default function ProdutosPage() {
     queryFn: async () => {
       // Lista completa de categorias: alimenta os selects do formulário e a
       // importação, então precisa de TODAS, não de uma página.
-      return fetchList<Categoria>('/categories?page=1&pageSize=100')
+      return fetchAllList<Categoria>('/categories?sort=nome&order=asc')
     }
   })
 

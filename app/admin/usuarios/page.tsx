@@ -412,32 +412,41 @@ export default function AdminUsersPage() {
           <div className="grid grid-cols-3 rounded-lg bg-slate-200 p-1">{(['TODOS', 'ATIVOS', 'INATIVOS'] as const).map(filter => <button key={filter} type="button" onClick={() => setStatusFilter(filter)} className={`h-8 rounded-md px-3 text-xs font-semibold ${statusFilter === filter ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{filter === 'TODOS' ? 'Todos' : filter === 'ATIVOS' ? 'Ativos' : 'Inativos'}</button>)}</div>
         </div>
 
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="hidden grid-cols-[minmax(240px,1fr)_160px_120px_110px_80px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-bold text-slate-500 lg:grid"><span>Usuário</span><span>Perfil</span><span>Operador</span><span>Status</span><span className="text-right">Ações</span></div>
-          <div className="divide-y divide-slate-200">
-            {filteredUsers.map(user => (
-              <div key={user.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50 lg:grid-cols-[minmax(240px,1fr)_160px_120px_110px_80px] lg:gap-4 lg:px-5">
-                <div className="col-span-2 flex min-w-0 items-center gap-3 lg:col-span-1">
-                  {user.foto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={user.foto} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-                  ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 font-bold text-orange-700">{user.nome.charAt(0).toUpperCase()}</div>
-                  )}
-                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-950">{user.nome}</p><p className="truncate text-xs text-slate-500">@{user.login}{user.email ? ` · ${user.email}` : ''}</p></div>
-                </div>
-                <div className="hidden lg:block"><span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">{ROLE_LABELS[user.role] ?? user.role}</span></div>
-                <p className="hidden text-sm text-slate-600 lg:block">{user.codOperador ?? 'Automático'}</p>
-                <div className="hidden lg:block"><span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${user.ativo ? 'text-emerald-700' : 'text-red-700'}`}><span className={`h-2 w-2 rounded-full ${user.ativo ? 'bg-emerald-500' : 'bg-red-500'}`} />{user.ativo ? 'Ativo' : 'Inativo'}</span></div>
-                <div className="col-start-3 row-start-1 flex justify-end gap-1 lg:col-auto lg:row-auto">
-                  {canEditUsers && canManage(user) && <Button variant="ghost" size="icon" title="Editar usuário" className="h-9 w-9" onClick={() => handleEdit(user)}><Edit size={17} /></Button>}
-                  {canDeleteUsers && canManage(user) && user.id !== actor?.id && <Button variant="ghost" size="icon" title="Desativar usuário" className="h-9 w-9 text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(user)}><Trash2 size={17} /></Button>}
-                </div>
-                <div className="col-span-3 flex flex-wrap gap-2 pl-[52px] lg:hidden"><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{ROLE_LABELS[user.role] ?? user.role}</span><span className={`rounded-md px-2 py-1 text-xs font-semibold ${user.ativo ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{user.ativo ? 'Ativo' : 'Inativo'}</span><span className="px-2 py-1 text-xs text-slate-500">Operador {user.codOperador ?? 'automático'}</span></div>
-              </div>
-            ))}
-            {filteredUsers.length === 0 && <div className="px-6 py-14 text-center"><UserRound size={28} className="mx-auto mb-3 text-slate-300" /><p className="font-semibold text-slate-700">Nenhum usuário encontrado</p><p className="mt-1 text-sm text-slate-500">Altere a busca ou o filtro de status.</p></div>}
-          </div>
+        <section aria-label="Lista de usuários">
+          {filteredUsers.length > 0 ? (
+            <div className="flex flex-wrap items-start gap-2">
+              {filteredUsers.map(user => (
+                <article key={user.id} className="relative w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 sm:w-[250px]">
+                  <div className="flex min-w-0 items-center gap-2.5 pr-16">
+                    {user.foto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={user.foto} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{user.nome.charAt(0).toUpperCase()}</div>
+                    )}
+                    <div className="min-w-0">
+                      <h2 className="truncate text-sm font-bold text-slate-950">{user.nome}</h2>
+                      <p className="truncate text-xs text-slate-500">@{user.login}{user.email ? ` · ${user.email}` : ''}</p>
+                    </div>
+                  </div>
+
+                  <dl className="mt-2 flex min-w-0 items-center gap-2 border-t border-slate-100 pt-2 text-xs">
+                    <div className="min-w-0"><dt className="sr-only">Perfil</dt><dd className="truncate font-semibold text-slate-700">{ROLE_LABELS[user.role] ?? user.role}</dd></div>
+                    <span aria-hidden="true" className="text-slate-300">·</span>
+                    <div className="min-w-0"><dt className="sr-only">Operador</dt><dd className="truncate text-slate-500">Op. {user.codOperador ?? 'automático'}</dd></div>
+                    <div className="ml-auto shrink-0"><dt className="sr-only">Status</dt><dd className={`inline-flex items-center gap-1 font-semibold ${user.ativo ? 'text-emerald-700' : 'text-red-700'}`}><span className={`h-1.5 w-1.5 rounded-full ${user.ativo ? 'bg-emerald-500' : 'bg-red-500'}`} />{user.ativo ? 'Ativo' : 'Inativo'}</dd></div>
+                  </dl>
+
+                  <div className="absolute right-2 top-2 flex items-center">
+                    {canEditUsers && canManage(user) && <Button variant="ghost" size="icon" title="Editar usuário" className="h-8 w-8" onClick={() => handleEdit(user)}><Edit size={15} /></Button>}
+                    {canDeleteUsers && canManage(user) && user.id !== actor?.id && <Button variant="ghost" size="icon" title="Desativar usuário" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(user)}><Trash2 size={15} /></Button>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white px-6 py-14 text-center"><UserRound size={28} className="mx-auto mb-3 text-slate-300" /><p className="font-semibold text-slate-700">Nenhum usuário encontrado</p><p className="mt-1 text-sm text-slate-500">Altere a busca ou o filtro de status.</p></div>
+          )}
         </section>
 
         <ConfirmationModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Desativar usuário?" description={`O usuário ${deleteTarget?.nome ?? ''} não conseguirá mais fazer login, mas o histórico será preservado.`} confirmText="Desativar" variant="danger" />

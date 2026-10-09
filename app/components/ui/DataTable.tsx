@@ -14,6 +14,7 @@ import { twMerge } from 'tailwind-merge'
 import { Pagination } from './Pagination'
 import Skeleton from './Skeleton'
 import { Button } from './Button'
+import { persistUiPreferences, UI_PREFERENCES_SYNC_EVENT } from '../../lib/uiPreferences'
 import {
   PAGE_SIZE_OPTIONS,
   SEARCH_DEBOUNCE_MS,
@@ -184,6 +185,18 @@ export function DataTable<T>({
     }
   }, [mounted, pageSizeInitialized, storageKey, meta, onPageSizeChange])
 
+  useEffect(() => {
+    if (!storageKey) return
+    const syncPageSize = () => {
+      const stored = readStoredPageSize(storageKey)
+      if (stored !== null && stored !== normalizeMetaPageSize(meta)) {
+        onPageSizeChange?.(stored)
+      }
+    }
+    window.addEventListener(UI_PREFERENCES_SYNC_EVENT, syncPageSize)
+    return () => window.removeEventListener(UI_PREFERENCES_SYNC_EVENT, syncPageSize)
+  }, [storageKey, meta, onPageSizeChange])
+
   const allIds = useMemo(() => data.map(getRowId), [data, getRowId])
   const allSelected = selectable && allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
   const someSelected = selectable && selectedIds.length > 0 && !allSelected
@@ -226,6 +239,7 @@ export function DataTable<T>({
       } catch {
         // Persistência é conveniência: falhar aqui não pode quebrar a lista.
       }
+      persistUiPreferences({ pageSizes: { [storageKey]: value } })
     }
     onPageSizeChange?.(value)
   }

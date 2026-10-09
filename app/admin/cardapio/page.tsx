@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowLeft, ArrowUp, PackagePlus, Puzzle, RefreshCw, Save, Utensils } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { apiFetch, fetchList } from '@/app/lib/api'
+import { apiFetch, fetchAllList, fetchList } from '@/app/lib/api'
 import { useToast } from '@/contexts/ToastContext'
 import type { Categoria, Produto } from '@/types'
 
@@ -112,7 +112,7 @@ export default function OrganizarCardapioPage() {
     setLoading(true)
     try {
       const [listaCategorias, listaGrupos] = await Promise.all([
-        fetchList<Categoria>('/categories'),
+        fetchAllList<Categoria>('/categories?ativo=true&sort=ordem&order=asc'),
         fetchList<ComplementoGrupo>('/complementos/grupos?page=1&pageSize=100&ativo=true&sort=ordem&order=asc')
       ])
 

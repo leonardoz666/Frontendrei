@@ -6,7 +6,7 @@ import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
 import { ExportMenu } from '@/app/components/ui/ExportMenu'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
-import { fetchList } from '@/app/lib/api'
+import { fetchAllList, fetchList } from '@/app/lib/api'
 import { usePagedQuery } from '@/app/lib/pagination'
 import { comoDecimalDigitado, comoNumero, paginaAtual, useCrud, useListaCrud } from '@/app/lib/crud-client'
 import { useToast } from '@/contexts/ToastContext'
@@ -67,7 +67,7 @@ export default function FichaTecnicaPage() {
 
   const { data: produtos = [] } = useQuery({
     queryKey: ['ficha-produtos-select'],
-    queryFn: () => fetchList<Produto>('/products?page=1&pageSize=100&ativo=true'),
+    queryFn: () => fetchAllList<Produto>('/products?ativo=true&sort=nome&order=asc'),
   })
   const { data: insumos = [] } = useQuery({
     queryKey: ['ficha-insumos-select'],

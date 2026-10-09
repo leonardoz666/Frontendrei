@@ -238,5 +238,29 @@ export async function fetchList<T>(path: string, options: ApiRequestOptions = {}
   return unwrapList<T>(await apiFetch<unknown>(path, options))
 }
 
+/** Busca todas as páginas de uma lista que precisa alimentar um seletor ou catálogo. */
+export async function fetchAllList<T>(path: string, options: ApiRequestOptions = {}): Promise<T[]> {
+  const url = new URL(path, 'http://local')
+  url.searchParams.delete('page')
+  url.searchParams.set('pageSize', '100')
+
+  const all: T[] = []
+  for (let page = 1; page <= 100; page += 1) {
+    url.searchParams.set('page', String(page))
+    const payload = await apiFetch<unknown>(`${url.pathname}${url.search}`, options)
+    if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new Error('Resposta paginada inválida')
+    }
+    const { data, meta } = payload as { data?: unknown; meta?: { total?: unknown; totalPages?: unknown } }
+    if (!Array.isArray(data) || !Number.isInteger(meta?.total) || !Number.isInteger(meta?.totalPages)) {
+      throw new Error('Resposta paginada inválida')
+    }
+    all.push(...data as T[])
+    if (page >= Number(meta?.totalPages)) return all
+  }
+
+  throw new Error('A listagem excedeu o limite de 10.000 itens')
+}
+
 export { unwrapList }
 export { hasPaginationMeta } from './legacyArray'

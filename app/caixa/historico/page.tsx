@@ -1,18 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Eye, History, Printer, RotateCcw, Settings2, X } from 'lucide-react'
+import { Eye, History, Printer, RotateCcw, Settings2, Trash2, X } from 'lucide-react'
 import { apiFetch } from '@/app/lib/api'
 import { buildPrintHtml } from '@/app/lib/export'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { ExportMenu } from '@/app/components/ui/ExportMenu'
 import { Button } from '@/app/components/ui/Button'
-import type { PageSize } from '@/app/lib/pagination'
+import { buildListQuery, usePagedQuery, type PageSize, type Paginated } from '@/app/lib/pagination'
 import { useToast } from '@/contexts/ToastContext'
 
 type Movimento = { id: number; tipo: string; valor: number; descricao: string | null; criadoEm: string }
-type Pagamento = { id: number; tipo: string; valor: number; status: string; criadoEm: string; motivoEstorno: string | null }
+type Pagamento = { id: number; tipo: string; valor: number; status: string; criadoEm: string; motivoEstorno: string | null; mesa: number | null }
 type CaixaResumo = {
   caixa: {
     id: number
@@ -47,8 +47,6 @@ const nomeForma = (valor: string) => valor.replaceAll('_', ' ').toLowerCase().re
 
 export default function HistoricoCaixaPage() {
   const { showToast } = useToast()
-  const [caixas, setCaixas] = useState<CaixaResumo[]>([])
-  const [loading, setLoading] = useState(true)
   const [desde, setDesde] = useState(() => {
     const data = new Date()
     data.setDate(data.getDate() - 30)
@@ -64,35 +62,55 @@ export default function HistoricoCaixaPage() {
   const [motivoEstorno, setMotivoEstorno] = useState('')
   const [ajusteValor, setAjusteValor] = useState('')
   const [ajusteMotivo, setAjusteMotivo] = useState('')
+  const [ajusteExclusao, setAjusteExclusao] = useState<Movimento | null>(null)
   const [salvando, setSalvando] = useState(false)
 
+  const historicoQuery = usePagedQuery<CaixaResumo>({
+    resource: `/caixa/historico?desde=${encodeURIComponent(desde)}`,
+    page,
+    pageSize,
+    search: busca,
+  })
+  const caixas = historicoQuery.data?.data ?? []
+  const meta = historicoQuery.data?.meta ?? { page, pageSize, total: 0, totalPages: 0 }
+  const refetchHistorico = historicoQuery.refetch
+
   const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [historico, me] = await Promise.all([
-        apiFetch<{ data: CaixaResumo[] }>(`/caixa/historico?desde=${desde}`),
-        apiFetch<{ user?: { permissions?: string[] } }>('/auth/me'),
-      ])
-      setCaixas(historico.data)
-      setPermissions(me.user?.permissions ?? [])
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Erro ao carregar histórico', 'error')
-    } finally {
-      setLoading(false)
+    await refetchHistorico()
+  }, [refetchHistorico])
+
+  useEffect(() => {
+    let active = true
+    void apiFetch<{ user?: { permissions?: string[] } }>('/auth/me')
+      .then(me => { if (active) setPermissions(me.user?.permissions ?? []) })
+      .catch(error => {
+        if (active) showToast(error instanceof Error ? error.message : 'Erro ao carregar permissões', 'error')
+      })
+    return () => { active = false }
+  }, [showToast])
+
+  const carregarLinhasExportacao = async () => {
+    const totalPages = Math.max(1, Math.ceil(meta.total / 100))
+    const todos: CaixaResumo[] = []
+    for (let exportPage = 1; exportPage <= totalPages; exportPage += 1) {
+      const query = buildListQuery({ page: exportPage, pageSize: 100, search: busca })
+      const resposta = await apiFetch<Paginated<CaixaResumo>>(
+        `/caixa/historico?desde=${encodeURIComponent(desde)}&${query.slice(1)}`
+      )
+      todos.push(...resposta.data)
     }
-  }, [desde, showToast])
-
-  useEffect(() => { void carregar() }, [carregar])
-
-  const filtrados = useMemo(() => {
-    const termo = busca.trim().toLocaleLowerCase('pt-BR')
-    if (!termo) return caixas
-    return caixas.filter(item => [item.caixa.id, item.caixa.status, item.usuarioAbertura, item.usuarioFechamento]
-      .some(valor => String(valor ?? '').toLocaleLowerCase('pt-BR').includes(termo)))
-  }, [busca, caixas])
-  const totalPages = Math.max(1, Math.ceil(filtrados.length / pageSize))
-  const paginaAtual = Math.min(page, totalPages)
-  const data = filtrados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize)
+    return todos.map(item => ({
+      caixa: item.caixa.id,
+      abertura: formatarData(item.caixa.abertoEm),
+      fechamento: formatarData(item.caixa.fechadoEm),
+      operador: item.usuarioFechamento ?? item.usuarioAbertura ?? '',
+      vendas: item.vendasTotal,
+      esperado: item.dinheiroEsperado,
+      contado: item.saldoInformado ?? '',
+      diferenca: item.diferenca ?? '',
+      status: item.caixa.status,
+    }))
+  }
 
   const abrirDetalhes = async (caixaId: number) => {
     setCarregandoDetalhes(true)
@@ -148,6 +166,23 @@ export default function HistoricoCaixaPage() {
     }
   }
 
+  const excluirAjuste = async () => {
+    if (!detalhes || !ajusteExclusao) return
+    setSalvando(true)
+    try {
+      await apiFetch(`/caixa/${detalhes.caixa.id}/ajustes/${ajusteExclusao.id}`, { method: 'DELETE' })
+      showToast('Ajuste excluído e valores recalculados', 'success')
+      const caixaId = detalhes.caixa.id
+      setAjusteExclusao(null)
+      await abrirDetalhes(caixaId)
+      await carregar()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Erro ao excluir ajuste', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
   const imprimir = (item: CaixaResumo) => {
     const linhas = [
       { descricao: 'Saldo inicial', valor: formatarMoeda(item.caixa.saldoInicial) },
@@ -196,17 +231,17 @@ export default function HistoricoCaixaPage() {
         <DataTable
           ariaLabel="Histórico de caixas"
           columns={columns}
-          data={data}
+          data={caixas}
           getRowId={item => item.caixa.id}
-          meta={{ page: paginaAtual, pageSize, total: filtrados.length, totalPages }}
-          loading={loading}
+          meta={meta}
+          loading={historicoQuery.isLoading || historicoQuery.isFetching}
           storageKey="caixa-historico"
           itemLabel="caixas"
           emptyMessage="Nenhum caixa encontrado no período"
           onPageChange={setPage}
           onPageSizeChange={valor => { setPageSize(valor); setPage(1) }}
           onSearch={valor => { setBusca(valor); setPage(1) }}
-          toolbar={<ExportMenu fileName="historico-caixas" title="Histórico de caixas" getRows={() => filtrados.map(item => ({ caixa: item.caixa.id, abertura: formatarData(item.caixa.abertoEm), fechamento: formatarData(item.caixa.fechadoEm), operador: item.usuarioFechamento ?? item.usuarioAbertura ?? '', vendas: item.vendasTotal, esperado: item.dinheiroEsperado, contado: item.saldoInformado ?? '', diferenca: item.diferenca ?? '', status: item.caixa.status }))} />}
+          toolbar={<ExportMenu fileName="historico-caixas" title="Histórico de caixas" getRows={carregarLinhasExportacao} />}
           rowActions={{ extra: item => <Button type="button" size="icon" variant="ghost" title={`Ver caixa ${item.caixa.id}`} onClick={() => void abrirDetalhes(item.caixa.id)}><Eye size={17} /></Button> }}
         />
       </div>
@@ -223,16 +258,42 @@ export default function HistoricoCaixaPage() {
             </div>
             <section className="px-5 py-5">
               <h3 className="font-bold text-slate-900">Pagamentos</h3>
-              <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[650px] text-sm"><thead className="border-y border-slate-200 bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Data</th><th className="px-3 py-2">Forma</th><th className="px-3 py-2 text-right">Valor</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ação</th></tr></thead><tbody className="divide-y divide-slate-100">{(detalhes.pagamentos ?? []).map(pagamento => <tr key={pagamento.id}><td className="px-3 py-2">{formatarData(pagamento.criadoEm)}</td><td className="px-3 py-2">{nomeForma(pagamento.tipo)}</td><td className="px-3 py-2 text-right font-bold">{formatarMoeda(pagamento.valor)}</td><td className="px-3 py-2"><span>{pagamento.status}</span>{pagamento.motivoEstorno && <span className="block text-xs text-red-600">{pagamento.motivoEstorno}</span>}</td><td className="px-3 py-2 text-right">{pagamento.status === 'PAGO' && permissions.includes('pagamentos.estornar') && <Button size="sm" variant="danger" onClick={() => setPagamentoEstorno(pagamento)}><RotateCcw size={14} className="mr-1" /> Estornar</Button>}</td></tr>)}</tbody></table></div>
+              <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[720px] text-sm"><thead className="border-y border-slate-200 bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Data</th><th className="px-3 py-2">Mesa</th><th className="px-3 py-2">Forma</th><th className="px-3 py-2 text-right">Valor</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ação</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{(detalhes.pagamentos ?? []).map(pagamento => <tr key={pagamento.id}><td className="px-3 py-2">{formatarData(pagamento.criadoEm)}</td><td className="px-3 py-2 font-semibold text-slate-900">{pagamento.mesa == null ? '—' : `Mesa ${pagamento.mesa}`}</td><td className="px-3 py-2">{nomeForma(pagamento.tipo)}</td><td className="px-3 py-2 text-right font-bold text-slate-900">{formatarMoeda(pagamento.valor)}</td><td className="px-3 py-2"><span className={pagamento.status === 'PAGO' ? 'font-semibold text-emerald-700' : 'font-semibold text-red-700'}>{pagamento.status}</span>{pagamento.motivoEstorno && <span className="block text-xs text-red-600">{pagamento.motivoEstorno}</span>}</td><td className="px-3 py-2 text-right">{pagamento.status === 'PAGO' && permissions.includes('pagamentos.estornar') && <Button size="sm" variant="danger" onClick={() => setPagamentoEstorno(pagamento)}><RotateCcw size={14} className="mr-1" /> Estornar</Button>}</td></tr>)}</tbody></table></div>
             </section>
-            <section className="border-t border-slate-200 px-5 py-5"><h3 className="font-bold text-slate-900">Movimentações</h3><div className="mt-3 divide-y divide-slate-100">{detalhes.caixa.movimentos.length === 0 ? <p className="py-4 text-sm text-slate-500">Nenhuma movimentação.</p> : detalhes.caixa.movimentos.map(movimento => <div key={movimento.id} className="flex justify-between gap-4 py-2 text-sm"><span><strong>{movimento.tipo}</strong><span className="ml-2 text-slate-500">{movimento.descricao}</span></span><strong>{formatarMoeda(movimento.valor)}</strong></div>)}</div></section>
-            {detalhes.caixa.status === 'FECHADO' && permissions.includes('caixa.ajustar_fechado') && <section className="border-t border-slate-200 bg-slate-50 px-5 py-5"><div className="flex items-center gap-2"><Settings2 size={18} className="text-orange-600" /><h3 className="font-bold text-slate-900">Ajuste pós-fechamento</h3></div><p className="mt-1 text-xs text-slate-500">Use valor negativo para retirada. O fechamento original permanece preservado.</p><div className="mt-3 grid gap-3 sm:grid-cols-[180px_1fr_auto]"><input value={ajusteValor} onChange={event => setAjusteValor(event.target.value)} inputMode="decimal" placeholder="Valor (+/-)" className="h-10 border border-slate-300 px-3" /><input value={ajusteMotivo} onChange={event => setAjusteMotivo(event.target.value)} placeholder="Motivo obrigatório" className="h-10 border border-slate-300 px-3" /><Button onClick={() => void ajustar()} isLoading={salvando}>Registrar ajuste</Button></div></section>}
-            <footer className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-5 py-4"><ExportMenu fileName={`caixa-${detalhes.caixa.id}`} title={`Caixa #${detalhes.caixa.id}`} getRows={() => (detalhes.pagamentos ?? []).map(p => ({ data: formatarData(p.criadoEm), forma: nomeForma(p.tipo), valor: p.valor, status: p.status }))} /><Button variant="outline" onClick={() => imprimir(detalhes)}><Printer size={16} className="mr-2" /> Imprimir fechamento</Button><Button variant="secondary" onClick={() => setDetalhes(null)}>Fechar</Button></footer>
+            <section className="border-t border-slate-200 px-5 py-5">
+              <h3 className="font-bold text-slate-900">Movimentações</h3>
+              <div className="mt-3 divide-y divide-slate-100">
+                {detalhes.caixa.movimentos.length === 0 ? <p className="py-4 text-sm text-slate-500">Nenhuma movimentação.</p> : detalhes.caixa.movimentos.map(movimento => (
+                  <div key={movimento.id} className="flex items-center justify-between gap-4 py-2 text-sm text-slate-700">
+                    <span className="min-w-0"><strong className="text-slate-900">{movimento.tipo}</strong><span className="ml-2 text-slate-600">{movimento.descricao}</span></span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <strong className="text-slate-900">{formatarMoeda(movimento.valor)}</strong>
+                      {movimento.tipo === 'AJUSTE' && (
+                        <button
+                          type="button"
+                          title={permissions.includes('caixa.ajustar_fechado') ? 'Excluir ajuste' : 'Sem permissão para ajustar caixa fechado'}
+                          aria-label={`Excluir ajuste de ${formatarMoeda(movimento.valor)}`}
+                          disabled={!permissions.includes('caixa.ajustar_fechado')}
+                          onClick={() => setAjusteExclusao(movimento)}
+                          className="flex h-8 items-center justify-center gap-1.5 rounded-md border border-red-200 px-2.5 text-xs font-bold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
+                        >
+                          <Trash2 size={16} />
+                          Excluir
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+            {detalhes.caixa.status === 'FECHADO' && permissions.includes('caixa.ajustar_fechado') && <section className="border-t border-slate-200 bg-slate-50 px-5 py-5"><div className="flex items-center gap-2"><Settings2 size={18} className="text-orange-600" /><h3 className="font-bold text-slate-900">Ajuste pós-fechamento</h3></div><p className="mt-1 text-xs text-slate-500">Use valor negativo para retirada. O fechamento original permanece preservado.</p><div className="mt-3 grid gap-3 sm:grid-cols-[180px_1fr_auto]"><input value={ajusteValor} onChange={event => setAjusteValor(event.target.value)} inputMode="decimal" placeholder="Valor (+/-)" className="h-10 border border-slate-300 bg-white px-3 text-slate-900" /><input value={ajusteMotivo} onChange={event => setAjusteMotivo(event.target.value)} placeholder="Motivo obrigatório" className="h-10 border border-slate-300 bg-white px-3 text-slate-900" /><Button onClick={() => void ajustar()} isLoading={salvando}>Registrar ajuste</Button></div></section>}
+            <footer className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-5 py-4"><ExportMenu fileName={`caixa-${detalhes.caixa.id}`} title={`Caixa #${detalhes.caixa.id}`} getRows={() => (detalhes.pagamentos ?? []).map(p => ({ data: formatarData(p.criadoEm), mesa: p.mesa ?? '', forma: nomeForma(p.tipo), valor: p.valor, status: p.status }))} /><Button variant="outline" onClick={() => imprimir(detalhes)}><Printer size={16} className="mr-2" /> Imprimir fechamento</Button><Button variant="secondary" onClick={() => setDetalhes(null)}>Fechar</Button></footer>
           </>}
         </div>
       </div>}
 
-      {pagamentoEstorno && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4"><div className="w-full max-w-md bg-white p-6 shadow-2xl"><h2 className="text-lg font-black text-slate-900">Estornar pagamento</h2><p className="mt-1 text-sm text-slate-600">{nomeForma(pagamentoEstorno.tipo)} · {formatarMoeda(pagamentoEstorno.valor)}</p><label className="mt-5 block text-sm font-bold text-slate-700">Motivo<textarea value={motivoEstorno} onChange={event => setMotivoEstorno(event.target.value)} className="mt-2 min-h-24 w-full border border-slate-300 p-3" placeholder="Motivo obrigatório" /></label><div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setPagamentoEstorno(null)}>Cancelar</Button><Button variant="danger" isLoading={salvando} onClick={() => void estornar()}>Confirmar estorno</Button></div></div></div>}
+      {pagamentoEstorno && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4"><div className="w-full max-w-md bg-white p-6 shadow-2xl"><h2 className="text-lg font-black text-slate-900">Estornar pagamento</h2><p className="mt-1 text-sm text-slate-600">{pagamentoEstorno.mesa == null ? 'Mesa não identificada' : `Mesa ${pagamentoEstorno.mesa}`} · {nomeForma(pagamentoEstorno.tipo)} · {formatarMoeda(pagamentoEstorno.valor)}</p><label className="mt-5 block text-sm font-bold text-slate-700">Motivo<textarea value={motivoEstorno} onChange={event => setMotivoEstorno(event.target.value)} className="mt-2 min-h-24 w-full border border-slate-300 p-3" placeholder="Motivo obrigatório" /></label><div className="mt-5 flex justify-end gap-3"><Button variant="outline" onClick={() => setPagamentoEstorno(null)}>Cancelar</Button><Button variant="danger" isLoading={salvando} onClick={() => void estornar()}>Confirmar estorno</Button></div></div></div>}
+      {ajusteExclusao && <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4"><div role="dialog" aria-modal="true" aria-labelledby="delete-adjustment-title" className="w-full max-w-md bg-white p-6 text-slate-900 shadow-2xl"><div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-100 text-red-700"><Trash2 size={20} /></div><h2 id="delete-adjustment-title" className="mt-4 text-lg font-black">Excluir este ajuste?</h2><p className="mt-2 text-sm leading-6 text-slate-600">O ajuste de <strong className="text-slate-900">{formatarMoeda(ajusteExclusao.valor)}</strong>{ajusteExclusao.descricao ? ` (${ajusteExclusao.descricao})` : ''} será removido. O valor esperado e a diferença do caixa serão recalculados.</p><div className="mt-6 flex justify-end gap-3"><Button variant="outline" disabled={salvando} onClick={() => setAjusteExclusao(null)}>Cancelar</Button><Button variant="danger" isLoading={salvando} onClick={() => void excluirAjuste()}>Excluir ajuste</Button></div></div></div>}
     </main>
   )
 }

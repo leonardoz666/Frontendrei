@@ -30,22 +30,22 @@ export default function MinhasMesasPage() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 pb-4 pt-6 sm:px-6 md:pt-12 lg:px-8 lg:pt-24">
       <div className="mx-auto w-full max-w-7xl">
-        {mesas.length === 0 ? (
-          <div className="bg-white p-8 rounded-lg shadow-sm text-center">
+        <div className="rounded-lg bg-white p-8 text-center shadow-sm">
+          {mesas.length === 0 ? (
             <p className="text-gray-500">Você não tem nenhuma mesa aberta no momento.</p>
-          </div>
-        ) : (
-          <div className="mx-auto grid max-w-[1111px] grid-cols-[repeat(auto-fit,minmax(136px,145px))] justify-center gap-4">
-            {mesas.map((mesa) => (
-              <TableCard
-                key={mesa.id}
-                mesa={mesa}
-                onClick={(selected) => router.push(`/mesas/${selected.id}`)}
-                fallbackUsuarioNome="Você"
-              />
-            ))}
-          </div>
-        )}
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(136px,145px))] justify-start gap-4">
+              {mesas.map((mesa) => (
+                <TableCard
+                  key={mesa.id}
+                  mesa={mesa}
+                  onClick={(selected) => router.push(`/mesas/${selected.id}`)}
+                  fallbackUsuarioNome="Você"
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -8,9 +8,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { ProductOptionsModal } from '@/components/ProductOptionsModal'
 import { PaymentModal } from '@/components/PaymentModal'
 import { RequestBillModal } from '@/app/components/RequestBillModal'
-import { unwrapList } from '@/app/lib/legacyArray'
 import { connectTableSocket } from '@/app/lib/table-socket'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, fetchAllList } from '@/app/lib/api'
 import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
 const CUSTOM_CANCELLATION_REASON = '__CUSTOM__'
@@ -184,16 +183,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         }
         setUserPermissions(meData.user.permissions ?? [])
 
-        // `unwrapList` aceita array puro (contrato antigo) OU `{ data, meta }`
-        // (contrato paginado novo). Sem isso, no dia em que a rota passar a ser
-        // paginada, `productsData.sort` estoura "sort is not a function" na tela
-        // de lançamento de pedido — o coração da operação. Ver lib/legacyArray.ts.
-        const [categoriesResponse] = await Promise.all([
-          apiFetch('/categories'),
+        const [productsData] = await Promise.all([
+          fetchAllList<Categoria>('/categories?ativo=true&sort=ordem&order=asc'),
           fetchTableData(),
           fetchEstadoCaixa()
         ])
-        const productsData = unwrapList<Categoria>(categoriesResponse)
 
         if (!cancelled) {
           const order = ['Entradas', 'Pratos Principais', 'Bebidas', 'Drinks']

@@ -1,3 +1,12 @@
+import {
+  persistUiPreferences,
+  SIDEBAR_COLLAPSED_STORAGE_KEY,
+  SIDEBAR_GROUPS_STORAGE_KEY,
+  SIDEBAR_VISIBILITY_EVENT,
+  type SidebarVisibilityPreference,
+  type UiPreferences,
+} from './uiPreferences'
+
 /**
  * Árvore de navegação da sidebar — DADOS puros, sem JSX (PRD seção 4, RF-UI-05).
  *
@@ -143,6 +152,7 @@ export interface NavUser {
   name?: string | null
   role?: string | null
   permissions?: string[] | null
+  uiPreferences?: UiPreferences | null
 }
 
 /** Grupos + itens visíveis para um usuário (grupo sem item visível não é renderizado). */
@@ -501,14 +511,9 @@ export const ROUTE_SHORTCUTS: ReadonlyArray<{
   { key: 'F8', href: '/mesas', label: 'Mapa de Mesas', disabled: false },
 ]
 
-export const SIDEBAR_COLLAPSED_STORAGE_KEY = 'rei.sidebar.collapsed'
-export const SIDEBAR_GROUPS_STORAGE_KEY = 'rei.sidebar.groups'
-export const SIDEBAR_VISIBILITY_EVENT = 'rei:sidebar-visibility-change'
+export { SIDEBAR_COLLAPSED_STORAGE_KEY, SIDEBAR_GROUPS_STORAGE_KEY, SIDEBAR_VISIBILITY_EVENT }
 
-export interface SidebarVisibilityState {
-  hiddenSectionIds: string[]
-  hiddenItemHrefs: string[]
-}
+export type SidebarVisibilityState = SidebarVisibilityPreference
 
 export interface SidebarVisualSectionGroup {
   id: string
@@ -525,6 +530,9 @@ export interface SidebarVisualSection {
 }
 
 const EMPTY_SIDEBAR_VISIBILITY: SidebarVisibilityState = {
+  hideBrand: false,
+  hideSearch: false,
+  hideShortcuts: false,
   hiddenSectionIds: [],
   hiddenItemHrefs: [],
 }
@@ -540,8 +548,12 @@ export function readStoredSidebarVisibility(user: NavUser | null | undefined): S
     if (!raw) return EMPTY_SIDEBAR_VISIBILITY
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return EMPTY_SIDEBAR_VISIBILITY
-    const state = parsed as Partial<SidebarVisibilityState>
+    const state = parsed as Partial<SidebarVisibilityState> & { hideHeader?: unknown }
+    const legacyHeaderHidden = state.hideHeader === true
     return {
+      hideBrand: legacyHeaderHidden || state.hideBrand === true,
+      hideSearch: legacyHeaderHidden || state.hideSearch === true,
+      hideShortcuts: legacyHeaderHidden || state.hideShortcuts === true,
       hiddenSectionIds: Array.isArray(state.hiddenSectionIds)
         ? state.hiddenSectionIds.filter((value): value is string => typeof value === 'string')
         : [],
@@ -565,6 +577,7 @@ export function writeStoredSidebarVisibility(
   } catch {
     // localStorage indisponível: a preferência deixa de persistir, sem quebrar o menu.
   }
+  persistUiPreferences({ sidebarVisibility: state })
 }
 
 /** Estado recolhido da sidebar, persistido pelo MainLayout. */
@@ -584,6 +597,7 @@ export function writeStoredCollapsed(collapsed: boolean): void {
   } catch {
     // localStorage indisponível (modo privado/quota): o estado só não é persistido.
   }
+  persistUiPreferences({ sidebarCollapsed: collapsed })
 }
 
 /** Grupos abertos/fechados escolhidos pelo usuário (`id do grupo -> aberto?`). */
@@ -611,6 +625,7 @@ export function writeStoredGroupState(state: Record<string, boolean>): void {
   } catch {
     // localStorage indisponível: o acordeão continua funcionando só em memória.
   }
+  persistUiPreferences({ sidebarGroups: state })
 }
 
 /**

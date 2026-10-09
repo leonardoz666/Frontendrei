@@ -7,6 +7,7 @@ import { LogOut, MessageCircle } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { apiFetch } from '@/app/lib/api'
 import { useToast } from '@/contexts/ToastContext'
+import { initializeUiPreferences } from '@/app/lib/uiPreferences'
 import {
   ROUTE_SHORTCUTS,
   readStoredCollapsed,
@@ -62,7 +63,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     const loadUser = async () => {
       try {
         const data = await apiFetch<{ user?: NavUser }>('/auth/me', { redirectOn401: false })
-        if (!cancelled) setUser(data.user ?? null)
+        if (!cancelled && data.user) {
+          const preferences = data.user.id === undefined
+            ? data.user.uiPreferences ?? {}
+            : await initializeUiPreferences(data.user.id, data.user.uiPreferences)
+          if (!cancelled) {
+            setIsCollapsed(preferences.sidebarCollapsed ?? readStoredCollapsed())
+            setUser(data.user)
+          }
+        } else if (!cancelled) {
+          setUser(null)
+        }
       } catch {
         // Sessão indisponível: as páginas cuidam do redirecionamento para /login.
         if (!cancelled) setUser(null)
