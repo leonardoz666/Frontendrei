@@ -14,6 +14,13 @@ import { unwrapList } from './legacyArray'
 export const API_PREFIX = '/api'
 export const LOGIN_PATH = '/login'
 
+const TRANSIENT_GET_STATUSES = new Set([429, 502, 503, 504])
+const TRANSIENT_GET_DELAYS_MS = [1000, 3000, 6000]
+const AUTH_ME_CACHE_MS = 15_000
+
+let authMeCache: { expiresAt: number; value: unknown } | null = null
+let authMeInFlight: Promise<unknown> | null = null
+
 export class ApiError extends Error {
   readonly status: number
   readonly details?: unknown
@@ -123,7 +130,23 @@ function extractMessage(body: unknown, response: Response): string {
   if (typeof body === 'string' && body.trim() !== '' && body.length <= 300) {
     return body.trim()
   }
+  if (response.status === 429 || response.status === 503) {
+    return 'Servidor temporariamente indisponível. Aguarde alguns segundos e tente novamente.'
+  }
   return response.statusText || `Erro ${response.status}`
+}
+
+function retryDelay(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get('retry-after')
+  if (retryAfter !== null) {
+    const seconds = Number(retryAfter)
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 10_000)
+  }
+  return TRANSIENT_GET_DELAYS_MS[attempt] ?? 0
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
 
 function extractDetails(body: unknown): unknown {
@@ -191,7 +214,16 @@ export async function apiRequest(path: string, options: ApiRequestOptions = {}):
     init.cache = noStore ? 'no-store' : 'default'
   }
 
-  const response = await fetch(url, init)
+  let response: Response
+  for (let attempt = 0; ; attempt += 1) {
+    response = await fetch(url, init)
+    const canRetry =
+      (upperMethod === 'GET' || upperMethod === 'HEAD') &&
+      TRANSIENT_GET_STATUSES.has(response.status) &&
+      attempt < TRANSIENT_GET_DELAYS_MS.length
+    if (!canRetry) break
+    await wait(retryDelay(response, attempt))
+  }
 
   if (!response.ok) {
     const parsed = await readResponseBody(response)
@@ -212,22 +244,58 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: ApiRequestOptions = {}
 ): Promise<T> {
-  const response = await apiRequest(path, options)
+  const method = (options.method ?? 'GET').toUpperCase()
+  const apiPath = toApiPath(path)
+  const isAuthMe = method === 'GET' && apiPath === '/api/auth/me'
 
-  if (response.status === 204 || response.status === 205) {
-    return undefined as T
+  if (isAuthMe && authMeCache && authMeCache.expiresAt > Date.now()) {
+    return authMeCache.value as T
+  }
+  if (isAuthMe && authMeInFlight) return authMeInFlight as Promise<T>
+
+  const execute = async (): Promise<T> => {
+    const response = await apiRequest(path, options)
+
+    if (response.status === 204 || response.status === 205) {
+      return undefined as T
+    }
+
+    const text = await response.text()
+    if (!text) {
+      return undefined as T
+    }
+
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      return text as unknown as T
+    }
   }
 
-  const text = await response.text()
-  if (!text) {
-    return undefined as T
+  if (!isAuthMe) {
+    const result = await execute()
+    if (apiPath === '/api/auth/login' && method === 'POST') {
+      authMeCache = { expiresAt: Date.now() + AUTH_ME_CACHE_MS, value: result }
+    } else if (apiPath === '/api/auth/logout' && method === 'POST') {
+      authMeCache = null
+    }
+    return result
   }
 
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    return text as unknown as T
-  }
+  authMeInFlight = execute()
+    .then(result => {
+      authMeCache = { expiresAt: Date.now() + AUTH_ME_CACHE_MS, value: result }
+      return result
+    })
+    .finally(() => {
+      authMeInFlight = null
+    })
+  return authMeInFlight as Promise<T>
+}
+
+export function invalidateAuthMeCache(): void {
+  authMeCache = null
+  authMeInFlight = null
 }
 
 /**
