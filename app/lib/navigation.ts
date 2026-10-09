@@ -100,6 +100,7 @@ export type NavIconName =
   | 'ClipboardCheck'
   | 'PackageSearch'
   | 'Clock'
+  | 'Camera'
   | 'CalendarDays'
   | 'Pencil'
   | 'Shield'
@@ -366,25 +367,28 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'ponto.visualizar',
       },
       {
+        href: '/ponto/batida',
+        label: 'Batida por Câmera',
+        icon: 'Camera',
+        permission: 'ponto.registrar',
+      },
+      {
         href: '/ponto/espelho',
         label: 'Espelho de Ponto',
         icon: 'CalendarDays',
         permission: 'ponto.visualizar',
-        disabled: true,
       },
       {
-        href: '/ponto/ajustes',
+        href: '/ponto#ajustes',
         label: 'Ajustes',
         icon: 'Pencil',
         permission: 'ponto.ajustar',
-        disabled: true,
       },
       {
         href: '/ponto/auditoria',
         label: 'Auditoria',
         icon: 'Shield',
         permission: 'ponto.auditar',
-        disabled: true,
       },
     ],
   },
