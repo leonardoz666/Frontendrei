@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ArrowDownToLine, PackageCheck, Plus, RotateCcw, Scale, Trash2, X } from 'lucide-react'
+import { ArrowDownToLine, FileDown, PackageCheck, Plus, RotateCcw, Scale, Trash2, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
@@ -233,6 +233,117 @@ export default function DistribuicoesEstoquePage() {
       showToast(err instanceof Error ? err.message : 'Erro ao comparar estoque', 'error')
     } finally {
       setComparando(false)
+    }
+  }
+
+  const gerarPdfComparacao = async () => {
+    if (!comparacao) return
+
+    try {
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const margem = 12
+      const larguraPagina = doc.internal.pageSize.getWidth()
+      const alturaPagina = doc.internal.pageSize.getHeight()
+      const colunas = [
+        { titulo: 'Item', largura: 68 },
+        { titulo: 'Enviado', largura: 34 },
+        { titulo: 'Pedidos', largura: 34 },
+        { titulo: 'Devolvido', largura: 34 },
+        { titulo: 'Perda', largura: 30 },
+        { titulo: 'Diferença', largura: 34 },
+        { titulo: 'Situação', largura: 35 },
+      ]
+      const statusTexto = (status: ComparacaoItem['status']) =>
+        status === 'CONCILIADO' ? 'Conciliado' : status === 'SOBRA_ESPERADA' ? 'Sobra esperada' : 'Consumo maior'
+
+      const desenharCabecalho = () => {
+        doc.setTextColor(17, 24, 39)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(15)
+        doc.text('Comparação do estoque da cozinha', margem, 15)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.text(`Destino: ${comparacao.destino}`, margem, 21)
+        doc.text(`Gerado em: ${formatarData(comparacao.geradoEm)}`, margem, 26)
+        doc.text('Diferença = enviado - pedidos - devoluções - perdas.', margem, 31)
+
+        let x = margem
+        doc.setFillColor(243, 244, 246)
+        doc.rect(margem, 36, colunas.reduce((total, coluna) => total + coluna.largura, 0), 9, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(8)
+        colunas.forEach((coluna, indice) => {
+          const alinhamento = indice > 0 && indice < 6 ? 'right' : 'left'
+          const textoX = alinhamento === 'right' ? x + coluna.largura - 2 : x + 2
+          doc.text(coluna.titulo, textoX, 42, { align: alinhamento })
+          x += coluna.largura
+        })
+        doc.setDrawColor(209, 213, 219)
+        doc.line(margem, 45, larguraPagina - margem, 45)
+      }
+
+      desenharCabecalho()
+      let y = 45
+
+      if (comparacao.data.length === 0) {
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(10)
+        doc.text('Nenhuma saída para a cozinha foi registrada.', margem, y + 10)
+      } else {
+        comparacao.data.forEach((item, indice) => {
+          const nomeLinhas = doc.splitTextToSize(item.nome, colunas[0].largura - 4) as string[]
+          const alturaLinha = Math.max(10, nomeLinhas.length * 4 + 4)
+          if (y + alturaLinha > alturaPagina - 14) {
+            doc.addPage()
+            desenharCabecalho()
+            y = 45
+          }
+
+          if (indice % 2 === 1) {
+            doc.setFillColor(249, 250, 251)
+            doc.rect(margem, y, colunas.reduce((total, coluna) => total + coluna.largura, 0), alturaLinha, 'F')
+          }
+
+          const valores = [
+            nomeLinhas,
+            formatarQuantidade(item.enviado, item.unidade),
+            formatarQuantidade(item.lancado, item.unidade),
+            formatarQuantidade(item.devolvido, item.unidade),
+            formatarQuantidade(item.perda, item.unidade),
+            formatarQuantidade(item.diferenca, item.unidade),
+            statusTexto(item.status),
+          ]
+          let x = margem
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(8)
+          doc.setTextColor(31, 41, 55)
+          valores.forEach((valor, colunaIndice) => {
+            const coluna = colunas[colunaIndice]
+            const alinhamento = colunaIndice > 0 && colunaIndice < 6 ? 'right' : 'left'
+            const textoX = alinhamento === 'right' ? x + coluna.largura - 2 : x + 2
+            doc.text(valor, textoX, y + 6, { align: alinhamento })
+            x += coluna.largura
+          })
+          doc.setDrawColor(229, 231, 235)
+          doc.line(margem, y + alturaLinha, larguraPagina - margem, y + alturaLinha)
+          y += alturaLinha
+        })
+      }
+
+      const totalPaginas = doc.getNumberOfPages()
+      for (let pagina = 1; pagina <= totalPaginas; pagina += 1) {
+        doc.setPage(pagina)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(107, 114, 128)
+        doc.text(`Página ${pagina} de ${totalPaginas}`, larguraPagina - margem, alturaPagina - 6, { align: 'right' })
+      }
+
+      const dataArquivo = new Date(comparacao.geradoEm).toISOString().slice(0, 16).replace(/[:T]/g, '-')
+      doc.save(`comparacao-estoque-cozinha-${dataArquivo}.pdf`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao gerar PDF', 'error')
     }
   }
 
@@ -530,9 +641,15 @@ export default function DistribuicoesEstoquePage() {
               </table>
             </div>
 
-            <div className="flex flex-col gap-2 border-t border-gray-100 px-6 py-4 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between">
-              <p>Diferença = enviado - pedidos - devoluções - perdas.</p>
-              <p>Atualizado em {formatarData(comparacao.geradoEm)}</p>
+            <div className="flex flex-col gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-gray-500">
+                <p>Diferença = enviado - pedidos - devoluções - perdas.</p>
+                <p className="mt-1">Atualizado em {formatarData(comparacao.geradoEm)}</p>
+              </div>
+              <Button type="button" variant="outline" onClick={() => void gerarPdfComparacao()}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Gerar PDF
+              </Button>
             </div>
           </div>
         </div>
