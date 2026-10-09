@@ -323,6 +323,12 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'estoque.movimentar',
       },
       {
+        href: '/admin/estoque/distribuicoes',
+        label: 'Distribuições',
+        icon: 'Truck',
+        permission: 'estoque.movimentar',
+      },
+      {
         href: '/admin/estoque/inventario',
         label: 'Inventário',
         icon: 'ClipboardCheck',
@@ -666,7 +672,8 @@ export function buildSidebarVisualSections(
       groupIds: ['inicio', 'mesas'],
       itemFilter: item => !['/', '/dashboard', '/mesas'].includes(item.href),
     },
-    { id: 'cardapio-estoque', label: 'CARDÁPIO E ESTOQUE', groupIds: ['cardapio', 'estoque'] },
+    { id: 'cardapio', label: 'CARDÁPIO', groupIds: ['cardapio'] },
+    { id: 'estoque', label: 'ESTOQUE', groupIds: ['estoque'] },
     {
       id: 'caixa',
       label: 'CAIXA',

@@ -441,11 +441,6 @@ export default function Sidebar({
                 <div className={isGroupOpen ? 'mt-2 rounded-lg border border-slate-200 bg-white/90 p-2 shadow-sm' : 'hidden'}>
                   {section.groups.map((group, index) => (
                     <div key={group.id} className={index > 0 ? 'mt-2 border-t border-slate-200 pt-2' : ''}>
-                      {section.id === 'cardapio-estoque' && (
-                        <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                          {group.label}
-                        </div>
-                      )}
                       <div className="space-y-0.5 border-l-2 border-slate-300 pl-1.5">
                         {group.items.map(renderItem)}
                       </div>
