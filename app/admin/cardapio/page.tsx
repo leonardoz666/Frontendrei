@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowDown, ArrowLeft, ArrowUp, PackagePlus, Puzzle, RefreshCw, Save, Utensils } from 'lucide-react'
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { ArrowDown, ArrowLeft, ArrowUp, GripVertical, PackagePlus, Puzzle, RefreshCw, Save, Utensils } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { apiFetch, fetchAllList, fetchList } from '@/app/lib/api'
 import { useToast } from '@/contexts/ToastContext'
@@ -56,6 +56,8 @@ export default function OrganizarCardapioPage() {
   const [complementos, setComplementos] = useState<Complemento[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [arrastandoId, setArrastandoId] = useState<number | null>(null)
+  const [anuncio, setAnuncio] = useState('')
 
   const categoriaAtual = useMemo(() => {
     if (categoriaId === 'all') return null
@@ -169,6 +171,48 @@ export default function OrganizarCardapioPage() {
     if (modo === 'produtos') setProdutos(trocar)
     if (modo === 'grupos') setGrupos(trocar)
     if (modo === 'complementos') setComplementos(trocar)
+    const item = itens[index]
+    if (item) setAnuncio(`${item.nome} movido para a posição ${destino + 1}.`)
+  }
+
+  const moverPara = (itemId: number, destinoId: number) => {
+    if (itemId === destinoId) return
+    const reordenar = <T extends { id: number; nome: string }>(atuais: T[]): T[] => {
+      const origem = atuais.findIndex((item) => item.id === itemId)
+      const destino = atuais.findIndex((item) => item.id === destinoId)
+      if (origem < 0 || destino < 0 || origem === destino) return atuais
+      const copia = [...atuais]
+      const [movido] = copia.splice(origem, 1)
+      copia.splice(destino, 0, movido)
+      setAnuncio(`${movido.nome} movido para a posição ${destino + 1}.`)
+      return copia
+    }
+
+    if (modo === 'produtos') setProdutos(reordenar)
+    if (modo === 'grupos') setGrupos(reordenar)
+    if (modo === 'complementos') setComplementos(reordenar)
+  }
+
+  const iniciarArraste = (event: ReactPointerEvent<HTMLButtonElement>, itemId: number) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setArrastandoId(itemId)
+  }
+
+  const continuarArraste = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (arrastandoId === null) return
+    event.preventDefault()
+    if (event.clientY < 90) window.scrollBy(0, -24)
+    if (event.clientY > window.innerHeight - 70) window.scrollBy(0, 24)
+    const elemento = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-sortable-id]')
+    const destinoId = Number(elemento?.dataset.sortableId)
+    if (Number.isInteger(destinoId)) moverPara(arrastandoId, destinoId)
+  }
+
+  const terminarArraste = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    setArrastandoId(null)
   }
 
   const salvar = async () => {
@@ -299,9 +343,12 @@ export default function OrganizarCardapioPage() {
         </section>
 
         <section className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-          <div className="border-b border-gray-200 px-4 py-3">
-            <h2 className="text-sm font-bold text-gray-900">{tituloLista}</h2>
-            <p className="text-xs text-gray-500">{itens.length} itens ativos</p>
+          <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">{tituloLista}</h2>
+              <p className="text-xs text-gray-500">{itens.length} itens ativos</p>
+            </div>
+            {itens.length > 1 && <p className="hidden text-xs text-gray-500 sm:block">Arraste pelo pegador ou use as setas</p>}
           </div>
           {loading ? (
             <div className="p-6 text-sm text-gray-500">Carregando...</div>
@@ -310,8 +357,32 @@ export default function OrganizarCardapioPage() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {itens.map((item, index) => (
-                <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0">
+                <li
+                  key={item.id}
+                  data-sortable-id={item.id}
+                  className={`flex items-center justify-between gap-3 px-3 py-3 transition-colors sm:px-4 ${
+                    arrastandoId === item.id ? 'relative z-10 bg-orange-50 ring-1 ring-inset ring-orange-300' : 'bg-white'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onPointerDown={(event) => iniciarArraste(event, item.id)}
+                    onPointerMove={continuarArraste}
+                    onPointerUp={terminarArraste}
+                    onPointerCancel={terminarArraste}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowUp') { event.preventDefault(); mover(index, -1) }
+                      if (event.key === 'ArrowDown') { event.preventDefault(); mover(index, 1) }
+                    }}
+                    className={`shrink-0 touch-none rounded-md p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
+                      arrastandoId === item.id ? 'cursor-grabbing text-orange-700' : 'cursor-grab text-gray-400 hover:bg-gray-100 hover:text-gray-700'
+                    }`}
+                    aria-label={`Arrastar ${item.nome}. Use as setas do teclado para mover.`}
+                    aria-pressed={arrastandoId === item.id}
+                  >
+                    <GripVertical size={18} />
+                  </button>
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-gray-900">{index + 1}. {item.nome}</p>
                     {item.detalhe && <p className="text-xs text-gray-500">{item.detalhe}</p>}
                   </div>
@@ -339,6 +410,7 @@ export default function OrganizarCardapioPage() {
               ))}
             </ul>
           )}
+          <p className="sr-only" aria-live="polite">{anuncio}</p>
         </section>
       </div>
     </main>
