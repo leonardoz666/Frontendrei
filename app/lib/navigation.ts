@@ -318,6 +318,12 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'estoque.visualizar',
       },
       {
+        href: '/admin/estoque/insumos',
+        label: 'Insumos',
+        icon: 'PackageSearch',
+        permission: 'estoque.visualizar',
+      },
+      {
         href: '/admin/estoque/movimentacoes',
         label: 'Movimentações',
         icon: 'History',
@@ -339,12 +345,6 @@ export const NAV_GROUPS: NavGroup[] = [
         href: '/admin/estoque/ficha-tecnica',
         label: 'Ficha Técnica',
         icon: 'ClipboardCheck',
-        permission: 'estoque.visualizar',
-      },
-      {
-        href: '/admin/estoque/insumos',
-        label: 'Insumos',
-        icon: 'PackageSearch',
         permission: 'estoque.visualizar',
       },
       {
