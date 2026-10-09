@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, ArrowRight, ClipboardList, ClipboardCheck, History, PackageSearch, RefreshCw, Tags } from 'lucide-react'
+import { AlertTriangle, ArrowDownToLine, ArrowRight, ClipboardList, ClipboardCheck, History, PackageSearch, RefreshCw, Tags } from 'lucide-react'
 import { apiFetch } from '@/app/lib/api'
 
 type Meta = {
@@ -57,6 +57,12 @@ const MODULOS = [
     titulo: 'Insumos',
     descricao: 'Cadastro, mínimos, máximos e custo médio.',
     icon: PackageSearch,
+  },
+  {
+    href: '/admin/estoque/distribuicoes',
+    titulo: 'Saídas e devoluções',
+    descricao: 'Envios para cozinha e unidades, com retorno ao estoque.',
+    icon: ArrowDownToLine,
   },
   {
     href: '/admin/estoque/movimentacoes',
