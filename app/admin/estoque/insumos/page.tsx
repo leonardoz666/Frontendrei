@@ -31,6 +31,11 @@ type Subgrupo = {
   grupo?: { id: number; nome: string }
 }
 
+type Grupo = {
+  id: number
+  nome: string
+}
+
 type Insumo = {
   id: number
   codigo: string
@@ -53,12 +58,14 @@ type FormState = {
   codCD: string
   nome: string
   unidade: string
+  grupoId: string
   subgrupoId: string
   planoContaId: string
   centroCustoId: string
   estoqueMin: string
   estoqueMax: string
   custoMedio: string
+  saldoInicial: string
 }
 
 type OpcaoFinanceira = {
@@ -71,12 +78,14 @@ const FORM_VAZIO: FormState = {
   codCD: '',
   nome: '',
   unidade: 'UN',
+  grupoId: '',
   subgrupoId: '',
   planoContaId: '',
   centroCustoId: '',
   estoqueMin: '0',
   estoqueMax: '0',
   custoMedio: '0',
+  saldoInicial: '0',
 }
 
 function quantidade(valor: unknown, unidade?: string): string {
@@ -97,9 +106,13 @@ export default function InsumosPage() {
   const { data, isLoading, isError, error, refetch } = usePagedQuery<Insumo>(ui.listaParams)
   const pagina = paginaAtual({ data }, ui.page, ui.pageSize)
 
+  const { data: grupos = [] } = useQuery({
+    queryKey: ['insumos-grupos-select'],
+    queryFn: () => fetchList<Grupo>('/insumos/grupos?page=1&pageSize=100&ativo=true'),
+  })
   const { data: subgrupos = [] } = useQuery({
     queryKey: ['insumos-subgrupos-select'],
-    queryFn: () => fetchList<Subgrupo>('/insumos/subgrupos?page=1&pageSize=100'),
+    queryFn: () => fetchList<Subgrupo>('/insumos/subgrupos?page=1&pageSize=100&ativo=true'),
   })
   const { data: planos = [] } = useQuery({
     queryKey: ['planos-contas-select'],
@@ -110,12 +123,9 @@ export default function InsumosPage() {
     queryFn: () => fetchList<OpcaoFinanceira>('/centros-custo?page=1&pageSize=100'),
   })
 
-  const subgruposSelect = useMemo(
-    () =>
-      [...subgrupos].sort((a, b) =>
-        `${a.grupo?.nome ?? ''} ${a.nome}`.localeCompare(`${b.grupo?.nome ?? ''} ${b.nome}`, 'pt-BR')
-      ),
-    [subgrupos]
+  const gruposSelect = useMemo(
+    () => [...grupos].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    [grupos]
   )
 
   const [showForm, setShowForm] = useState(false)
@@ -124,6 +134,12 @@ export default function InsumosPage() {
   const [salvando, setSalvando] = useState(false)
   const [paraExcluir, setParaExcluir] = useState<Insumo | null>(null)
   const [alternandoId, setAlternandoId] = useState<number | null>(null)
+  const subgruposDoGrupo = useMemo(
+    () => subgrupos
+      .filter((subgrupo) => String(subgrupo.grupoId) === form.grupoId && subgrupo.nome.toLocaleLowerCase('pt-BR') !== 'geral')
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    [form.grupoId, subgrupos]
+  )
 
   const atualizarCampo = <K extends keyof FormState>(campo: K, valor: FormState[K]) => {
     setForm((atual) => ({ ...atual, [campo]: valor }))
@@ -131,7 +147,7 @@ export default function InsumosPage() {
 
   const abrirNovo = () => {
     setEditing(null)
-    setForm({ ...FORM_VAZIO, subgrupoId: subgruposSelect[0]?.id ? String(subgruposSelect[0].id) : '' })
+    setForm({ ...FORM_VAZIO, grupoId: gruposSelect[0]?.id ? String(gruposSelect[0].id) : '' })
     setShowForm(true)
   }
 
@@ -142,12 +158,14 @@ export default function InsumosPage() {
       codCD: insumo.codCD ?? '',
       nome: insumo.nome ?? '',
       unidade: insumo.unidade ?? 'UN',
-      subgrupoId: String(insumo.subgrupoId ?? ''),
+      grupoId: String(insumo.subgrupo?.grupoId ?? insumo.subgrupo?.grupo?.id ?? ''),
+      subgrupoId: insumo.subgrupo?.nome.toLocaleLowerCase('pt-BR') === 'geral' ? '' : String(insumo.subgrupoId ?? ''),
       planoContaId: insumo.planoContaId ? String(insumo.planoContaId) : '',
       centroCustoId: insumo.centroCustoId ? String(insumo.centroCustoId) : '',
       estoqueMin: String(insumo.estoqueMin ?? 0),
       estoqueMax: String(insumo.estoqueMax ?? 0),
       custoMedio: String(insumo.custoMedio ?? 0),
+      saldoInicial: '0',
     })
     setShowForm(true)
   }
@@ -171,28 +189,31 @@ export default function InsumosPage() {
     event.preventDefault()
     const codigo = form.codigo.trim()
     const nome = form.nome.trim()
-    const subgrupoId = Number(form.subgrupoId)
-    if (!codigo || !nome || !Number.isInteger(subgrupoId) || subgrupoId < 1) {
-      showToast('Informe código, nome e subgrupo', 'error')
+    const grupoId = Number(form.grupoId)
+    if (!codigo || !nome || !Number.isInteger(grupoId) || grupoId < 1) {
+      showToast('Informe código, nome e grupo', 'error')
       return
     }
 
     const estoqueMin = numeroDecimal(form.estoqueMin, 'Estoque mínimo')
     const estoqueMax = numeroDecimal(form.estoqueMax, 'Estoque máximo')
     const custoMedio = numeroDecimal(form.custoMedio, 'Custo médio')
-    if (estoqueMin === null || estoqueMax === null || custoMedio === null) return
+    const saldoInicial = editing ? 0 : numeroDecimal(form.saldoInicial, 'Quantidade atual')
+    if (estoqueMin === null || estoqueMax === null || custoMedio === null || saldoInicial === null) return
 
     const corpo = {
       codigo,
       codCD: form.codCD.trim() || null,
       nome,
       unidade: form.unidade,
-      subgrupoId,
+      grupoId,
+      subgrupoId: form.subgrupoId ? Number(form.subgrupoId) : null,
       planoContaId: form.planoContaId ? Number(form.planoContaId) : null,
       centroCustoId: form.centroCustoId ? Number(form.centroCustoId) : null,
       estoqueMin,
       estoqueMax,
       custoMedio,
+      ...(!editing ? { saldoInicial } : {}),
     }
 
     setSalvando(true)
@@ -238,7 +259,10 @@ export default function InsumosPage() {
       render: (insumo) => (
         <div>
           <span className="font-medium text-gray-900">{insumo.nome}</span>
-          <span className="block text-xs text-gray-500">{insumo.subgrupo?.nome ?? 'Sem subgrupo'}</span>
+          <span className="block text-xs text-gray-500">
+            {insumo.subgrupo?.grupo?.nome ?? 'Sem grupo'}
+            {insumo.subgrupo?.nome && insumo.subgrupo.nome.toLocaleLowerCase('pt-BR') !== 'geral' ? ` / ${insumo.subgrupo.nome}` : ''}
+          </span>
         </div>
       ),
     },
@@ -280,7 +304,7 @@ export default function InsumosPage() {
     <div className="mx-auto max-w-7xl p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Insumos</h1>
       <p className="mb-4 text-sm text-gray-600">
-        Matéria-prima usada pela ficha técnica. Não confundir com o estoque comercial de produtos.
+        Cadastre matérias-primas e produtos prontos, organize por grupo e acompanhe o saldo disponível.
       </p>
 
       {pagina.data.some(abaixoDoMinimo) && (
@@ -318,6 +342,7 @@ export default function InsumosPage() {
               pagina.data.map((insumo) => ({
                 codigo: insumo.codigo,
                 nome: insumo.nome,
+                grupo: insumo.subgrupo?.grupo?.nome ?? '',
                 subgrupo: insumo.subgrupo?.nome ?? '',
                 unidade: insumo.unidade,
                 saldo: comoNumero(insumo.saldoAtual),
@@ -389,18 +414,32 @@ export default function InsumosPage() {
                 <input id="nome" value={form.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black" required />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="subgrupo" className="mb-1 block text-sm font-medium text-black">Subgrupo</label>
-                  <select id="subgrupo" value={form.subgrupoId} onChange={(event) => atualizarCampo('subgrupoId', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black" required>
-                    <option value="">Selecione</option>
-                    {subgruposSelect.map((subgrupo) => (
-                      <option key={subgrupo.id} value={subgrupo.id}>
-                        {subgrupo.grupo?.nome ? `${subgrupo.grupo.nome} / ` : ''}{subgrupo.nome}
-                      </option>
-                    ))}
+                  <label htmlFor="grupo" className="mb-1 block text-sm font-medium text-black">Grupo</label>
+                  <select
+                    id="grupo"
+                    value={form.grupoId}
+                    onChange={(event) => setForm((atual) => ({ ...atual, grupoId: event.target.value, subgrupoId: '' }))}
+                    className="w-full rounded-lg border border-gray-300 bg-white p-2 text-black"
+                    required
+                  >
+                    <option value="">Selecione um grupo</option>
+                    {gruposSelect.map((grupo) => <option key={grupo.id} value={grupo.id}>{grupo.nome}</option>)}
                   </select>
+                  {gruposSelect.length === 0 && <Link href="/admin/estoque/grupos" className="mt-1 block text-xs font-semibold text-orange-700 hover:underline">Cadastre um grupo primeiro</Link>}
                 </div>
+                <div>
+                  <label htmlFor="subgrupo" className="mb-1 block text-sm font-medium text-black">Detalhamento <span className="font-normal text-gray-500">(opcional)</span></label>
+                  <select id="subgrupo" value={form.subgrupoId} onChange={(event) => atualizarCampo('subgrupoId', event.target.value)} disabled={!form.grupoId} className="w-full rounded-lg border border-gray-300 bg-white p-2 text-black disabled:bg-gray-100">
+                    <option value="">Geral</option>
+                    {subgruposDoGrupo.map((subgrupo) => <option key={subgrupo.id} value={subgrupo.id}>{subgrupo.nome}</option>)}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">Use apenas quando precisar dividir o grupo em classificações menores.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="plano" className="mb-1 block text-sm font-medium text-black">Plano de conta</label>
                   <select id="plano" value={form.planoContaId} onChange={(event) => atualizarCampo('planoContaId', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black">
@@ -417,7 +456,12 @@ export default function InsumosPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className={`grid gap-4 ${editing ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
+                {!editing && <div>
+                  <label htmlFor="saldoInicial" className="mb-1 block text-sm font-medium text-black">Quantidade atual</label>
+                  <input id="saldoInicial" inputMode="decimal" value={form.saldoInicial} onChange={(event) => atualizarCampo('saldoInicial', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black" />
+                  <p className="mt-1 text-xs text-gray-500">Cria a entrada inicial no histórico.</p>
+                </div>}
                 <div>
                   <label htmlFor="min" className="mb-1 block text-sm font-medium text-black">Estoque mínimo</label>
                   <input id="min" inputMode="decimal" value={form.estoqueMin} onChange={(event) => atualizarCampo('estoqueMin', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black" />
