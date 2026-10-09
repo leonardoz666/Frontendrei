@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { apiFetch } from '@/app/lib/api'
+import { Switch } from '@/app/components/ui/Switch'
 
 type MovementType = 'SANGRIA' | 'SUPRIMENTO' | 'AJUSTE'
 
@@ -218,10 +219,13 @@ export default function CaixaDashboard({ fechamento = false }: CashPanelProps) {
       <PageHeading title={fechamento ? 'Fechamento do Caixa' : 'Caixa do Dia'} subtitle={`Caixa #${data.caixa.id} aberto em ${dateTime.format(new Date(data.caixa.abertoEm))}`} onRefresh={loadStatus} />
       <CashTabs fechamento={fechamento} />
 
-      {fechamento && <label className="mt-6 flex max-w-3xl cursor-pointer items-center justify-between gap-4 border-y border-slate-200 bg-white px-4 py-3">
-        <span><span className="block text-sm font-bold text-slate-900">Fechamento cego</span><span className="text-xs text-slate-500">Oculta os valores esperados até o saldo contado ser enviado.</span></span>
-        <input type="checkbox" checked={fechamentoCego} onChange={(event) => setFechamentoCego(event.target.checked)} className="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
-      </label>}
+      {fechamento && <Switch
+        checked={fechamentoCego}
+        onCheckedChange={setFechamentoCego}
+        label="Fechamento cego"
+        description="Oculta os valores esperados até o saldo contado ser enviado."
+        className="mt-6 max-w-3xl border-y border-slate-200 bg-white px-4 py-3"
+      />}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Saldo inicial" value={formatMoney(data.saldoInicial)} icon={<Wallet size={19} />} />

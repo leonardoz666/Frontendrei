@@ -1,27 +1,29 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
+import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
+import { Switch } from '@/app/components/ui/Switch'
+import { usePagedQuery } from '@/app/lib/pagination'
+import { paginaAtual, SeloAtivo, useListaCrud } from '@/app/lib/crud-client'
 import {
   ArrowLeft,
   Camera,
   ChevronDown,
-  Edit,
   KeyRound,
   Plus,
   Save,
-  Search,
   ShieldCheck,
-  Trash2,
   UserCheck,
   UserRound,
   UserX,
 } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
-import { ApiError, apiFetch } from '@/app/lib/api'
+import { apiFetch } from '@/app/lib/api'
 
 interface User {
   id: number
@@ -61,7 +63,6 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function AdminUsersPage() {
   const { showToast } = useToast()
-  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [actor, setActor] = useState<{ id: number; role: string; permissions: string[] } | null>(null)
   const [permissionSchema, setPermissionSchema] = useState<PermissionSchema | null>(null)
@@ -80,7 +81,6 @@ export default function AdminUsersPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'TODOS' | 'ATIVOS' | 'INATIVOS'>('TODOS')
   const [expandedPermissionGroups, setExpandedPermissionGroups] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -88,19 +88,22 @@ export default function AdminUsersPage() {
   const [error, setError] = useState('')
   const [, setSuccess] = useState('')
   const router = useRouter()
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      const data = await apiFetch<User[]>('/users')
-      setUsers(data)
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) router.replace('/login')
-      else if (error instanceof ApiError && error.status === 403) router.replace('/')
-      else showToast(error instanceof Error ? error.message : 'Erro ao carregar usuários', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [router, showToast])
+  const queryClient = useQueryClient()
+  const lista = useListaCrud('/users')
+  const statusResource = statusFilter === 'TODOS'
+    ? '/users'
+    : `/users?ativo=${statusFilter === 'ATIVOS'}`
+  const usersQuery = usePagedQuery<User>({
+    ...lista.listaParams,
+    resource: statusResource,
+    enabled: actor !== null,
+  })
+  const pagina = paginaAtual(usersQuery, lista.page, lista.pageSize)
+  const resumoQuery = useQuery({
+    queryKey: ['users-resumo'],
+    queryFn: () => apiFetch<{ total: number; ativos: number; inativos: number }>('/users/resumo'),
+    enabled: actor !== null,
+  })
 
   useEffect(() => {
     const run = async () => {
@@ -116,10 +119,7 @@ export default function AdminUsersPage() {
           return
         }
         setActor(meData.user)
-        const [schema] = await Promise.all([
-          apiFetch<PermissionSchema>('/users/permissions/schema'),
-          fetchUsers(),
-        ])
+        const schema = await apiFetch<PermissionSchema>('/users/permissions/schema')
         setPermissionSchema(schema)
         setSelectedPermissions(schema.roleDefaults.GARCOM ?? [])
       } catch (error) {
@@ -129,7 +129,7 @@ export default function AdminUsersPage() {
     }
 
     run()
-  }, [fetchUsers, router, showToast])
+  }, [router, showToast])
 
   const isAdmin = actor?.role === 'DONO' || actor?.role === 'ADMIN'
   const canCreateUsers = actor?.role === 'DONO' || Boolean(actor?.permissions.includes('usuarios.criar'))
@@ -171,14 +171,11 @@ export default function AdminUsersPage() {
 
     setSaving(true)
     try {
-      const data = await apiFetch<{ user: User }>(url, {
+      await apiFetch<{ user: User }>(url, {
         method,
         body,
       })
-      setUsers(editingId
-        ? users.map(u => u.id === editingId ? data.user : u)
-        : [...users, data.user]
-      )
+      await Promise.all([usersQuery.refetch(), queryClient.invalidateQueries({ queryKey: ['users-resumo'] })])
       showToast(editingId ? 'Usuário atualizado!' : 'Usuário criado!', 'success')
       resetForm()
     } catch (error) {
@@ -259,7 +256,7 @@ export default function AdminUsersPage() {
 
     try {
       await apiFetch(`/users/${deleteTarget.id}`, { method: 'DELETE' })
-      setUsers(users.map(u => u.id === deleteTarget.id ? { ...u, ativo: false } : u))
+      await Promise.all([usersQuery.refetch(), queryClient.invalidateQueries({ queryKey: ['users-resumo'] })])
       showToast('Usuário desativado com sucesso!', 'success')
       setDeleteTarget(null)
     } catch (error) {
@@ -268,18 +265,6 @@ export default function AdminUsersPage() {
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Carregando...</div>
-
-  const normalizedSearch = searchTerm.trim().toLocaleLowerCase('pt-BR')
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = !normalizedSearch || [user.nome, user.login, user.email ?? '', user.role]
-      .some(value => value.toLocaleLowerCase('pt-BR').includes(normalizedSearch))
-    const matchesStatus = statusFilter === 'TODOS'
-      || (statusFilter === 'ATIVOS' && user.ativo)
-      || (statusFilter === 'INATIVOS' && !user.ativo)
-    return matchesSearch && matchesStatus
-  })
-  const activeUsers = users.filter(user => user.ativo).length
-  const inactiveUsers = users.length - activeUsers
 
   if (isCreating || editingId) {
     return (
@@ -346,10 +331,13 @@ export default function AdminUsersPage() {
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">Senha {editingId && <span className="font-normal text-slate-500">(opcional na edição)</span>}</label>
                   <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required={!editingId} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-orange-500" />
                 </div>
-                <button type="button" role="switch" aria-checked={ativo} onClick={() => setAtivo(!ativo)} className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left md:col-span-2">
-                  <span><span className="block text-sm font-semibold text-slate-900">Usuário ativo</span><span className="block text-xs text-slate-500">Permite entrar e operar o sistema.</span></span>
-                  <span className={`flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 ${ativo ? 'justify-end bg-emerald-600' : 'justify-start bg-slate-300'}`}><span className="h-6 w-6 rounded-full bg-white shadow-sm" /></span>
-                </button>
+                <Switch
+                  checked={ativo}
+                  onCheckedChange={setAtivo}
+                  label="Usuário ativo"
+                  description="Permite entrar e operar o sistema."
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2"
+                />
               </div>
             </section>
 
@@ -393,6 +381,50 @@ export default function AdminUsersPage() {
     )
   }
 
+  const columns: Array<DataTableColumn<User>> = [
+    {
+      key: 'nome',
+      header: 'Usuário',
+      sortKey: 'nome',
+      render: (user) => (
+        <div className="flex min-w-0 items-center gap-3">
+          {user.foto ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.foto} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+          ) : (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700">
+              {user.nome.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-slate-950">{user.nome}</span>
+            <span className="block truncate text-xs text-slate-500">@{user.login}{user.email ? ` · ${user.email}` : ''}</span>
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'role',
+      header: 'Perfil',
+      sortKey: 'role',
+      render: (user) => ROLE_LABELS[user.role] ?? user.role,
+    },
+    {
+      key: 'codOperador',
+      header: 'Operador',
+      sortKey: 'codOperador',
+      hideOnMobile: true,
+      render: (user) => user.codOperador ?? 'Automático',
+    },
+    {
+      key: 'ativo',
+      header: 'Situação',
+      sortKey: 'ativo',
+      align: 'center',
+      render: (user) => <SeloAtivo ativo={user.ativo} />,
+    },
+  ]
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-5">
@@ -402,52 +434,38 @@ export default function AdminUsersPage() {
         </header>
 
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-slate-200 pb-4">
-          <div className="flex items-center gap-2"><UserRound size={18} className="text-slate-500" /><span className="text-sm text-slate-500">Total</span><strong className="text-lg text-slate-950">{users.length}</strong></div>
-          <div className="flex items-center gap-2"><UserCheck size={18} className="text-emerald-600" /><span className="text-sm text-slate-500">Ativos</span><strong className="text-lg text-slate-950">{activeUsers}</strong></div>
-          <div className="flex items-center gap-2"><UserX size={18} className="text-red-500" /><span className="text-sm text-slate-500">Inativos</span><strong className="text-lg text-slate-950">{inactiveUsers}</strong></div>
+          <div className="flex items-center gap-2"><UserRound size={18} className="text-slate-500" /><span className="text-sm text-slate-500">Total</span><strong className="text-lg text-slate-950">{resumoQuery.data?.total ?? '—'}</strong></div>
+          <div className="flex items-center gap-2"><UserCheck size={18} className="text-emerald-600" /><span className="text-sm text-slate-500">Ativos</span><strong className="text-lg text-slate-950">{resumoQuery.data?.ativos ?? '—'}</strong></div>
+          <div className="flex items-center gap-2"><UserX size={18} className="text-red-500" /><span className="text-sm text-slate-500">Inativos</span><strong className="text-lg text-slate-950">{resumoQuery.data?.inativos ?? '—'}</strong></div>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex h-10 w-full max-w-md items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 shadow-sm focus-within:ring-2 focus-within:ring-orange-500"><Search size={17} className="text-slate-400" /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar nome, login, e-mail ou perfil" className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none" /></label>
-          <div className="grid grid-cols-3 rounded-lg bg-slate-200 p-1">{(['TODOS', 'ATIVOS', 'INATIVOS'] as const).map(filter => <button key={filter} type="button" onClick={() => setStatusFilter(filter)} className={`h-8 rounded-md px-3 text-xs font-semibold ${statusFilter === filter ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{filter === 'TODOS' ? 'Todos' : filter === 'ATIVOS' ? 'Ativos' : 'Inativos'}</button>)}</div>
-        </div>
+        {usersQuery.isError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{usersQuery.error.message}</div>}
 
-        <section aria-label="Lista de usuários">
-          {filteredUsers.length > 0 ? (
-            <div className="flex flex-wrap items-start gap-2">
-              {filteredUsers.map(user => (
-                <article key={user.id} className="relative w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 sm:w-[250px]">
-                  <div className="flex min-w-0 items-center gap-2.5 pr-16">
-                    {user.foto ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={user.foto} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-                    ) : (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{user.nome.charAt(0).toUpperCase()}</div>
-                    )}
-                    <div className="min-w-0">
-                      <h2 className="truncate text-sm font-bold text-slate-950">{user.nome}</h2>
-                      <p className="truncate text-xs text-slate-500">@{user.login}{user.email ? ` · ${user.email}` : ''}</p>
-                    </div>
-                  </div>
-
-                  <dl className="mt-2 flex min-w-0 items-center gap-2 border-t border-slate-100 pt-2 text-xs">
-                    <div className="min-w-0"><dt className="sr-only">Perfil</dt><dd className="truncate font-semibold text-slate-700">{ROLE_LABELS[user.role] ?? user.role}</dd></div>
-                    <span aria-hidden="true" className="text-slate-300">·</span>
-                    <div className="min-w-0"><dt className="sr-only">Operador</dt><dd className="truncate text-slate-500">Op. {user.codOperador ?? 'automático'}</dd></div>
-                    <div className="ml-auto shrink-0"><dt className="sr-only">Status</dt><dd className={`inline-flex items-center gap-1 font-semibold ${user.ativo ? 'text-emerald-700' : 'text-red-700'}`}><span className={`h-1.5 w-1.5 rounded-full ${user.ativo ? 'bg-emerald-500' : 'bg-red-500'}`} />{user.ativo ? 'Ativo' : 'Inativo'}</dd></div>
-                  </dl>
-
-                  <div className="absolute right-2 top-2 flex items-center">
-                    {canEditUsers && canManage(user) && <Button variant="ghost" size="icon" title="Editar usuário" className="h-8 w-8" onClick={() => handleEdit(user)}><Edit size={15} /></Button>}
-                    {canDeleteUsers && canManage(user) && user.id !== actor?.id && <Button variant="ghost" size="icon" title="Desativar usuário" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(user)}><Trash2 size={15} /></Button>}
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-slate-200 bg-white px-6 py-14 text-center"><UserRound size={28} className="mx-auto mb-3 text-slate-300" /><p className="font-semibold text-slate-700">Nenhum usuário encontrado</p><p className="mt-1 text-sm text-slate-500">Altere a busca ou o filtro de status.</p></div>
-          )}
-        </section>
+        <DataTable<User>
+          columns={columns}
+          data={pagina.data}
+          getRowId={(user) => user.id}
+          meta={pagina.meta}
+          loading={usersQuery.isLoading || usersQuery.isFetching}
+          storageKey="admin-usuarios"
+          itemLabel="usuários"
+          emptyMessage="Nenhum usuário encontrado"
+          emptyHint="Altere a busca ou o filtro de situação."
+          toolbar={<div className="grid grid-cols-3 rounded-lg bg-slate-200 p-1">{(['TODOS', 'ATIVOS', 'INATIVOS'] as const).map(filter => <button key={filter} type="button" onClick={() => { setStatusFilter(filter); lista.reiniciarPagina() }} className={`h-8 rounded-md px-3 text-xs font-semibold ${statusFilter === filter ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{filter === 'TODOS' ? 'Todos' : filter === 'ATIVOS' ? 'Ativos' : 'Inativos'}</button>)}</div>}
+          rowActions={{
+            onEdit: handleEdit,
+            onDelete: setDeleteTarget,
+            editLabel: 'Editar usuário',
+            deleteLabel: 'Desativar usuário',
+            canEdit: (user) => canEditUsers && canManage(user),
+            canDelete: (user) => canDeleteUsers && canManage(user) && user.id !== actor?.id,
+          }}
+          onPageChange={lista.setPage}
+          onPageSizeChange={lista.setPageSize}
+          onSearch={lista.definirBusca}
+          onSort={lista.definirOrdenacao}
+          ariaLabel="Lista de usuários"
+        />
 
         <ConfirmationModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Desativar usuário?" description={`O usuário ${deleteTarget?.nome ?? ''} não conseguirá mais fazer login, mas o histórico será preservado.`} confirmText="Desativar" variant="danger" />
       </div>

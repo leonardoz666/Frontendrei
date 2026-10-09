@@ -12,34 +12,7 @@ import {
   type SidebarVisibilityState,
 } from '@/app/lib/navigation'
 import { initializeUiPreferences } from '@/app/lib/uiPreferences'
-
-function VisibilitySwitch({
-  checked,
-  disabled = false,
-  label,
-  onChange,
-}: {
-  checked: boolean
-  disabled?: boolean
-  label: string
-  onChange: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={onChange}
-      className={`flex h-7 w-12 shrink-0 items-center rounded-full border p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${
-        checked ? 'border-orange-600 bg-orange-600' : 'border-slate-300 bg-slate-200'
-      } ${checked ? 'justify-end' : 'justify-start'}`}
-    >
-      <span className="h-5 w-5 rounded-full border border-slate-200 bg-white shadow-sm" />
-    </button>
-  )
-}
+import { Switch } from '@/app/components/ui/Switch'
 
 export default function SidebarVisibilityPage() {
   const [user, setUser] = useState<NavUser | null>(null)
@@ -150,10 +123,11 @@ export default function SidebarVisibilityPage() {
               <span className="mt-0.5 block text-xs text-slate-500">{section.items.length} opção(ões)</span>
             </span>
           </button>
-          <VisibilitySwitch
+          <Switch
             checked={sectionVisible}
             label={`${sectionVisible ? 'Ocultar' : 'Exibir'} categoria ${section.label}`}
-            onChange={() => toggleSection(section.id)}
+            onCheckedChange={() => toggleSection(section.id)}
+            className="[&>span:first-child]:sr-only"
           />
         </div>
 
@@ -179,11 +153,12 @@ export default function SidebarVisibilityPage() {
                         </p>
                         {item.disabled && <p className="text-xs text-slate-400">Em breve</p>}
                       </div>
-                      <VisibilitySwitch
+                      <Switch
                         checked={itemVisible}
                         disabled={!sectionVisible}
                         label={`${itemVisible ? 'Ocultar' : 'Exibir'} ${item.label}`}
-                        onChange={() => toggleItem(item.href)}
+                        onCheckedChange={() => toggleItem(item.href)}
+                        className="[&>span:first-child]:sr-only"
                       />
                     </div>
                   )
@@ -245,10 +220,11 @@ export default function SidebarVisibilityPage() {
                 <p className="text-sm font-bold text-slate-900">{option.title}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{option.description}</p>
               </div>
-              <VisibilitySwitch
+              <Switch
                 checked={!visibility[option.key]}
                 label={`${visibility[option.key] ? 'Exibir' : 'Ocultar'} ${option.title.toLowerCase()}`}
-                onChange={() => persist({ ...visibility, [option.key]: !visibility[option.key] })}
+                onCheckedChange={() => persist({ ...visibility, [option.key]: !visibility[option.key] })}
+                className="[&>span:first-child]:sr-only"
               />
             </div>
           ))}

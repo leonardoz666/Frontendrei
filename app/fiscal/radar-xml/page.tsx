@@ -4,7 +4,10 @@ import Link from 'next/link'
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, DownloadCloud, FileSearch, Upload } from 'lucide-react'
 import { Button } from '@/app/components/ui/Button'
+import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { apiFetch } from '@/app/lib/api'
+import { usePagedQuery } from '@/app/lib/pagination'
+import { paginaAtual, useListaCrud } from '@/app/lib/crud-client'
 import { useToast } from '@/contexts/ToastContext'
 
 type PessoaXml = {
@@ -78,13 +81,6 @@ type XmlRecebido = {
 
 type TipoManifestacao = 'CIENCIA' | 'CONFIRMACAO' | 'DESCONHECIMENTO' | 'NAO_REALIZADA'
 
-type ListaApi<T> = {
-  data: T[]
-  meta: {
-    total: number
-  }
-}
-
 function dinheiro(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(valor || 0))
 }
@@ -107,27 +103,34 @@ export default function RadarXmlPage() {
   const [xml, setXml] = useState('')
   const [resultado, setResultado] = useState<RadarXmlResumo | null>(null)
   const [status, setStatus] = useState<RadarDfeStatus | null>(null)
-  const [recebidos, setRecebidos] = useState<XmlRecebido[]>([])
   const [analisando, setAnalisando] = useState(false)
   const [sincronizando, setSincronizando] = useState(false)
   const [importando, setImportando] = useState(false)
   const [manifestandoId, setManifestandoId] = useState<number | null>(null)
   const [manifestacoes, setManifestacoes] = useState<Record<number, TipoManifestacao>>({})
   const [activeTab, setActiveTab] = useState<'sefaz' | 'manual'>('sefaz')
+  const lista = useListaCrud('/fiscal/radar-xml/recebidos')
+  const recebidosQuery = usePagedQuery<XmlRecebido>({
+    ...lista.listaParams,
+    sort: lista.sort ?? 'recebidoEm',
+    order: lista.order ?? 'desc',
+    enabled: activeTab === 'sefaz',
+  })
+  const pagina = paginaAtual(recebidosQuery, lista.page, lista.pageSize)
 
-  const carregarRadar = useCallback(async () => {
-    const [statusAtual, lista] = await Promise.all([
-      apiFetch<RadarDfeStatus>('/fiscal/radar-xml/status'),
-      apiFetch<ListaApi<XmlRecebido>>('/fiscal/radar-xml/recebidos?page=1&pageSize=10&sort=recebidoEm&order=desc'),
-    ])
+  const carregarStatus = useCallback(async () => {
+    const statusAtual = await apiFetch<RadarDfeStatus>('/fiscal/radar-xml/status')
     setStatus(statusAtual)
-    setRecebidos(lista.data)
   }, [])
 
+  const recarregarRadar = async () => {
+    await Promise.all([carregarStatus(), recebidosQuery.refetch()])
+  }
+
   useEffect(() => {
-    carregarRadar()
+    carregarStatus()
       .catch((err) => showToast(err instanceof Error ? err.message : 'Erro ao carregar Radar XML', 'error'))
-  }, [carregarRadar, showToast])
+  }, [carregarStatus, showToast])
 
   const resumoUso = useMemo(() => {
     if (!resultado) return null
@@ -175,7 +178,7 @@ export default function RadarXmlPage() {
     try {
       await apiFetch('/fiscal/radar-xml/importar', { method: 'POST', body: { xml } })
       showToast('XML salvo no Radar', 'success')
-      await carregarRadar()
+      await recarregarRadar()
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao salvar XML no Radar', 'error')
     } finally {
@@ -188,10 +191,10 @@ export default function RadarXmlPage() {
     try {
       const resposta = await apiFetch<{ documentosRecebidos: number; documentosNovos: number; motivo: string | null }>('/fiscal/radar-xml/sincronizar', { method: 'POST' })
       showToast(`${resposta.documentosRecebidos} documento(s) retornado(s) pela SEFAZ`, resposta.documentosRecebidos > 0 ? 'success' : 'warning')
-      await carregarRadar()
+      await recarregarRadar()
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao consultar SEFAZ por NSU', 'error')
-      await carregarRadar().catch(() => undefined)
+      await recarregarRadar().catch(() => undefined)
     } finally {
       setSincronizando(false)
     }
@@ -204,7 +207,7 @@ export default function RadarXmlPage() {
         body: { statusConferencia },
       })
       showToast('Status de conferência atualizado', 'success')
-      await carregarRadar()
+      await recarregarRadar()
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao atualizar conferência', 'error')
     }
@@ -228,13 +231,93 @@ export default function RadarXmlPage() {
         body: { tipo, justificativa },
       })
       showToast(resposta.avisoConsulta ?? 'Manifestação enviada à SEFAZ', resposta.avisoConsulta ? 'warning' : 'success')
-      await carregarRadar()
+      await recarregarRadar()
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao manifestar documento', 'error')
     } finally {
       setManifestandoId(null)
     }
   }
+
+  const colunasRecebidos: Array<DataTableColumn<XmlRecebido>> = [
+    {
+      key: 'nsu',
+      header: 'NSU',
+      sortKey: 'nsu',
+      hideOnMobile: true,
+      render: (item) => <span className="font-mono text-xs text-gray-700">{item.nsu}</span>,
+    },
+    {
+      key: 'documento',
+      header: 'Documento',
+      render: (item) => (
+        <span>
+          <span className="block font-medium text-gray-900">{item.tipoDocumento} {item.serie && item.numero ? `${item.serie}/${item.numero}` : ''}</span>
+          <span className="block max-w-[260px] break-all font-mono text-xs text-gray-500">{item.chave ?? '-'}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'emitente',
+      header: 'Emitente',
+      sortKey: 'emitenteNome',
+      render: (item) => (
+        <span>
+          <span className="block font-medium text-gray-900">{item.emitenteNome ?? '-'}</span>
+          <span className="block text-xs text-gray-500">{documento(item.emitenteDoc)}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'emitidaEm',
+      header: 'Emissão',
+      sortKey: 'emitidaEm',
+      hideOnMobile: true,
+      render: (item) => dataFiscal(item.emitidaEm),
+    },
+    {
+      key: 'valorTotal',
+      header: 'Valor',
+      sortKey: 'valorTotal',
+      align: 'right',
+      render: (item) => <span className="font-medium text-gray-900">{dinheiro(item.valorTotal)}</span>,
+    },
+    {
+      key: 'conferencia',
+      header: 'Conferência',
+      hideOnMobile: true,
+      render: (item) => (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-700">{item.statusConferencia}</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => void atualizarConferencia(item, 'CONFERIDO')}>Conferido</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => void atualizarConferencia(item, 'IGNORADO')}>Ignorar</Button>
+        </div>
+      ),
+    },
+    {
+      key: 'manifestacao',
+      header: 'Manifestação',
+      render: (item) => (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-gray-700">{item.statusManifestacao}</p>
+          <div className="flex items-center gap-2">
+            <select
+              aria-label={`Manifestação da nota ${item.numero ?? item.id}`}
+              value={manifestacoes[item.id] ?? 'CIENCIA'}
+              onChange={(event) => setManifestacoes((atual) => ({ ...atual, [item.id]: event.target.value as TipoManifestacao }))}
+              className="h-9 max-w-40 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="CIENCIA">Ciência</option>
+              <option value="CONFIRMACAO">Confirmar operação</option>
+              <option value="DESCONHECIMENTO">Desconhecer operação</option>
+              <option value="NAO_REALIZADA">Operação não realizada</option>
+            </select>
+            <Button type="button" size="sm" onClick={() => void manifestar(item)} isLoading={manifestandoId === item.id} disabled={!item.chave}>Enviar</Button>
+          </div>
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="mx-auto min-w-0 max-w-7xl px-4 py-6 [overflow-wrap:anywhere] sm:px-6 lg:px-8">
@@ -445,84 +528,29 @@ export default function RadarXmlPage() {
         </section>
       )}
 
-      {activeTab === 'sefaz' && <section className="mt-6 overflow-hidden border-y border-gray-200 bg-white">
-        <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-5">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">XMLs recebidos</h2>
-            <p className="text-sm text-gray-600">Histórico vindo da consulta por NSU e importações manuais.</p>
-          </div>
-          <Button type="button" variant="outline" onClick={() => void carregarRadar()}>
-            Atualizar
-          </Button>
+      {activeTab === 'sefaz' && <section className="mt-6 border-y border-gray-200 bg-white px-4 py-5 sm:px-5">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">XMLs recebidos</h2>
+          <p className="text-sm text-gray-600">Histórico vindo da consulta por NSU e importações manuais.</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] text-left text-sm">
-            <thead className="border-y border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-3 py-2">NSU</th>
-                <th className="px-3 py-2">Documento</th>
-                <th className="px-3 py-2">Emitente</th>
-                <th className="px-3 py-2">Emissão</th>
-                <th className="px-3 py-2 text-right">Valor</th>
-                <th className="px-3 py-2">Conferência</th>
-                <th className="px-3 py-2">Manifestação</th>
-                <th className="px-3 py-2">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {recebidos.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-gray-500">Nenhum XML recebido ainda</td>
-                </tr>
-              )}
-              {recebidos.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-700">{item.nsu}</td>
-                  <td className="px-3 py-2">
-                    <p className="font-medium text-gray-900">{item.tipoDocumento} {item.serie && item.numero ? `${item.serie}/${item.numero}` : ''}</p>
-                    <p className="max-w-[260px] break-all font-mono text-xs text-gray-500">{item.chave ?? '-'}</p>
-                  </td>
-                  <td className="px-3 py-2">
-                    <p className="font-medium text-gray-900">{item.emitenteNome ?? '-'}</p>
-                    <p className="text-xs text-gray-500">{documento(item.emitenteDoc)}</p>
-                  </td>
-                  <td className="px-3 py-2 text-gray-700">{dataFiscal(item.emitidaEm)}</td>
-                  <td className="px-3 py-2 text-right font-medium text-gray-900">{dinheiro(item.valorTotal)}</td>
-                  <td className="px-3 py-2 font-medium text-gray-900">{item.statusConferencia}</td>
-                  <td className="px-3 py-2">
-                    <p className="mb-2 text-xs font-semibold text-gray-700">{item.statusManifestacao}</p>
-                    <div className="flex items-center gap-2">
-                      <select
-                        aria-label={`Manifestação da nota ${item.numero ?? item.id}`}
-                        value={manifestacoes[item.id] ?? 'CIENCIA'}
-                        onChange={(event) => setManifestacoes((atual) => ({ ...atual, [item.id]: event.target.value as TipoManifestacao }))}
-                        className="h-9 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                      >
-                        <option value="CIENCIA">Ciência</option>
-                        <option value="CONFIRMACAO">Confirmar operação</option>
-                        <option value="DESCONHECIMENTO">Desconhecer operação</option>
-                        <option value="NAO_REALIZADA">Operação não realizada</option>
-                      </select>
-                      <Button type="button" size="sm" onClick={() => void manifestar(item)} isLoading={manifestandoId === item.id} disabled={!item.chave}>
-                        Enviar
-                      </Button>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => void atualizarConferencia(item, 'CONFERIDO')}>
-                        Conferido
-                      </Button>
-                      <Button type="button" size="sm" variant="ghost" onClick={() => void atualizarConferencia(item, 'IGNORADO')}>
-                        Ignorar
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {recebidosQuery.isError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{recebidosQuery.error.message}</div>}
+        <DataTable<XmlRecebido>
+          columns={colunasRecebidos}
+          data={pagina.data}
+          getRowId={(item) => item.id}
+          meta={pagina.meta}
+          loading={recebidosQuery.isLoading || recebidosQuery.isFetching}
+          storageKey="fiscal-radar-xml"
+          itemLabel="documentos"
+          emptyMessage="Nenhum XML recebido ainda"
+          emptyHint="Sincronize com a SEFAZ ou importe um XML manualmente."
+          toolbar={<Button type="button" variant="outline" onClick={() => void recarregarRadar()}>Atualizar</Button>}
+          onPageChange={lista.setPage}
+          onPageSizeChange={lista.setPageSize}
+          onSearch={lista.definirBusca}
+          onSort={lista.definirOrdenacao}
+          ariaLabel="XMLs recebidos"
+        />
       </section>}
     </div>
   )

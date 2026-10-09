@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Power, PowerOff } from 'lucide-react'
 import { Button } from '@/app/components/ui/Button'
+import { Switch } from '@/app/components/ui/Switch'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { usePagedQuery } from '@/app/lib/pagination'
@@ -614,20 +615,13 @@ export default function ComplementosPage() {
                 </div>
               </div>
 
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3">
-                <input
-                  type="checkbox"
-                  checked={grupoForm.obrigatorio}
-                  onChange={() => atualizarGrupoCampo('obrigatorio', !grupoForm.obrigatorio)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                />
-                <span className="text-sm text-gray-700">
-                  <span className="font-medium text-gray-900">Obrigatório</span>
-                  <span className="block text-xs text-gray-500">
-                    O produto exigirá que o operador escolha pelo menos o mínimo definido.
-                  </span>
-                </span>
-              </label>
+              <Switch
+                checked={grupoForm.obrigatorio}
+                onCheckedChange={(checked) => atualizarGrupoCampo('obrigatorio', checked)}
+                label="Obrigatório"
+                description="O produto exigirá que o operador escolha pelo menos o mínimo definido."
+                className="rounded-lg border border-gray-200 p-3"
+              />
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={fecharGrupoForm} disabled={salvandoGrupo}>

@@ -6,6 +6,7 @@ import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
+import { Switch } from '@/app/components/ui/Switch'
 import { ExportMenu } from '@/app/components/ui/ExportMenu'
 import { apiFetch, fetchList } from '@/app/lib/api'
 import { usePagedQuery } from '@/app/lib/pagination'
@@ -309,10 +310,12 @@ function MovimentacoesEstoqueContent() {
                 <textarea id="mov-motivo" value={form.motivo} onChange={(event) => atualizarCampo('motivo', event.target.value)} className="min-h-20 w-full rounded-lg border border-gray-300 p-2 text-black" />
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" checked={form.permitirNegativo} onChange={(event) => atualizarCampo('permitirNegativo', event.target.checked)} className="h-4 w-4 rounded border-gray-300 text-orange-600" />
-                Autorizar saldo negativo quando minha permissão permitir
-              </label>
+              <Switch
+                checked={form.permitirNegativo}
+                onCheckedChange={(checked) => atualizarCampo('permitirNegativo', checked)}
+                label="Autorizar saldo negativo"
+                description="O movimento só será aceito quando sua permissão também permitir."
+              />
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={fecharForm} disabled={salvando}>Cancelar</Button>

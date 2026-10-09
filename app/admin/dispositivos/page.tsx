@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Crown, Power, PowerOff, Printer, RefreshCw, Trash2 } from 'lucide-react'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
+import { Switch } from '@/app/components/ui/Switch'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
 import { apiFetch } from '@/app/lib/api'
 import { usePagedQuery } from '@/app/lib/pagination'
@@ -328,7 +329,7 @@ export default function DispositivosPage() {
               throw erroDoAgente(error)
             }
           })()
-        : await apiFetch<{ message?: string }>(`/printers/${dispositivo.id}/test`, { method: 'POST' })
+        : await apiFetch<{ message?: string }>(`/dispositivos/${dispositivo.id}/test`, { method: 'POST' })
       showToast(body.message || 'Teste enviado para a impressora', 'success')
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao testar impressora', 'error')
@@ -719,39 +720,19 @@ export default function DispositivosPage() {
                   Funções da impressora
                 </legend>
 
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={form.isCaixa}
-                    onChange={() => alternarFlag('isCaixa')}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    <span className="font-medium text-gray-900">Padrão do caixa</span>
-                    <span className="block text-xs text-gray-500">
-                      Imprime a conta/fechamento. Só UMA impressora pode ser caixa ao mesmo tempo:
-                      marcar este <strong>desmarca automaticamente o anterior</strong> (RF-DIS-02).
-                    </span>
-                  </span>
-                </label>
+                <Switch
+                  checked={form.isCaixa}
+                  onCheckedChange={() => alternarFlag('isCaixa')}
+                  label="Padrão do caixa"
+                  description="Imprime a conta/fechamento. Só uma impressora pode ser caixa; marcar esta desmarca a anterior."
+                />
 
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={form.vincularTodos}
-                    onChange={() => alternarFlag('vincularTodos')}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    <span className="font-medium text-gray-900">
-                      Vincular todos os produtos da praça
-                    </span>
-                    <span className="block text-xs text-gray-500">
-                      Sugere esta impressora para a praça inteira no wizard de vínculos (RF-DIS-04).
-                      Não cria vínculo sozinho.
-                    </span>
-                  </span>
-                </label>
+                <Switch
+                  checked={form.vincularTodos}
+                  onCheckedChange={() => alternarFlag('vincularTodos')}
+                  label="Vincular todos os produtos da praça"
+                  description="Sugere esta impressora para a praça inteira no wizard de vínculos. Não cria vínculo sozinho."
+                />
               </fieldset>
 
               <div className="flex justify-end gap-2 pt-2">
