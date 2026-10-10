@@ -6,18 +6,22 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
-import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
+import { Pagination } from '@/app/components/ui/Pagination'
 import { Switch } from '@/app/components/ui/Switch'
-import { usePagedQuery } from '@/app/lib/pagination'
-import { paginaAtual, SeloAtivo, useListaCrud } from '@/app/lib/crud-client'
+import Skeleton from '@/app/components/ui/Skeleton'
+import { PAGE_SIZE_OPTIONS, usePagedQuery } from '@/app/lib/pagination'
+import { paginaAtual, useListaCrud } from '@/app/lib/crud-client'
 import {
   ArrowLeft,
   Camera,
   ChevronDown,
+  Edit,
   KeyRound,
   Plus,
   Save,
+  Search,
   ShieldCheck,
+  Trash2,
   UserCheck,
   UserRound,
   UserX,
@@ -383,50 +387,6 @@ export default function AdminUsersPage() {
     )
   }
 
-  const columns: Array<DataTableColumn<User>> = [
-    {
-      key: 'nome',
-      header: 'Usuário',
-      sortKey: 'nome',
-      render: (user) => (
-        <div className="flex min-w-0 items-center gap-3">
-          {user.foto ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.foto} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
-          ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700">
-              {user.nome.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <span className="min-w-0">
-            <span className="block truncate font-semibold text-slate-950">{user.nome}</span>
-            <span className="block truncate text-xs text-slate-500">@{user.login}{user.email ? ` · ${user.email}` : ''}</span>
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'role',
-      header: 'Perfil',
-      sortKey: 'role',
-      render: (user) => ROLE_LABELS[user.role] ?? user.role,
-    },
-    {
-      key: 'codOperador',
-      header: 'Operador',
-      sortKey: 'codOperador',
-      hideOnMobile: true,
-      render: (user) => user.codOperador ?? 'Automático',
-    },
-    {
-      key: 'ativo',
-      header: 'Situação',
-      sortKey: 'ativo',
-      align: 'center',
-      render: (user) => <SeloAtivo ativo={user.ativo} />,
-    },
-  ]
-
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-5">
@@ -443,31 +403,89 @@ export default function AdminUsersPage() {
 
         {usersQuery.isError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{usersQuery.error.message}</div>}
 
-        <DataTable<User>
-          columns={columns}
-          data={pagina.data}
-          getRowId={(user) => user.id}
-          meta={pagina.meta}
-          loading={usersQuery.isLoading || usersQuery.isFetching}
-          storageKey="admin-usuarios"
-          itemLabel="usuários"
-          emptyMessage="Nenhum usuário encontrado"
-          emptyHint="Altere a busca ou o filtro de situação."
-          toolbar={<div className="grid grid-cols-3 rounded-lg bg-slate-200 p-1">{(['TODOS', 'ATIVOS', 'INATIVOS'] as const).map(filter => <button key={filter} type="button" onClick={() => { setStatusFilter(filter); lista.reiniciarPagina() }} className={`h-8 rounded-md px-3 text-xs font-semibold ${statusFilter === filter ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{filter === 'TODOS' ? 'Todos' : filter === 'ATIVOS' ? 'Ativos' : 'Inativos'}</button>)}</div>}
-          rowActions={{
-            onEdit: handleEdit,
-            onDelete: setDeleteTarget,
-            editLabel: 'Editar usuário',
-            deleteLabel: 'Desativar usuário',
-            canEdit: (user) => canEditUsers && canManage(user),
-            canDelete: (user) => canDeleteUsers && canManage(user) && user.id !== actor?.id,
-          }}
-          onPageChange={lista.setPage}
-          onPageSizeChange={lista.setPageSize}
-          onSearch={lista.definirBusca}
-          onSort={lista.definirOrdenacao}
-          ariaLabel="Lista de usuários"
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <label htmlFor="usuarios-page-size" className="whitespace-nowrap">Exibir</label>
+            <select
+              id="usuarios-page-size"
+              value={lista.pageSize}
+              onChange={(event) => lista.setPageSize(Number(event.target.value))}
+              className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+            >
+              {PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size}</option>)}
+            </select>
+            <span className="whitespace-nowrap">resultados por página</span>
+          </div>
+
+          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <label className="flex h-9 w-full max-w-xs items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-100">
+              <Search size={16} className="shrink-0 text-slate-400" />
+              <input
+                type="search"
+                value={lista.search}
+                onChange={(event) => lista.definirBusca(event.target.value)}
+                placeholder="Pesquisar..."
+                aria-label="Pesquisar usuários"
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+              />
+            </label>
+            <div className="grid grid-cols-3 rounded-lg bg-slate-200 p-1">
+              {(['TODOS', 'ATIVOS', 'INATIVOS'] as const).map(filter => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => { setStatusFilter(filter); lista.reiniciarPagina() }}
+                  className={`h-8 rounded-md px-3 text-xs font-semibold ${statusFilter === filter ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  {filter === 'TODOS' ? 'Todos' : filter === 'ATIVOS' ? 'Ativos' : 'Inativos'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <section aria-label="Lista de usuários">
+          {usersQuery.isLoading ? (
+            <div className="flex flex-wrap items-start gap-2">
+              {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[94px] w-full rounded-lg sm:w-[250px]" />)}
+            </div>
+          ) : pagina.data.length > 0 ? (
+            <div className={`transition-opacity ${usersQuery.isFetching ? 'opacity-60' : 'opacity-100'} flex flex-wrap items-start gap-2`}>
+              {pagina.data.map(user => (
+                <article key={user.id} className="relative w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 hover:shadow-sm sm:w-[250px]">
+                  <div className="flex min-w-0 items-center gap-2.5 pr-16">
+                    {user.foto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={user.foto} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-700">{user.nome.charAt(0).toUpperCase()}</div>
+                    )}
+                    <div className="min-w-0">
+                      <h2 className="truncate text-sm font-bold text-slate-950">{user.nome}</h2>
+                      <p className="truncate text-xs text-slate-500">@{user.login}{user.email ? ` · ${user.email}` : ''}</p>
+                    </div>
+                  </div>
+
+                  <dl className="mt-2 flex min-w-0 items-center gap-2 border-t border-slate-100 pt-2 text-xs">
+                    <div className="min-w-0"><dt className="sr-only">Perfil</dt><dd className="truncate font-semibold text-slate-700">{ROLE_LABELS[user.role] ?? user.role}</dd></div>
+                    <span aria-hidden="true" className="text-slate-300">·</span>
+                    <div className="min-w-0"><dt className="sr-only">Operador</dt><dd className="truncate text-slate-500">Op. {user.codOperador ?? 'automático'}</dd></div>
+                    <div className="ml-auto shrink-0"><dt className="sr-only">Status</dt><dd className={`inline-flex items-center gap-1 font-semibold ${user.ativo ? 'text-emerald-700' : 'text-red-700'}`}><span className={`h-1.5 w-1.5 rounded-full ${user.ativo ? 'bg-emerald-500' : 'bg-red-500'}`} />{user.ativo ? 'Ativo' : 'Inativo'}</dd></div>
+                  </dl>
+
+                  <div className="absolute right-2 top-2 flex items-center">
+                    {canEditUsers && canManage(user) && <Button variant="ghost" size="icon" title="Editar usuário" aria-label="Editar usuário" className="h-8 w-8" onClick={() => handleEdit(user)}><Edit size={15} /></Button>}
+                    {canDeleteUsers && canManage(user) && user.id !== actor?.id && <Button variant="ghost" size="icon" title="Desativar usuário" aria-label="Desativar usuário" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(user)}><Trash2 size={15} /></Button>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white px-6 py-14 text-center"><UserRound size={28} className="mx-auto mb-3 text-slate-300" /><p className="font-semibold text-slate-700">Nenhum usuário encontrado</p><p className="mt-1 text-sm text-slate-500">Altere a busca ou o filtro de situação.</p></div>
+          )}
+
+          <Pagination meta={pagina.meta} onPageChange={lista.setPage} disabled={usersQuery.isFetching} itemLabel="usuários" className="mt-3 rounded-lg border border-slate-200 bg-white" />
+        </section>
 
         <ConfirmationModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Desativar usuário?" description={`O usuário ${deleteTarget?.nome ?? ''} não conseguirá mais fazer login, mas o histórico será preservado.`} confirmText="Desativar" variant="danger" />
       </div>
