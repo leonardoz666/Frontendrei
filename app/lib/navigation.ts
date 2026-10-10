@@ -78,10 +78,6 @@ export type NavPermission =
   | 'fiscal.emitir'
   | 'fiscal.cancelar'
   | 'fiscal.configurar'
-  | 'hotelaria.visualizar'
-  | 'hotelaria.reservar'
-  | 'hotelaria.checkin'
-  | 'hotelaria.governanca'
 
 /** Nomes de ícone do `lucide-react` usados na árvore (resolvidos em `Sidebar.tsx`). */
 export type NavIconName =
@@ -106,9 +102,6 @@ export type NavIconName =
   | 'CalendarDays'
   | 'Pencil'
   | 'Shield'
-  | 'BedDouble'
-  | 'UserCheck'
-  | 'Sparkles'
   | 'Landmark'
   | 'Bike'
   | 'FileText'
@@ -398,44 +391,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Auditoria',
         icon: 'Shield',
         permission: 'ponto.auditar',
-      },
-    ],
-  },
-  {
-    id: 'hotelaria',
-    label: 'Hotelaria',
-    icon: 'BedDouble',
-    items: [
-      {
-        href: '/hotelaria',
-        label: 'Painel',
-        icon: 'BedDouble',
-        permission: 'hotelaria.visualizar',
-      },
-      {
-        href: '/hotelaria/reservas',
-        label: 'Reservas',
-        icon: 'CalendarDays',
-        permission: 'hotelaria.reservar',
-      },
-      {
-        href: '/hotelaria/mapa',
-        label: 'Mapa de Reservas',
-        icon: 'BedDouble',
-        permission: 'hotelaria.visualizar',
-      },
-      {
-        href: '/hotelaria/checkin',
-        label: 'Check-in',
-        icon: 'UserCheck',
-        permission: 'hotelaria.checkin',
-        disabled: true,
-      },
-      {
-        href: '/hotelaria/governanca',
-        label: 'Governança',
-        icon: 'Sparkles',
-        permission: 'hotelaria.governanca',
       },
     ],
   },
