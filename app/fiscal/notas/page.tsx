@@ -147,7 +147,7 @@ export default function NotasFiscaisPage() {
             </div>
             {relatorio.produtos.length > 0 && (
               <div className="overflow-x-auto rounded-lg border border-gray-200">
-                <table className="w-full text-left text-sm">
+                <table className="w-full min-w-[520px] text-left text-sm">
                   <thead className="bg-gray-50 text-xs uppercase text-gray-600"><tr><th className="px-3 py-2">Produto</th><th className="px-3 py-2 text-right">Quantidade</th><th className="px-3 py-2 text-right">Valor</th></tr></thead>
                   <tbody className="divide-y divide-gray-100">{relatorio.produtos.map((produto) => <tr key={`${produto.codigo}-${produto.descricao}`}><td className="px-3 py-2"><span className="font-medium text-gray-900">{produto.descricao}</span><span className="ml-2 font-mono text-xs text-gray-500">{produto.codigo}</span></td><td className="px-3 py-2 text-right">{produto.quantidade.toLocaleString('pt-BR')}</td><td className="px-3 py-2 text-right">{formatarMoeda(produto.valor)}</td></tr>)}</tbody>
                 </table>

@@ -423,7 +423,7 @@ export default function PontoPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Controle de ponto</h1>
       <p className="mb-6 text-sm text-gray-600">
         Registro imutável com NSR sequencial. AFD aqui é placeholder até validação jurídica do leiaute REP-P.

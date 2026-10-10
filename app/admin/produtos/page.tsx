@@ -476,7 +476,7 @@ export default function ProdutosPage() {
           <Skeleton className="w-10 h-10 rounded-xl" />
           <Skeleton className="w-10 h-10 rounded-xl" />
         </div>
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+        <div className="grid grid-cols-3 gap-3 min-[380px]:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
           {Array.from({ length: 20 }).map((_, i) => (
             <div key={i} className="bg-white rounded-xl overflow-hidden border border-gray-200">
               <Skeleton className="aspect-square w-full" />
@@ -493,7 +493,7 @@ export default function ProdutosPage() {
 
   return (
     <div className="min-h-screen pb-32 bg-gray-50 relative">
-      <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-200 z-40 p-4">
+      <header className="sticky top-14 z-40 border-b border-gray-200 bg-white/90 p-4 backdrop-blur-md md:top-0">
         <div className="flex items-center justify-between mb-4">
           <button onClick={() => router.push('/')} className="p-2 -ml-2 text-gray-500 hover:text-gray-900 transition-colors">
             <ArrowLeft size={24} />
@@ -503,8 +503,8 @@ export default function ProdutosPage() {
         </div>
 
         {/* Search & Add */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        <div className="grid grid-cols-4 gap-2 sm:flex">
+          <div className="relative col-span-4 sm:flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
@@ -519,28 +519,28 @@ export default function ProdutosPage() {
           </div>
           <button
             onClick={() => setIsAdding(true)}
-            className="bg-blue-600 text-white font-bold p-2.5 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20 active:scale-95 transition-transform"
+            className="flex min-h-10 items-center justify-center rounded-xl bg-blue-600 p-2.5 font-bold text-white shadow-lg shadow-blue-900/20 transition-transform active:scale-95"
           >
             <Plus size={20} />
           </button>
           <button
             onClick={() => setConfirmarFixSetores(true)}
             title="Auto-corrigir setores (Cozinha/Bar) de TODO o cardápio"
-            className="bg-white text-gray-700 font-bold p-2.5 rounded-xl flex items-center justify-center border border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform"
+            className="flex min-h-10 items-center justify-center rounded-xl border border-gray-200 bg-white p-2.5 font-bold text-gray-700 transition-transform hover:bg-gray-50 active:scale-95"
           >
             <Wand2 size={18} />
           </button>
           <button
             onClick={handleExport}
             title="Exportar cardápio (JSON)"
-            className="bg-white text-gray-700 font-bold p-2.5 rounded-xl flex items-center justify-center border border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform"
+            className="flex min-h-10 items-center justify-center rounded-xl border border-gray-200 bg-white p-2.5 font-bold text-gray-700 transition-transform hover:bg-gray-50 active:scale-95"
           >
             <Download size={18} />
           </button>
           <button
             onClick={() => importInputRef.current?.click()}
             title="Importar cardápio (JSON)"
-            className="bg-white text-gray-700 font-bold p-2.5 rounded-xl flex items-center justify-center border border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform"
+            className="flex min-h-10 items-center justify-center rounded-xl border border-gray-200 bg-white p-2.5 font-bold text-gray-700 transition-transform hover:bg-gray-50 active:scale-95"
           >
             <Upload size={18} />
           </button>
@@ -621,7 +621,7 @@ export default function ProdutosPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+        <div className="grid grid-cols-3 gap-3 min-[380px]:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
           {loadingProd &&
             Array.from({ length: Math.min(pageSize, 20) }).map((_, indice) => (
               <div key={`skeleton-${indice}`} className="flex flex-col gap-2">

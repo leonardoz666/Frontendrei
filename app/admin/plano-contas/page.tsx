@@ -338,7 +338,7 @@ export default function PlanoContasPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Plano de Contas</h1>
       <p className="mb-6 text-sm text-gray-600">
         Estrutura hierárquica de receitas e despesas. Uma conta pode ter uma conta pai (agrupador)

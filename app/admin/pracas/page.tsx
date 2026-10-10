@@ -273,7 +273,7 @@ export default function PracasPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Praças</h1>
       <p className="mb-4 text-sm text-gray-600">
         A praça agrupa mesas por faixa de numeração (ex.: salão 1–50, varanda 200–250) e é o

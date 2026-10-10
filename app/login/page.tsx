@@ -91,7 +91,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex flex-1 items-center justify-center p-4 sm:p-8">
         <Card className="w-full max-w-md border-0 shadow-none lg:border lg:shadow-sm">
           <CardHeader className="space-y-1 text-center lg:text-left">
             <div className="flex justify-center lg:hidden mb-4">

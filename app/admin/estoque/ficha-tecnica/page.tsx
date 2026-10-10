@@ -194,7 +194,7 @@ export default function FichaTecnicaPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Ficha técnica</h1>
       <p className="mb-6 text-sm text-gray-600">
         Defina quanto de cada insumo é consumido quando um produto é vendido.

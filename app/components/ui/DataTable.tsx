@@ -294,7 +294,95 @@ export function DataTable<T>({
       )}
 
       <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        {/* No celular, linhas tabulares viram blocos verticais. Isso mantém os
+            dados e as ações visíveis sem obrigar o operador a rolar na horizontal. */}
+        <div className="divide-y divide-gray-100 md:hidden" aria-label={`${ariaLabel} em cartões`}>
+          {loading &&
+            Array.from({ length: Math.min(meta.pageSize, 6) }).map((_, rowIndex) => (
+              <div key={`mobile-skeleton-${rowIndex}`} className="space-y-3 px-4 py-4">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-4/5" />
+              </div>
+            ))}
+
+          {!loading && data.map((row, index) => {
+            const id = getRowId(row)
+            const isSelected = selectedIds.includes(id)
+            const mobileColumns = columns.filter(column => !column.hideOnMobile)
+            const primaryColumn = mobileColumns[0]
+            const detailColumns = mobileColumns.slice(1)
+
+            return (
+              <article key={id} className={cn('px-4 py-4', isSelected && 'bg-orange-50/60')}>
+                <div className="flex min-w-0 items-start gap-3">
+                  {selectable && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleOne(id)}
+                      aria-label={`Selecionar linha ${index + 1}`}
+                      className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1 text-sm text-gray-900">
+                    {primaryColumn?.render(row, index)}
+                  </div>
+                  {rowActions && (
+                    <div className="flex max-w-[50%] shrink-0 flex-wrap items-center justify-end gap-1">
+                      {rowActions.extra?.(row)}
+                      {rowActions.onEdit && (rowActions.canEdit?.(row) ?? true) && (
+                        <button
+                          type="button"
+                          onClick={() => rowActions.onEdit?.(row)}
+                          title={rowActions.editLabel ?? 'Editar'}
+                          aria-label={rowActions.editLabel ?? 'Editar'}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-blue-600 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {rowActions.onDelete && (rowActions.canDelete?.(row) ?? true) && (
+                        <button
+                          type="button"
+                          onClick={() => rowActions.onDelete?.(row)}
+                          title={rowActions.deleteLabel ?? 'Excluir'}
+                          aria-label={rowActions.deleteLabel ?? 'Excluir'}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {detailColumns.length > 0 && (
+                  <dl className="mt-3 grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-2 border-t border-gray-100 pt-3 text-sm">
+                    {detailColumns.map(column => (
+                      <div key={column.key} className="contents">
+                        <dt className="self-start text-xs font-medium text-gray-500">{column.header}</dt>
+                        <dd className={cn('min-w-0 break-words text-gray-800', ALIGN_CLASS[column.align ?? 'left'], column.className)}>
+                          {column.render(row, index)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </article>
+            )
+          })}
+
+          {!loading && data.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
+              <Inbox className="h-8 w-8 text-gray-300" />
+              <p className="font-medium text-gray-700">{emptyMessage}</p>
+              {emptyHint && <p className="text-sm text-gray-500">{emptyHint}</p>}
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full border-collapse text-sm" aria-label={ariaLabel}>
             <thead className="bg-gray-50">
               <tr>

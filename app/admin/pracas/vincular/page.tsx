@@ -428,7 +428,7 @@ export default function VincularImpressaoPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Vincular Impressão</h1>
       <p className="mb-4 text-sm text-gray-600">
         Diz para qual impressora vai cada item de um pedido, por praça.

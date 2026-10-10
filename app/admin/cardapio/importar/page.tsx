@@ -134,7 +134,7 @@ export default function ImportarCardapioPage() {
   const podeConfirmar = Boolean(arquivo && preview && preview.erros.length === 0 && preview.linhas.length > 0)
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-black">Importar Cardápio</h1>
@@ -225,8 +225,8 @@ export default function ImportarCardapioPage() {
                 <AlertTriangle className="h-5 w-5" />
                 Erros encontrados
               </h2>
-              <div className="overflow-hidden rounded-lg border border-red-200">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-lg border border-red-200">
+                <table className="w-full min-w-[520px] text-sm">
                   <thead className="bg-red-50 text-left text-red-800">
                     <tr>
                       <th className="px-3 py-2">Linha</th>
@@ -250,8 +250,8 @@ export default function ImportarCardapioPage() {
 
           <section>
             <h2 className="mb-3 text-lg font-semibold text-gray-900">Prévia das linhas válidas</h2>
-            <div className="overflow-hidden rounded-lg border border-gray-200">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead className="bg-gray-50 text-left text-gray-700">
                   <tr>
                     <th className="px-3 py-2">Código</th>

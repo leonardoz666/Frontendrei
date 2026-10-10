@@ -35,12 +35,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      <div className="fixed inset-x-3 bottom-3 z-[140] flex flex-col items-stretch gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:items-end">
         {toasts.map(toast => (
           <div
             key={toast.id}
             className={`
-              flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white min-w-[300px]
+              flex w-full min-w-0 max-w-md items-center gap-3 rounded-lg px-4 py-3 text-white shadow-lg sm:min-w-[300px]
               animate-in slide-in-from-right fade-in duration-300
               ${toast.type === 'success' ? 'bg-green-500' : ''}
               ${toast.type === 'error' ? 'bg-red-500' : ''}
@@ -53,7 +53,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             {toast.type === 'info' && <Info size={20} />}
             {toast.type === 'warning' && <AlertCircle size={20} />}
             
-            <p className="flex-1 text-sm font-medium">{toast.message}</p>
+            <p className="min-w-0 flex-1 break-words text-sm font-medium">{toast.message}</p>
             
             <button 
               onClick={() => removeToast(toast.id)}

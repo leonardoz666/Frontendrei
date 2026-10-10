@@ -209,7 +209,7 @@ function MovimentacoesEstoqueContent() {
   ]
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Movimentações de estoque</h1>
       <p className="mb-6 text-sm text-gray-600">
         Registre entradas, saídas, perdas e inventários. Movimentos são auditados e não são editados.
@@ -331,7 +331,7 @@ function MovimentacoesEstoqueContent() {
 
 export default function MovimentacoesEstoquePage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-7xl p-8 text-sm text-gray-600">Carregando movimentações...</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-7xl p-4 text-sm text-gray-600 sm:p-6 lg:p-8">Carregando movimentações...</div>}>
       <MovimentacoesEstoqueContent />
     </Suspense>
   )

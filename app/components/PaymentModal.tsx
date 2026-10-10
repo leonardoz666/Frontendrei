@@ -548,7 +548,7 @@ export function PaymentModal({ isOpen, onClose, mesaId, mesaNumero, onSuccess, c
                                 </div>
 
                                 {/* Quick amounts */}
-                                <div className="grid grid-cols-5 gap-2 mb-3">
+                                <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
                                     {quickAmounts.map((amount) => (
                                         <button
                                             key={amount}

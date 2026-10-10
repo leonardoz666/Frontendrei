@@ -442,7 +442,7 @@ export default function DispositivosPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Impressoras</h1>
       <p className="mb-6 text-sm text-gray-600">
         Configure impressoras TCP ou filas do Windows, envie testes e defina os destinos usados pelo

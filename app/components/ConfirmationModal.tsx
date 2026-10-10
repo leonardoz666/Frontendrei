@@ -32,9 +32,9 @@ export function ConfirmationModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl border border-gray-200 animate-in zoom-in-95 duration-200">
-        <div className="p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-3 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4">
+      <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200 sm:max-h-[calc(100dvh-2rem)]">
+        <div className="p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4">
             {variant === 'danger' && <div className="p-3 rounded-full bg-red-100 text-red-600"><AlertTriangle size={24} /></div>}
             {variant === 'warning' && <div className="p-3 rounded-full bg-amber-100 text-amber-600"><AlertTriangle size={24} /></div>}
@@ -47,7 +47,7 @@ export function ConfirmationModal({
           
           {children}
 
-          <div className="flex gap-3 mt-6">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
             {showCancel && (
               <button
                 onClick={onClose}

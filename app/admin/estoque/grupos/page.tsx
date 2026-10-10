@@ -220,7 +220,7 @@ export default function EstoqueGruposPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Grupos de insumos</h1>
       <p className="mb-6 text-sm text-gray-600">
         Classifique matéria-prima por grupo e subgrupo antes de cadastrar os itens de estoque.

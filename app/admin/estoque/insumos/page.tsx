@@ -301,7 +301,7 @@ export default function InsumosPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-2 text-3xl font-bold text-black">Insumos</h1>
       <p className="mb-4 text-sm text-gray-600">
         Cadastre matérias-primas e produtos prontos, organize por grupo e acompanhe o saldo disponível.

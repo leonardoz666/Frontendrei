@@ -121,7 +121,7 @@ export default function CentrosCustoPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
       <h1 className="mb-6 text-3xl font-bold text-black">Centros de Custo</h1>
 
       {isError && (

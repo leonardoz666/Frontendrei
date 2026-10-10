@@ -187,7 +187,7 @@ export default function EstoquePage() {
           <h2 className="text-sm font-bold text-gray-900">Movimentações dos últimos 30 dias por tipo</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-600">
               <tr><th className="px-4 py-3">Tipo</th><th className="px-4 py-3 text-right">Registros</th><th className="px-4 py-3 text-right">Quantidade</th><th className="px-4 py-3 text-right">Valor</th></tr>
             </thead>
