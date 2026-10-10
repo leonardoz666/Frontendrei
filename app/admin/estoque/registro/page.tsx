@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ClipboardCheck, PackageMinus, PackagePlus, Plus, Scale, Send, Trash2, X } from 'lucide-react'
 import { apiFetch, fetchList } from '@/app/lib/api'
@@ -8,8 +8,8 @@ import { comoDecimalDigitado, comoNumero } from '@/app/lib/crud-client'
 import { useToast } from '@/contexts/ToastContext'
 
 type TipoLote = 'ENTRADA' | 'SAIDA' | 'CONTAGEM' | 'PERDA'
-type Insumo = { id: number; codigo: string; nome: string; unidade: string; saldoAtual: number | string }
-type ItemRascunho = { chave: number; insumoId: string; quantidade: string; custoUnitario: string; observacao: string }
+type Insumo = { id: number; codigo: string; nome: string; unidade: string; saldoAtual: number | string; unidadesConversao?: Array<{ unidade: string; fatorConversao: number | string }> }
+type ItemRascunho = { chave: number; insumoId: string; unidade: string; quantidade: string; custoUnitario: string; observacao: string }
 type Lote = {
   id: number
   tipo: TipoLote
@@ -18,7 +18,7 @@ type Lote = {
   observacao: string | null
   criadoEm: string
   motivoRevisao: string | null
-  itens: Array<{ id: number; status: string; quantidade: number | string; unidadeSnapshot: string; insumo: Insumo }>
+  itens: Array<{ id: number; status: string; quantidade: number | string; quantidadeInformada: number | string; unidadeSnapshot: string; unidadeInformada: string; insumo: Insumo }>
 }
 type ListaLotes = { data: Lote[]; meta: { total: number } }
 
@@ -44,7 +44,13 @@ const STATUS: Record<string, { label: string; classe: string }> = {
 }
 
 function itemVazio(): ItemRascunho {
-  return { chave: Date.now() + Math.random(), insumoId: '', quantidade: '', custoUnitario: '', observacao: '' }
+  return { chave: Date.now() + Math.random(), insumoId: '', unidade: '', quantidade: '', custoUnitario: '', observacao: '' }
+}
+
+function novaChaveIdempotencia(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 function formatarQuantidade(valor: unknown, unidade: string): string {
@@ -59,6 +65,8 @@ export default function RegistroEstoqueSimplificadoPage() {
   const [documento, setDocumento] = useState('')
   const [observacao, setObservacao] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const enviandoRef = useRef(false)
+  const chaveIdempotenciaRef = useRef(novaChaveIdempotencia())
 
   const { data: insumos = [], isLoading: carregandoInsumos } = useQuery({
     queryKey: ['estoque-registro-insumos'],
@@ -95,6 +103,7 @@ export default function RegistroEstoqueSimplificadoPage() {
 
   const enviar = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (enviandoRef.current) return
     const validos = itens.map(item => ({ ...item, quantidadeNumero: comoDecimalDigitado(item.quantidade) }))
     if (validos.some(item => !item.insumoId || item.quantidadeNumero === null || (tipo === 'CONTAGEM' ? item.quantidadeNumero < 0 : item.quantidadeNumero <= 0))) {
       showToast('Preencha o insumo e uma quantidade válida em todos os itens', 'error')
@@ -109,10 +118,12 @@ export default function RegistroEstoqueSimplificadoPage() {
       return
     }
 
+    enviandoRef.current = true
     setSalvando(true)
     try {
       await apiFetch('/estoque-lotes', {
         method: 'POST',
+        headers: { 'Idempotency-Key': chaveIdempotenciaRef.current },
         body: {
           tipo,
           documento: documento.trim() || null,
@@ -120,17 +131,20 @@ export default function RegistroEstoqueSimplificadoPage() {
           itens: validos.map(item => ({
             insumoId: Number(item.insumoId),
             quantidade: item.quantidadeNumero,
+            unidade: item.unidade,
             custoUnitario: tipo === 'ENTRADA' && item.custoUnitario.trim() ? comoDecimalDigitado(item.custoUnitario) : null,
             observacao: item.observacao.trim() || null,
           })),
         },
       })
       limpar()
+      chaveIdempotenciaRef.current = novaChaveIdempotencia()
       await queryClient.invalidateQueries({ queryKey: ['estoque-lotes-me'] })
       showToast(`Lote com ${validos.length} item(ns) enviado para revisão`, 'success')
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Falha ao enviar o lote', 'error')
     } finally {
+      enviandoRef.current = false
       setSalvando(false)
     }
   }
@@ -181,9 +195,9 @@ export default function RegistroEstoqueSimplificadoPage() {
                 <legend className="sr-only">Item {index + 1}</legend>
                 <div className="mb-3 flex items-center justify-between"><strong className="text-sm text-slate-700">Item {index + 1}</strong><button type="button" onClick={() => removerItem(item.chave)} aria-label={`Remover item ${index + 1}`} className="rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={17} /></button></div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <label className="sm:col-span-2"><span className="mb-1 block text-sm font-medium text-slate-700">Insumo</span><select value={item.insumoId} onChange={event => atualizarItem(item.chave, 'insumoId', event.target.value)} disabled={carregandoInsumos} className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:ring-2 focus:ring-orange-500" required><option value="">Selecione</option>{insumosOrdenados.map(opcao => <option key={opcao.id} value={opcao.id}>{opcao.codigo} · {opcao.nome}</option>)}</select></label>
-                  <label><span className="mb-1 block text-sm font-medium text-slate-700">{tipo === 'CONTAGEM' ? 'Saldo contado' : 'Quantidade'}</span><div className="flex h-11 overflow-hidden rounded-lg border border-slate-300 focus-within:ring-2 focus-within:ring-orange-500"><input inputMode="decimal" value={item.quantidade} onChange={event => atualizarItem(item.chave, 'quantidade', event.target.value)} className="min-w-0 flex-1 px-3 text-sm text-slate-950 outline-none" required /><span className="flex min-w-12 items-center justify-center border-l border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-600">{insumo?.unidade ?? '—'}</span></div></label>
-                  {tipo === 'ENTRADA' ? <label><span className="mb-1 block text-sm font-medium text-slate-700">Custo unitário</span><input inputMode="decimal" value={item.custoUnitario} onChange={event => atualizarItem(item.chave, 'custoUnitario', event.target.value)} placeholder="Opcional" className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-950 outline-none focus:ring-2 focus:ring-orange-500" /></label> : <div className="rounded-lg bg-slate-50 px-3 py-2"><span className="block text-xs text-slate-500">Saldo no sistema</span><strong className="text-sm text-slate-800">{insumo ? formatarQuantidade(insumo.saldoAtual, insumo.unidade) : '—'}</strong></div>}
+                  <label className="sm:col-span-2"><span className="mb-1 block text-sm font-medium text-slate-700">Insumo</span><select value={item.insumoId} onChange={event => { const selecionado = insumosOrdenados.find(opcao => String(opcao.id) === event.target.value); setItens(atuais => atuais.map(atual => atual.chave === item.chave ? { ...atual, insumoId: event.target.value, unidade: selecionado?.unidade ?? '' } : atual)) }} disabled={carregandoInsumos || salvando} className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-100" required><option value="">Selecione</option>{insumosOrdenados.map(opcao => <option key={opcao.id} value={opcao.id}>{opcao.codigo} · {opcao.nome}</option>)}</select></label>
+                  <label><span className="mb-1 block text-sm font-medium text-slate-700">{tipo === 'CONTAGEM' ? 'Saldo contado' : 'Quantidade'}</span><div className="flex h-11 overflow-hidden rounded-lg border border-slate-300 focus-within:ring-2 focus-within:ring-orange-500"><input inputMode="decimal" value={item.quantidade} onChange={event => atualizarItem(item.chave, 'quantidade', event.target.value)} disabled={salvando} className="min-w-0 flex-1 px-3 text-sm text-slate-950 outline-none disabled:bg-slate-100" required />{insumo && (insumo.unidadesConversao?.length ?? 0) > 0 ? <select aria-label={`Unidade do item ${index + 1}`} value={item.unidade || insumo.unidade} onChange={event => atualizarItem(item.chave, 'unidade', event.target.value)} disabled={salvando} className="min-w-16 border-l border-slate-300 bg-slate-50 px-2 text-xs font-bold text-slate-700 outline-none disabled:bg-slate-100"><option value={insumo.unidade}>{insumo.unidade}</option>{insumo.unidadesConversao?.map(conversao => <option key={conversao.unidade} value={conversao.unidade}>{conversao.unidade}</option>)}</select> : <span className="flex min-w-12 items-center justify-center border-l border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-600">{insumo?.unidade ?? '—'}</span>}</div>{insumo && item.unidade && item.unidade !== insumo.unidade && <span className="mt-1 block text-xs text-slate-500">1 {item.unidade} = {insumo.unidadesConversao?.find(conversao => conversao.unidade === item.unidade)?.fatorConversao} {insumo.unidade}</span>}</label>
+                  {tipo === 'ENTRADA' ? <label><span className="mb-1 block text-sm font-medium text-slate-700">Custo por {item.unidade || insumo?.unidade || 'unidade'}</span><input inputMode="decimal" value={item.custoUnitario} onChange={event => atualizarItem(item.chave, 'custoUnitario', event.target.value)} disabled={salvando} placeholder="Opcional" className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-950 outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-100" /></label> : <div className="rounded-lg bg-slate-50 px-3 py-2"><span className="block text-xs text-slate-500">Saldo no sistema</span><strong className="text-sm text-slate-800">{insumo ? formatarQuantidade(insumo.saldoAtual, insumo.unidade) : '—'}</strong></div>}
                   <label className="sm:col-span-2 lg:col-span-4"><span className="mb-1 block text-sm font-medium text-slate-700">Observação do item</span><input value={item.observacao} onChange={event => atualizarItem(item.chave, 'observacao', event.target.value)} placeholder={tipo === 'PERDA' ? 'Motivo da perda' : 'Opcional'} className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-950 outline-none focus:ring-2 focus:ring-orange-500" /></label>
                 </div>
               </fieldset>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, ArrowRightLeft, Power, PowerOff } from 'lucide-react'
+import { AlertTriangle, ArrowRightLeft, Plus, Power, PowerOff, Trash2 } from 'lucide-react'
 import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
 import { ExportMenu } from '@/app/components/ui/ExportMenu'
@@ -51,7 +51,10 @@ type Insumo = {
   saldoAtual?: number | string
   custoMedio: number | string
   ativo: boolean
+  unidadesConversao?: Array<{ id: number; unidade: string; fatorConversao: number | string; ativo: boolean }>
 }
+
+type ConversaoForm = { chave: number; unidade: string; fatorConversao: string }
 
 type FormState = {
   codigo: string
@@ -66,6 +69,7 @@ type FormState = {
   estoqueMax: string
   custoMedio: string
   saldoInicial: string
+  conversoes: ConversaoForm[]
 }
 
 type OpcaoFinanceira = {
@@ -86,6 +90,7 @@ const FORM_VAZIO: FormState = {
   estoqueMax: '0',
   custoMedio: '0',
   saldoInicial: '0',
+  conversoes: [],
 }
 
 function quantidade(valor: unknown, unidade?: string): string {
@@ -166,6 +171,11 @@ export default function InsumosPage() {
       estoqueMax: String(insumo.estoqueMax ?? 0),
       custoMedio: String(insumo.custoMedio ?? 0),
       saldoInicial: '0',
+      conversoes: (insumo.unidadesConversao ?? []).map(conversao => ({
+        chave: conversao.id,
+        unidade: conversao.unidade,
+        fatorConversao: String(conversao.fatorConversao),
+      })),
     })
     setShowForm(true)
   }
@@ -200,6 +210,15 @@ export default function InsumosPage() {
     const custoMedio = numeroDecimal(form.custoMedio, 'Custo médio')
     const saldoInicial = editing ? 0 : numeroDecimal(form.saldoInicial, 'Quantidade atual')
     if (estoqueMin === null || estoqueMax === null || custoMedio === null || saldoInicial === null) return
+    const conversoes = form.conversoes.map((conversao, index) => ({
+      unidade: conversao.unidade,
+      fatorConversao: numeroDecimal(conversao.fatorConversao, `Fator da conversão ${index + 1}`),
+    }))
+    if (conversoes.some(conversao => conversao.fatorConversao === null)) return
+    if (new Set(conversoes.map(conversao => conversao.unidade)).size !== conversoes.length) {
+      showToast('Não repita a mesma unidade de conversão', 'error')
+      return
+    }
 
     const corpo = {
       codigo,
@@ -213,6 +232,7 @@ export default function InsumosPage() {
       estoqueMin,
       estoqueMax,
       custoMedio,
+      conversoes: conversoes.map(conversao => ({ unidade: conversao.unidade, fatorConversao: conversao.fatorConversao! })),
       ...(!editing ? { saldoInicial } : {}),
     }
 
@@ -403,7 +423,7 @@ export default function InsumosPage() {
                 </div>
                 <div>
                   <label htmlFor="unidade" className="mb-1 block text-sm font-medium text-black">Unidade</label>
-                  <select id="unidade" value={form.unidade} onChange={(event) => atualizarCampo('unidade', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black">
+                  <select id="unidade" value={form.unidade} onChange={(event) => setForm(atual => ({ ...atual, unidade: event.target.value, conversoes: atual.conversoes.filter(conversao => conversao.unidade !== event.target.value) }))} className="w-full rounded-lg border border-gray-300 p-2 text-black">
                     {UNIDADES.map((unidade) => <option key={unidade} value={unidade}>{unidade}</option>)}
                   </select>
                 </div>
@@ -412,6 +432,23 @@ export default function InsumosPage() {
               <div>
                 <label htmlFor="nome" className="mb-1 block text-sm font-medium text-black">Nome</label>
                 <input id="nome" value={form.nome} onChange={(event) => atualizarCampo('nome', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black" required />
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Conversões de embalagem</h3>
+                    <p className="mt-0.5 text-xs text-gray-600">Cadastre apenas quando o item puder ser lançado em caixa, pacote ou outra unidade. O saldo continuará em {form.unidade}.</p>
+                  </div>
+                  <button type="button" onClick={() => setForm(atual => ({ ...atual, conversoes: [...atual.conversoes, { chave: Date.now() + Math.random(), unidade: UNIDADES.find(unidade => unidade !== atual.unidade && !atual.conversoes.some(item => item.unidade === unidade)) ?? 'CX', fatorConversao: '' }] }))} disabled={form.conversoes.length >= UNIDADES.length - 1} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-3 text-xs font-semibold text-orange-700 hover:bg-orange-50 disabled:opacity-40"><Plus className="h-4 w-4" />Adicionar</button>
+                </div>
+                {form.conversoes.length > 0 && <div className="mt-3 space-y-2">{form.conversoes.map((conversao, index) => (
+                  <div key={conversao.chave} className="grid items-end gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-[110px_1fr_auto]">
+                    <label><span className="mb-1 block text-xs font-medium text-gray-700">Unidade</span><select value={conversao.unidade} onChange={event => setForm(atual => ({ ...atual, conversoes: atual.conversoes.map(item => item.chave === conversao.chave ? { ...item, unidade: event.target.value } : item) }))} className="h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm text-black">{UNIDADES.filter(unidade => unidade !== form.unidade).map(unidade => <option key={unidade} value={unidade}>{unidade}</option>)}</select></label>
+                    <label><span className="mb-1 block text-xs font-medium text-gray-700">1 {conversao.unidade} equivale a quantos {form.unidade}?</span><input inputMode="decimal" value={conversao.fatorConversao} onChange={event => setForm(atual => ({ ...atual, conversoes: atual.conversoes.map(item => item.chave === conversao.chave ? { ...item, fatorConversao: event.target.value } : item) }))} placeholder={`Ex.: ${index + 2}`} className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm text-black" required /></label>
+                    <button type="button" onClick={() => setForm(atual => ({ ...atual, conversoes: atual.conversoes.filter(item => item.chave !== conversao.chave) }))} aria-label={`Remover conversão ${index + 1}`} className="flex h-10 w-10 items-center justify-center rounded-lg text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                ))}</div>}
               </div>
 
               <div className="grid gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
