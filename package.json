@@ -7,6 +7,7 @@
     "test:product-catalog": "node scripts/verify-product-catalog.cjs",
     "test:product-form": "node scripts/verify-product-form.cjs",
     "test:api": "node scripts/verify-api.cjs",
+    "test:stock-lot-contrast": "node scripts/verify-stock-lot-contrast.cjs",
     "dev": "node --disable-warning=DEP0060 node_modules/next/dist/bin/next dev",
     "build": "npm run typecheck && node --disable-warning=DEP0060 node_modules/next/dist/bin/next build",
     "typecheck": "tsc --noEmit",
