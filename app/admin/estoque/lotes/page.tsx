@@ -59,6 +59,7 @@ export default function RevisaoLotesEstoquePage() {
   const [confirmarDivergencias, setConfirmarDivergencias] = useState(false)
   const [permitirNegativo, setPermitirNegativo] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
 
   const url = filtro === 'PENDENTE' ? '/estoque-lotes?page=1&pageSize=25&status=PENDENTE' : '/estoque-lotes?page=1&pageSize=25'
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
@@ -68,6 +69,7 @@ export default function RevisaoLotesEstoquePage() {
 
   const abrirLote = (selecionado: Lote) => {
     setLote(selecionado)
+    setConfirmando(false)
     setSelecionados(new Set(selecionado.status === 'PENDENTE' ? selecionado.itens.map(item => item.id) : []))
     setAjustes(Object.fromEntries(selecionado.itens.map(item => [item.id, {
       quantidade: String(item.quantidadeInformada),
@@ -117,8 +119,12 @@ export default function RevisaoLotesEstoquePage() {
       showToast(error instanceof Error ? error.message : 'Dados inválidos', 'error')
       return
     }
-    if (!window.confirm(selecionados.size === 0 ? `Não lançar nenhum item do lote #${lote.id}?` : `Lançar ${selecionados.size} item(ns) do lote #${lote.id}?`)) return
+    if (!confirmando) {
+      setConfirmando(true)
+      return
+    }
 
+    setConfirmando(false)
     setSalvando(true)
     try {
       await apiFetch(`/estoque-lotes/${lote.id}/revisar`, {
@@ -168,7 +174,7 @@ export default function RevisaoLotesEstoquePage() {
           <section role="dialog" aria-modal="true" aria-labelledby="lote-title" className="my-2 w-full max-w-5xl overflow-hidden rounded-xl bg-white shadow-2xl sm:my-6">
             <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6">
               <div><h2 id="lote-title" className="text-xl font-bold text-slate-950">Lote #{lote.id} · {TIPO_LABEL[lote.tipo]}</h2><p className="mt-1 text-sm text-slate-500">Registrado por {lote.solicitante.nome} em {new Date(lote.criadoEm).toLocaleString('pt-BR')}</p></div>
-              <button type="button" onClick={() => setLote(null)} aria-label="Fechar" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
+              <button type="button" onClick={() => { setConfirmando(false); setLote(null) }} aria-label="Fechar" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
             </header>
 
             <div className="max-h-[calc(100dvh-12rem)] overflow-y-auto">
@@ -196,8 +202,27 @@ export default function RevisaoLotesEstoquePage() {
                 {selecionados.size < lote.itens.length && <label><span className="mb-1 block text-sm font-bold text-slate-700">Motivo dos itens não lançados</span><textarea value={motivo} onChange={event => setMotivo(event.target.value)} className="min-h-20 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-orange-500" required /></label>}
                 {divergencias.length > 0 && <Switch checked={confirmarDivergencias} onCheckedChange={setConfirmarDivergencias} label="Confirmo que revisei os saldos alterados" description="A contagem será calculada contra o saldo atual." />}
                 {lote.tipo !== 'ENTRADA' && <Switch checked={permitirNegativo} onCheckedChange={setPermitirNegativo} label="Permitir saldo negativo" description="Somente funciona para quem possui essa permissão." />}
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => setLote(null)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700">Cancelar</button><button type="button" onClick={() => void revisar()} disabled={salvando || (divergencias.length > 0 && !confirmarDivergencias)} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold text-white disabled:opacity-50 ${selecionados.size === 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}`}>{selecionados.size === 0 ? <X size={17} /> : <Check size={17} />}{salvando ? 'Processando...' : selecionados.size === 0 ? 'Não lançar lote' : `Lançar ${selecionados.size} item(ns)`}</button></div>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => { setConfirmando(false); setLote(null) }} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700">Cancelar</button><button type="button" onClick={() => void revisar()} disabled={salvando || (divergencias.length > 0 && !confirmarDivergencias)} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold text-white disabled:opacity-50 ${selecionados.size === 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}`}>{selecionados.size === 0 ? <X size={17} /> : <Check size={17} />}{salvando ? 'Processando...' : selecionados.size === 0 ? 'Não lançar lote' : `Lançar ${selecionados.size} item(ns)`}</button></div>
               </div> : <div className="border-t border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 sm:px-6">Revisado por <strong>{lote.revisor?.nome ?? 'Administrador'}</strong>{lote.revisadoEm ? ` em ${new Date(lote.revisadoEm).toLocaleString('pt-BR')}` : ''}. {lote.motivoRevisao}</div>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {lote && confirmando && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="confirmar-lote-titulo" aria-describedby="confirmar-lote-descricao" className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="p-5 sm:p-6">
+              <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${selecionados.size === 0 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                {selecionados.size === 0 ? <AlertTriangle size={24} /> : <Check size={24} />}
+              </div>
+              <h2 id="confirmar-lote-titulo" className="text-xl font-bold text-slate-950">{selecionados.size === 0 ? 'Não lançar este lote?' : 'Confirmar lançamento?'}</h2>
+              <p id="confirmar-lote-descricao" className="mt-2 text-sm leading-6 text-slate-600">{selecionados.size === 0 ? `Nenhum item do lote #${lote.id} será lançado no estoque.` : `${selecionados.size} item(ns) do lote #${lote.id} serão lançados no estoque.`}</p>
+              {lote.entreguePara && <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700"><span className="font-bold">Entregue para:</span> {lote.entreguePara}</p>}
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 p-4 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setConfirmando(false)} disabled={salvando} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Voltar e revisar</button>
+              <button type="button" onClick={() => void revisar()} disabled={salvando} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold text-white shadow-sm disabled:opacity-50 ${selecionados.size === 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}`}>{selecionados.size === 0 ? <X size={17} /> : <Check size={17} />}{salvando ? 'Processando...' : selecionados.size === 0 ? 'Confirmar sem lançamento' : 'Confirmar lançamento'}</button>
             </div>
           </section>
         </div>

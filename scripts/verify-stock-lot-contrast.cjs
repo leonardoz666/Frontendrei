@@ -28,3 +28,13 @@ for (const [nome, padrao] of campos) {
 
 if (falhas > 0) process.exitCode = 1
 else console.log('3 campos de revisão possuem contraste legível')
+
+if (fonte.includes('window.confirm(')) {
+  console.error('FAIL confirmação: a revisão ainda usa o diálogo nativo do navegador')
+  process.exitCode = 1
+} else if (!fonte.includes('role="alertdialog"')) {
+  console.error('FAIL confirmação: falta um modal visual acessível para confirmar o lançamento')
+  process.exitCode = 1
+} else {
+  console.log('PASS confirmação: modal visual substitui o diálogo nativo')
+}

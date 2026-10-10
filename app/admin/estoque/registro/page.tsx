@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ClipboardCheck, PackageMinus, PackagePlus, Plus, Scale, Send, Trash2, X } from 'lucide-react'
 import { apiFetch, fetchList } from '@/app/lib/api'
 import { comoDecimalDigitado, comoNumero } from '@/app/lib/crud-client'
+import { ConfirmationModal } from '@/app/components/ConfirmationModal'
 import { useToast } from '@/contexts/ToastContext'
 
 type TipoLote = 'ENTRADA' | 'SAIDA' | 'CONTAGEM' | 'PERDA'
@@ -67,6 +68,8 @@ export default function RegistroEstoqueSimplificadoPage() {
   const [entreguePara, setEntreguePara] = useState('')
   const [observacao, setObservacao] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [loteParaCancelar, setLoteParaCancelar] = useState<Lote | null>(null)
+  const [cancelando, setCancelando] = useState(false)
   const enviandoRef = useRef(false)
   const chaveIdempotenciaRef = useRef(novaChaveIdempotencia())
 
@@ -157,14 +160,18 @@ export default function RegistroEstoqueSimplificadoPage() {
     }
   }
 
-  const cancelar = async (lote: Lote) => {
-    if (!window.confirm(`Cancelar o lote #${lote.id}?`)) return
+  const cancelar = async () => {
+    if (!loteParaCancelar || cancelando) return
+    setCancelando(true)
     try {
-      await apiFetch(`/estoque-lotes/${lote.id}/cancelar`, { method: 'POST' })
+      await apiFetch(`/estoque-lotes/${loteParaCancelar.id}/cancelar`, { method: 'POST' })
       await queryClient.invalidateQueries({ queryKey: ['estoque-lotes-me'] })
+      setLoteParaCancelar(null)
       showToast('Lote cancelado', 'success')
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Falha ao cancelar o lote', 'error')
+    } finally {
+      setCancelando(false)
     }
   }
 
@@ -225,9 +232,29 @@ export default function RegistroEstoqueSimplificadoPage() {
         <div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-950">Histórico recente</h2><p className="text-sm text-slate-500">Acompanhe o resultado dos seus lotes.</p></div><Scale className="h-5 w-5 text-slate-400" /></div>
         {erroHistorico ? <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{detalheErroHistorico instanceof Error ? detalheErroHistorico.message : 'Falha ao carregar o histórico'}</div> : carregandoHistorico ? <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">Carregando...</p> : historico?.data.length ? <div className="space-y-2">{historico.data.map(lote => {
           const status = STATUS[lote.status] ?? { label: lote.status, classe: 'bg-slate-100 text-slate-700' }
-          return <article key={lote.id} className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-bold text-slate-900">Lote #{lote.id} · {TIPOS.find(item => item.tipo === lote.tipo)?.titulo}</h3><p className="mt-0.5 text-xs text-slate-500">{new Date(lote.criadoEm).toLocaleString('pt-BR')} · {lote.itens.length} item(ns)</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.classe}`}>{status.label}</span></div>{lote.entreguePara && <p className="mt-2 text-sm font-semibold text-slate-700">Entregue para: {lote.entreguePara}</p>}<p className="mt-2 text-sm text-slate-600">{lote.itens.slice(0, 3).map(item => item.insumo.nome).join(', ')}{lote.itens.length > 3 ? ` e mais ${lote.itens.length - 3}` : ''}</p>{lote.motivoRevisao && <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">{lote.motivoRevisao}</p>}{lote.status === 'PENDENTE' && <button type="button" onClick={() => void cancelar(lote)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700"><X size={14} />Cancelar lote</button>}</article>
+          return <article key={lote.id} className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-bold text-slate-900">Lote #{lote.id} · {TIPOS.find(item => item.tipo === lote.tipo)?.titulo}</h3><p className="mt-0.5 text-xs text-slate-500">{new Date(lote.criadoEm).toLocaleString('pt-BR')} · {lote.itens.length} item(ns)</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.classe}`}>{status.label}</span></div>{lote.entreguePara && <p className="mt-2 text-sm font-semibold text-slate-700">Entregue para: {lote.entreguePara}</p>}<p className="mt-2 text-sm text-slate-600">{lote.itens.slice(0, 3).map(item => item.insumo.nome).join(', ')}{lote.itens.length > 3 ? ` e mais ${lote.itens.length - 3}` : ''}</p>{lote.motivoRevisao && <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">{lote.motivoRevisao}</p>}{lote.status === 'PENDENTE' && <button type="button" onClick={() => setLoteParaCancelar(lote)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700"><X size={14} />Cancelar lote</button>}</article>
         })}</div> : <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">Nenhum lote enviado ainda.</div>}
       </section>
+
+      <ConfirmationModal
+        isOpen={Boolean(loteParaCancelar)}
+        onClose={() => { if (!cancelando) setLoteParaCancelar(null) }}
+        onConfirm={() => void cancelar()}
+        title={`Cancelar lote #${loteParaCancelar?.id ?? ''}?`}
+        description="Este lote será removido da fila de revisão e não poderá mais ser lançado no estoque."
+        confirmText={cancelando ? 'Cancelando...' : 'Cancelar lote'}
+        cancelText="Manter lote"
+        variant="warning"
+        closeOnConfirm={false}
+        isLoading={cancelando}
+      >
+        {loteParaCancelar && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <strong className="block">{TIPOS.find(item => item.tipo === loteParaCancelar.tipo)?.titulo}</strong>
+            <span className="mt-1 block text-amber-800">{loteParaCancelar.itens.length} item(ns) · criado em {new Date(loteParaCancelar.criadoEm).toLocaleString('pt-BR')}</span>
+          </div>
+        )}
+      </ConfirmationModal>
     </main>
   )
 }
