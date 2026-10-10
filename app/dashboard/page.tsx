@@ -22,16 +22,19 @@ type DashboardStats = {
         orders: number
         avgTicket: number
         tables: number
+        closedTables: number
     }
     week: {
         total: number
         orders: number
         avgTicket: number
+        closedTables: number
     }
     month: {
         total: number
         orders: number
         avgTicket: number
+        closedTables: number
     }
     topProducts: Array<{
         name: string
@@ -283,9 +286,9 @@ export default function DashboardPage() {
                     <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 text-white">
                         <div className="flex items-center gap-2 mb-2">
                             <Users size={18} />
-                            <span className="text-sm font-medium opacity-90">Clientes/Dia</span>
+                            <span className="text-sm font-medium opacity-90">Mesas Fechadas Hoje</span>
                         </div>
-                        <p className="text-2xl font-bold">{stats?.today.tables ? stats.today.tables * 3 : 0}</p>
+                        <p className="text-2xl font-bold">{stats?.today.closedTables ?? 0}</p>
                     </div>
                 </div>
             </div>
