@@ -658,12 +658,6 @@ export function buildSidebarVisualSections(
       groupIds: ['inicio', 'mesas'],
       itemFilter: item => !['/', '/dashboard', '/mesas'].includes(item.href),
     },
-    {
-      id: 'indicadores',
-      label: 'INDICADORES',
-      groupIds: ['inicio'],
-      itemFilter: item => item.href === '/dashboard',
-    },
     { id: 'cardapio', label: 'CARDÁPIO', groupIds: ['cardapio'] },
     { id: 'estoque', label: 'ESTOQUE', groupIds: ['estoque'] },
     { id: 'producao-impressao', label: 'PRODUÇÃO E IMPRESSÃO', groupIds: ['producao-impressao'] },
@@ -682,12 +676,6 @@ export function buildSidebarVisualSections(
     },
     { id: 'ponto', label: 'CONTROLE DE PONTO', groupIds: ['ponto'] },
     { id: 'cadastros', label: 'CADASTROS', groupIds: ['cadastros'] },
-    {
-      id: 'administracao',
-      label: 'ADMINISTRAÇÃO',
-      groupIds: ['administracao'],
-      itemFilter: item => ['/admin/usuarios', '/admin/visibilidade'].includes(item.href),
-    },
   ]
 
   const sections = sectionDefinitions

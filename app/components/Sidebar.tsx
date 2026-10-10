@@ -187,6 +187,11 @@ export default function Sidebar({
       })
       .filter(section => section.items.length > 0)
   }, [filteredGroups, isWaiter, normalizedSearch, visibility, visibleGroups])
+  const dashboardItem = useMemo(() => {
+    if (visibility.hiddenItemHrefs.includes('/dashboard')) return null
+    const sourceGroups = normalizedSearch ? filteredGroups : visibleGroups
+    return sourceGroups.flatMap(({ items }) => items).find(item => item.href === '/dashboard') ?? null
+  }, [filteredGroups, normalizedSearch, visibility.hiddenItemHrefs, visibleGroups])
 
   useEffect(() => {
     if (!user) return
@@ -410,7 +415,14 @@ export default function Sidebar({
 
           {isCollapsed && (
             <div className="hidden space-y-1 md:block">
+              {dashboardItem && renderItem(dashboardItem)}
               {visualSections.flatMap(section => section.items).map(renderItem)}
+            </div>
+          )}
+
+          {dashboardItem && (
+            <div className={`mb-3 ${isCollapsed ? 'md:hidden' : ''}`}>
+              {renderItem(dashboardItem)}
             </div>
           )}
 
