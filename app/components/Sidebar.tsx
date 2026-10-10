@@ -259,7 +259,7 @@ export default function Sidebar({
     router.refresh()
   }
 
-  const renderItem = (item: NavItem) => {
+  const renderItem = (item: NavItem, standalone = false) => {
     const Icon = NAV_ICONS[item.icon]
 
     if (item.disabled) {
@@ -293,13 +293,22 @@ export default function Sidebar({
         href={item.href}
         title={item.label}
         aria-current={isActive ? 'page' : undefined}
-        className={`group relative flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] font-medium leading-5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
+        className={`group relative flex items-center gap-2.5 px-3 text-[13px] leading-5 transition-[background-color,border-color,color,box-shadow,transform] focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
+          standalone ? 'h-11 rounded-lg border font-semibold' : 'h-9 rounded-md font-medium'
+        } ${
           isActive
-            ? 'bg-orange-600 font-semibold text-white shadow-sm'
-            : 'text-slate-800 hover:bg-orange-600 hover:text-white'
+            ? `bg-orange-600 font-semibold text-white ${standalone ? 'border-orange-700 shadow-[0_4px_10px_rgba(194,65,12,0.28)]' : 'shadow-sm'}`
+            : standalone
+              ? 'border-slate-300 bg-white text-slate-950 shadow-[0_3px_8px_rgba(15,23,42,0.14)] hover:-translate-y-px hover:border-orange-400 hover:bg-orange-50 hover:text-orange-900 hover:shadow-[0_5px_12px_rgba(15,23,42,0.18)]'
+              : 'text-slate-800 hover:bg-orange-600 hover:text-white'
         } ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
       >
-        <Icon size={19} className={`hidden shrink-0 ${isCollapsed ? 'md:block' : ''}`} aria-hidden="true" />
+        <Icon
+          size={19}
+          strokeWidth={standalone ? 2.25 : 2}
+          className={`${standalone ? 'block' : 'hidden'} shrink-0 ${isCollapsed ? 'md:block' : ''}`}
+          aria-hidden="true"
+        />
         <span className={`flex-1 truncate ${isCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
         {item.shortcut && (
           <kbd
@@ -382,7 +391,7 @@ export default function Sidebar({
           )}
 
           {!visibility.hideShortcuts && (
-          <div className={`${visibility.hideBrand && visibility.hideSearch ? '' : 'mt-3'} ${isWaiter ? 'flex flex-col gap-1.5' : 'flex gap-1 rounded-lg bg-slate-100 p-1'} ${isCollapsed ? 'md:hidden' : ''}`}>
+          <div className={`${visibility.hideBrand && visibility.hideSearch ? '' : 'mt-3'} ${isWaiter ? 'flex flex-col gap-1.5' : 'flex gap-1.5 rounded-xl border border-slate-300 bg-slate-200/70 p-1.5 shadow-[0_3px_8px_rgba(15,23,42,0.14)]'} ${isCollapsed ? 'md:hidden' : ''}`}>
             {quickShortcuts.map(shortcut => {
               const activeShortcut = pathname === shortcut.href
               return (
@@ -390,10 +399,10 @@ export default function Sidebar({
                   key={shortcut.href}
                   href={shortcut.href}
                   title={shortcut.label}
-                  className={`flex items-center justify-center rounded-md border px-2 text-center text-[11px] font-bold leading-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1 ${isWaiter ? 'min-h-10 w-full' : 'min-h-10 min-w-0 flex-1'} ${
+                  className={`flex items-center justify-center rounded-lg border px-2 text-center text-[11px] font-bold leading-3 transition-[background-color,border-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1 ${isWaiter ? 'min-h-10 w-full' : 'min-h-10 min-w-0 flex-1'} ${
                     activeShortcut
-                      ? 'border-orange-600 bg-orange-600 text-white shadow-sm'
-                      : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-white hover:text-slate-950'
+                      ? 'border-orange-700 bg-orange-600 text-white shadow-[0_3px_7px_rgba(194,65,12,0.3)]'
+                      : 'border-slate-200 bg-white text-slate-950 shadow-sm hover:-translate-y-px hover:border-orange-400 hover:bg-orange-50 hover:text-orange-900 hover:shadow-md'
                   }`}
                 >
                   {shortcut.label}
@@ -415,14 +424,14 @@ export default function Sidebar({
 
           {isCollapsed && (
             <div className="hidden space-y-1 md:block">
-              {dashboardItem && renderItem(dashboardItem)}
-              {visualSections.flatMap(section => section.items).map(renderItem)}
+              {dashboardItem && renderItem(dashboardItem, true)}
+              {visualSections.flatMap(section => section.items).map(item => renderItem(item))}
             </div>
           )}
 
           {dashboardItem && (
             <div className={`mb-3 ${isCollapsed ? 'md:hidden' : ''}`}>
-              {renderItem(dashboardItem)}
+              {renderItem(dashboardItem, true)}
             </div>
           )}
 
@@ -451,7 +460,7 @@ export default function Sidebar({
                   {section.groups.map((group, index) => (
                     <div key={group.id} className={index > 0 ? 'mt-2 border-t border-slate-200 pt-2' : ''}>
                       <div className="space-y-0.5 border-l-2 border-slate-300 pl-1.5">
-                        {group.items.map(renderItem)}
+                        {group.items.map(item => renderItem(item))}
                       </div>
                     </div>
                   ))}
