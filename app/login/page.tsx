@@ -8,6 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ChefHat } from 'lucide-react'
 import { ApiError, apiFetch } from '@/app/lib/api'
 
+function paginaInicial(role?: string): string {
+  return role === 'ESTOQUISTA' ? '/admin/estoque' : '/'
+}
+
 export default function LoginPage() {
   const [login, setLogin] = useState('')
   const [senha, setSenha] = useState('')
@@ -24,12 +28,12 @@ export default function LoginPage() {
       const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
 
       try {
-        const data = await apiFetch<{ user?: unknown }>('/auth/me', {
+        const data = await apiFetch<{ user?: { role?: string } }>('/auth/me', {
           signal: controller.signal,
           redirectOn401: false,
         })
         if (!cancelled && data.user) {
-          router.replace('/')
+          router.replace(paginaInicial(data.user.role))
         }
       } catch {
         // Login continua disponível quando a verificação da sessão falha.
@@ -51,12 +55,12 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      await apiFetch('/auth/login', {
+      const data = await apiFetch<{ user?: { role?: string } }>('/auth/login', {
         method: 'POST',
         body: { login, senha },
         redirectOn401: false,
       })
-      router.push('/')
+      router.push(paginaInicial(data.user?.role))
       router.refresh()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao conectar ao servidor')

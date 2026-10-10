@@ -656,6 +656,10 @@ export function visibleNavGroups(user: NavUser | null | undefined): VisibleNavGr
       .filter(({ items }) => items.length > 0)
   }
 
+  if (user?.role === 'ESTOQUISTA') {
+    return visible.filter(({ group }) => group.id === 'estoque')
+  }
+
   return visible
 }
 

@@ -37,6 +37,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [user, setUser] = useState<NavUser | null>(null)
 
   const isWaiter = user?.role === 'GARCOM'
+  const isStockkeeper = user?.role === 'ESTOQUISTA'
+  const isStockRoute = pathname === '/admin/estoque' || pathname.startsWith('/admin/estoque/')
+  const isStockRouteBlocked = isStockkeeper && !isStockRoute
   const sidebarOffset = isLoginPage || !user || isWaiter ? '' : isCollapsed ? 'md:ml-[88px]' : 'md:ml-72'
   const supportHref = isLoginPage || !user ? null : resolveSupportHref(process.env.NEXT_PUBLIC_SUPORTE_WHATSAPP)
 
@@ -85,9 +88,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     }
   }, [isLoginPage])
 
+  // O cargo de estoquista é operacional e permanece restrito ao módulo de estoque,
+  // inclusive quando alguém tenta abrir outra URL diretamente.
+  useEffect(() => {
+    if (isStockRouteBlocked) router.replace('/admin/estoque')
+  }, [isStockRouteBlocked, router])
+
   // Atalho global (PRD seção 13): F8 abre o mapa de mesas.
   useEffect(() => {
-    if (isLoginPage) return
+    if (isLoginPage || isStockkeeper) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return
@@ -112,7 +121,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isLoginPage, router, showToast])
+  }, [isLoginPage, isStockkeeper, router, showToast])
 
   const handleLogout = async () => {
     await apiFetch('/auth/logout', { method: 'POST' })
@@ -205,7 +214,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       )}
 
       <main className={`min-w-0 flex-1 transition-[margin] duration-300 ${sidebarOffset}`}>
-        {children}
+        {!isStockRouteBlocked && children}
       </main>
     </div>
   )
