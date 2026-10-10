@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, redirectToLogin } from '@/app/lib/api'
 import {
     TrendingUp,
     DollarSign,
@@ -59,7 +59,7 @@ export default function DashboardPage() {
             try {
                 const meData = await apiFetch<{ user?: { permissions?: string[] } }>('/auth/me')
                 if (!meData.user) {
-                    router.replace('/login')
+                    redirectToLogin()
                     return
                 }
 

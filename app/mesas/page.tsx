@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { TableCard, Mesa } from '@/components/TableCard'
 import { connectTableSocket } from '@/app/lib/table-socket'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, redirectToLogin } from '@/app/lib/api'
 
 type User = {
   role: string
@@ -225,7 +225,7 @@ export default function MesasPage() {
             // Auth check
             const meData = await apiFetch<{ user?: User & { permissions?: string[] } }>('/auth/me')
             if (!meData.user) {
-                router.replace('/login')
+                redirectToLogin()
                 return
             }
             setUser(meData.user)

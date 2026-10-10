@@ -27,7 +27,7 @@ import {
   UserX,
 } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, redirectToLogin } from '@/app/lib/api'
 
 interface User {
   id: number
@@ -117,7 +117,7 @@ export default function AdminUsersPage() {
       try {
         const meData = await apiFetch<{ user: { id: number; role: string; permissions: string[] } }>('/auth/me')
         if (!meData.user) {
-          router.replace('/login')
+          redirectToLogin()
           return
         }
         const permissoes: string[] = meData.user.permissions ?? []

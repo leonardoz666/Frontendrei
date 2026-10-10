@@ -44,7 +44,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, redirectToLogin } from '@/app/lib/api'
 import {
   buildSidebarVisualSections,
   findActiveNavItem,
@@ -254,9 +254,11 @@ export default function Sidebar({
   }
 
   const handleLogout = async () => {
-    await apiFetch('/auth/logout', { method: 'POST' })
-    router.push('/login')
-    router.refresh()
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' })
+    } finally {
+      redirectToLogin()
+    }
   }
 
   const renderItem = (item: NavItem, standalone = false) => {

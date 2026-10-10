@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { LogOut, Menu, MessageCircle } from 'lucide-react'
 import Sidebar from './Sidebar'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, redirectToLogin } from '@/app/lib/api'
 import { useToast } from '@/contexts/ToastContext'
 import { initializeUiPreferences } from '@/app/lib/uiPreferences'
 import {
@@ -41,7 +41,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const isSimplifiedStockkeeper = isStockkeeper && user?.modoEstoque === 'SIMPLIFICADO'
   const isStockRoute = pathname === '/admin/estoque' || pathname.startsWith('/admin/estoque/')
   const simplifiedStockRoute = pathname === '/admin/estoque/registro'
-  const isStockRouteBlocked = isStockkeeper && (isSimplifiedStockkeeper ? !simplifiedStockRoute : !isStockRoute)
+  const isStockRouteBlocked = !isLoginPage && isStockkeeper && (isSimplifiedStockkeeper ? !simplifiedStockRoute : !isStockRoute)
   const sidebarOffset = isLoginPage || !user || isWaiter || isSimplifiedStockkeeper ? '' : isStockkeeper || !isCollapsed ? 'md:ml-72' : 'md:ml-[88px]'
   const supportHref = isLoginPage || !user ? null : resolveSupportHref(process.env.NEXT_PUBLIC_SUPORTE_WHATSAPP)
 
@@ -126,9 +126,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }, [isLoginPage, isStockkeeper, router, showToast])
 
   const handleLogout = async () => {
-    await apiFetch('/auth/logout', { method: 'POST' })
-    router.push('/login')
-    router.refresh()
+    setUser(null)
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' })
+    } finally {
+      redirectToLogin()
+    }
   }
 
   return (

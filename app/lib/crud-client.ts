@@ -1,8 +1,7 @@
 'use client'
 
 import { createElement, useCallback, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { apiFetch } from './api'
+import { apiFetch, redirectToLogin } from './api'
 import type { Paginated, SortOrder } from './pagination'
 import { useToast } from '@/contexts/ToastContext'
 
@@ -103,7 +102,6 @@ const PAGE_SIZE_INICIAL = 25
  */
 export function useCrud<T extends RegistroCrud>(options: UseCrudOptions): UseCrudResult<T> {
   const { resource, entidade, genero = 'm' } = options
-  const router = useRouter()
   const { showToast } = useToast()
 
   const mensagem = useCallback(
@@ -120,7 +118,7 @@ export function useCrud<T extends RegistroCrud>(options: UseCrudOptions): UseCru
    * Tratamento único de erro. O status é lido por FORMA (`status === 401`) para
    * não acoplar o helper a um `instanceof ApiError` — mesma decisão da tela de
    * referência `admin/categorias`. O `apiFetch` já redireciona em 401; o
-   * `router.push` aqui cobre quem chamar com `redirectOn401: false`.
+   * O redirecionamento explícito aqui cobre quem chamar com `redirectOn401: false`.
    */
   const executar = useCallback(
     async <R,>(fn: () => Promise<R>, mensagemErro: string): Promise<R | null> => {
@@ -129,14 +127,14 @@ export function useCrud<T extends RegistroCrud>(options: UseCrudOptions): UseCru
       } catch (err) {
         const status = (err as { status?: number } | null)?.status
         if (status === 401) {
-          router.push('/login')
+          redirectToLogin()
           return null
         }
         showToast(err instanceof Error ? err.message : mensagemErro, 'error')
         return null
       }
     },
-    [router, showToast]
+    [showToast]
   )
 
   const criar = useCallback(

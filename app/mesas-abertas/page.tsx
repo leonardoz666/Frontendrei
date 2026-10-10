@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from 'lucide-react'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, redirectToLogin } from '@/app/lib/api'
 
 type Mesa = {
   id: number
@@ -28,7 +28,7 @@ export default function MesasAbertasPage() {
       try {
         const meData = await apiFetch<{ user?: unknown }>('/auth/me')
         if (!meData.user) {
-          router.replace('/login')
+          redirectToLogin()
           return
         }
 

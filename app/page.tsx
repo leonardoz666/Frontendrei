@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, redirectToLogin } from '@/app/lib/api'
 
 type Mesa = {
   id: number
@@ -37,7 +37,7 @@ export default function Home() {
       try {
         const meData = await apiFetch<{ user?: { permissions?: string[] } }>('/auth/me')
         if (!meData.user) {
-          router.replace('/login')
+          redirectToLogin()
           return
         }
         setCanCreateTable(Array.isArray(meData.user.permissions) && meData.user.permissions.includes('cadastros.editar'))

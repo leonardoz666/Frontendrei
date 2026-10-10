@@ -7,7 +7,7 @@ import { DataTable, type DataTableColumn } from '@/app/components/ui/DataTable'
 import { Button } from '@/app/components/ui/Button'
 import { ConfirmationModal } from '@/app/components/ConfirmationModal'
 import { useToast } from '@/contexts/ToastContext'
-import { apiFetch } from '@/app/lib/api'
+import { apiFetch, redirectToLogin } from '@/app/lib/api'
 import { usePagedQuery, type SortOrder } from '@/app/lib/pagination'
 import { SeloAtivo } from '@/app/lib/crud-client'
 
@@ -82,7 +82,7 @@ export default function CategoriasPage() {
       } catch (err) {
         const status = (err as { status?: number } | null)?.status
         if (status === 401) {
-          router.push('/login')
+          redirectToLogin()
           return null
         }
         showToast(err instanceof Error ? err.message : mensagemErro, 'error')

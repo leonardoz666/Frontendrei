@@ -89,7 +89,7 @@ export function redirectToLogin(): void {
   if (window.location.pathname.startsWith(LOGIN_PATH)) {
     return
   }
-  window.location.assign(LOGIN_PATH)
+  window.location.replace(LOGIN_PATH)
 }
 
 async function readResponseBody(response: Response): Promise<unknown> {

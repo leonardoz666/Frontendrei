@@ -9,7 +9,7 @@ import { ProductOptionsModal } from '@/components/ProductOptionsModal'
 import { PaymentModal } from '@/components/PaymentModal'
 import { RequestBillModal } from '@/app/components/RequestBillModal'
 import { connectTableSocket } from '@/app/lib/table-socket'
-import { apiFetch, fetchAllList } from '@/app/lib/api'
+import { apiFetch, fetchAllList, redirectToLogin } from '@/app/lib/api'
 import { Produto, Categoria, CartItem, SubmittedItem, APIPedido } from '@/types'
 
 const CUSTOM_CANCELLATION_REASON = '__CUSTOM__'
@@ -178,7 +178,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       try {
         const meData = await apiFetch<{ user?: { role: string; permissions?: string[] } }>('/auth/me')
         if (!meData.user) {
-          router.replace('/login')
+          redirectToLogin()
           return
         }
         setUserPermissions(meData.user.permissions ?? [])
