@@ -149,6 +149,7 @@ export default function Sidebar({
 
   const user = userProp !== undefined ? userProp : fetchedUser
   const isWaiter = user?.role === 'GARCOM'
+  const isStockkeeper = user?.role === 'ESTOQUISTA'
 
   const visibleGroups = useMemo(() => visibleNavGroups(user), [user])
   const active = useMemo(() => findActiveNavItem(pathname), [pathname])
@@ -330,7 +331,7 @@ export default function Sidebar({
         ${isCollapsed ? 'md:w-[88px]' : 'md:w-72'}
         md:translate-x-0
       `}>
-        {(!visibility.hideBrand || !visibility.hideSearch || !visibility.hideShortcuts) && (
+        {!isStockkeeper && (!visibility.hideBrand || !visibility.hideSearch || !visibility.hideShortcuts) && (
         <div
           className={`px-4 pt-[18px] pb-0 ${
             isCollapsed ? `md:px-4 ${visibility.hideBrand ? 'md:hidden' : ''}` : ''

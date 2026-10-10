@@ -40,7 +40,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const isStockkeeper = user?.role === 'ESTOQUISTA'
   const isStockRoute = pathname === '/admin/estoque' || pathname.startsWith('/admin/estoque/')
   const isStockRouteBlocked = isStockkeeper && !isStockRoute
-  const sidebarOffset = isLoginPage || !user || isWaiter ? '' : isCollapsed ? 'md:ml-[88px]' : 'md:ml-72'
+  const sidebarOffset = isLoginPage || !user || isWaiter ? '' : isStockkeeper || !isCollapsed ? 'md:ml-72' : 'md:ml-[88px]'
   const supportHref = isLoginPage || !user ? null : resolveSupportHref(process.env.NEXT_PUBLIC_SUPORTE_WHATSAPP)
 
   // Estado recolhido persistido: lido após a montagem para não divergir do SSR.
@@ -193,8 +193,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               isOpen={isSidebarOpen}
               onClose={() => setIsSidebarOpen(false)}
               user={user}
-              collapsed={isCollapsed}
-              onToggleCollapse={toggleCollapsed}
+              collapsed={isStockkeeper ? false : isCollapsed}
+              onToggleCollapse={isStockkeeper ? undefined : toggleCollapsed}
             />
           )}
 
