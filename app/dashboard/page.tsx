@@ -12,8 +12,7 @@ import {
     BarChart3,
     ArrowUpRight,
     ArrowDownRight,
-    Clock,
-    ChefHat
+    Clock
 } from 'lucide-react'
 
 type DashboardStats = {
@@ -36,11 +35,6 @@ type DashboardStats = {
         avgTicket: number
         closedTables: number
     }
-    topProducts: Array<{
-        name: string
-        quantity: number
-        revenue: number
-    }>
     hourlySales: Array<{
         hour: string
         total: number
@@ -187,9 +181,9 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div>
                     {/* Vendas por Hora */}
-                    <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2">
                                 <BarChart3 className="text-gray-400" size={20} />
@@ -219,38 +213,6 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Produtos Mais Vendidos */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <div className="flex items-center gap-2 mb-6">
-                            <ChefHat className="text-gray-400" size={20} />
-                            <h2 className="text-lg font-bold text-gray-900">Mais Vendidos</h2>
-                        </div>
-
-                        <div className="space-y-4">
-                            {stats?.topProducts.slice(0, 5).map((product, idx) => (
-                                <div key={idx} className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${idx === 0 ? 'bg-yellow-100 text-yellow-700' :
-                                            idx === 1 ? 'bg-gray-100 text-gray-600' :
-                                                idx === 2 ? 'bg-orange-100 text-orange-700' :
-                                                    'bg-gray-50 text-gray-500'
-                                        }`}>
-                                        {idx + 1}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                                        <p className="text-xs text-gray-500">{product.quantity} vendidos</p>
-                                    </div>
-                                    <p className="text-sm font-bold text-gray-900">
-                                        R$ {product.revenue.toFixed(2).replace('.', ',')}
-                                    </p>
-                                </div>
-                            ))}
-
-                            {(!stats?.topProducts || stats.topProducts.length === 0) && (
-                                <p className="text-center text-gray-400 py-8">Nenhum dado disponível</p>
-                            )}
-                        </div>
-                    </div>
                 </div>
 
                 {/* Quick Stats Footer */}

@@ -304,6 +304,13 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ['ADMIN', 'DONO', 'GERENTE'],
       },
       {
+        href: '/admin/cardapio/ranking-vendas',
+        label: 'Ranking de vendas',
+        icon: 'ChartColumn',
+        permission: 'relatorios.visualizar',
+        roles: ['ADMIN', 'DONO', 'GERENTE'],
+      },
+      {
         href: '/admin/cardapio',
         label: 'Organizar Cardápio',
         icon: 'UtensilsCrossed',
