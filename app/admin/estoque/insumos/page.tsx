@@ -231,7 +231,7 @@ export default function InsumosPage() {
       centroCustoId: form.centroCustoId ? Number(form.centroCustoId) : null,
       estoqueMin,
       estoqueMax,
-      custoMedio,
+      ...(!editing ? { custoMedio } : {}),
       conversoes: conversoes.map(conversao => ({ unidade: conversao.unidade, fatorConversao: conversao.fatorConversao! })),
       ...(!editing ? { saldoInicial } : {}),
     }
@@ -508,8 +508,9 @@ export default function InsumosPage() {
                   <input id="max" inputMode="decimal" value={form.estoqueMax} onChange={(event) => atualizarCampo('estoqueMax', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black" />
                 </div>
                 <div>
-                  <label htmlFor="custo" className="mb-1 block text-sm font-medium text-black">Custo médio</label>
-                  <input id="custo" inputMode="decimal" value={form.custoMedio} onChange={(event) => atualizarCampo('custoMedio', event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-black" />
+                  <label htmlFor="custo" className="mb-1 block text-sm font-medium text-black">{editing ? 'Custo médio calculado' : 'Custo inicial'}</label>
+                  <input id="custo" inputMode="decimal" value={form.custoMedio} onChange={(event) => atualizarCampo('custoMedio', event.target.value)} disabled={Boolean(editing)} className="w-full rounded-lg border border-gray-300 p-2 text-black disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600" />
+                  {editing && <p className="mt-1 text-xs text-gray-500">Atualizado automaticamente pelas entradas de estoque.</p>}
                 </div>
               </div>
 

@@ -58,7 +58,7 @@ const FORM_VAZIO: FormState = {
   permitirNegativo: false,
 }
 
-const TIPOS = ['ENTRADA', 'SAIDA', 'AJUSTE', 'PERDA', 'INVENTARIO'] as const
+const TIPOS = ['ENTRADA', 'SAIDA', 'AJUSTE', 'PERDA'] as const
 
 function quantidade(valor: unknown, unidade?: string): string {
   return `${comoNumero(valor).toLocaleString('pt-BR', {

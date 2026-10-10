@@ -206,24 +206,18 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: 'Tags',
     items: [
       {
-        href: '/admin/categorias',
-        label: 'Categorias',
-        icon: 'Tags',
-        permission: 'cadastros.visualizar',
-        roles: ['ADMIN', 'DONO', 'GERENTE'],
-      },
-      {
-        href: '/admin/pracas',
-        label: 'Praças',
-        icon: 'MapPin',
+        href: '/admin/fornecedores',
+        label: 'Fornecedores',
+        icon: 'Truck',
         permission: 'cadastros.visualizar',
       },
-      {
-        href: '/admin/pracas/vincular',
-        label: 'Vincular Impressora',
-        icon: 'Printer',
-        permission: 'cadastros.visualizar',
-      },
+    ],
+  },
+  {
+    id: 'financeiro',
+    label: 'Financeiro',
+    icon: 'Landmark',
+    items: [
       {
         href: '/admin/centros-custo',
         label: 'Centros de Custo',
@@ -243,22 +237,36 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'cadastros.visualizar',
       },
       {
-        href: '/admin/fornecedores',
-        label: 'Fornecedores',
-        icon: 'Truck',
-        permission: 'cadastros.visualizar',
-      },
-      {
-        href: '/admin/estoques',
-        label: 'Estoques',
-        icon: 'Warehouse',
-        permission: 'cadastros.visualizar',
-      },
-      {
         href: '/admin/formas-pagamento',
         label: 'Formas de Pagamento',
         icon: 'Wallet',
         permission: 'cadastros.visualizar',
+      },
+    ],
+  },
+  {
+    id: 'producao-impressao',
+    label: 'Produção e Impressão',
+    icon: 'Printer',
+    items: [
+      {
+        href: '/admin/pracas',
+        label: 'Praças',
+        icon: 'MapPin',
+        permission: 'cadastros.visualizar',
+      },
+      {
+        href: '/admin/pracas/vincular',
+        label: 'Vincular Impressora',
+        icon: 'Printer',
+        permission: 'cadastros.visualizar',
+      },
+      {
+        href: '/admin/impressoras',
+        label: 'Impressoras',
+        icon: 'Printer',
+        permission: 'cadastros.visualizar',
+        roles: ['ADMIN', 'DONO', 'GERENTE'],
       },
     ],
   },
@@ -275,17 +283,24 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ['ADMIN', 'DONO', 'GERENTE', 'CAIXA', 'GARCOM', 'COZINHA'],
       },
       {
+        href: '/admin/categorias',
+        label: 'Categorias',
+        icon: 'Tags',
+        permission: 'produtos.visualizar',
+        roles: ['ADMIN', 'DONO', 'GERENTE'],
+      },
+      {
         href: '/admin/cardapio/tipos-tamanho',
         label: 'Tipos e Tamanhos',
         icon: 'ListTree',
-        anyPermission: ['produtos.visualizar', 'cardapio.publicar'],
+        permission: 'produtos.visualizar',
         roles: ['ADMIN', 'DONO', 'GERENTE'],
       },
       {
         href: '/admin/cardapio/complementos',
         label: 'Complementos',
         icon: 'PackageSearch',
-        anyPermission: ['produtos.visualizar', 'cardapio.publicar'],
+        permission: 'produtos.visualizar',
         roles: ['ADMIN', 'DONO', 'GERENTE'],
       },
       {
@@ -320,10 +335,16 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'estoque.visualizar',
       },
       {
+        href: '/admin/estoques',
+        label: 'Locais de estoque',
+        icon: 'Warehouse',
+        anyPermission: ['cadastros.visualizar', 'estoque.visualizar'],
+      },
+      {
         href: '/admin/estoque/movimentacoes',
         label: 'Movimentações',
         icon: 'History',
-        permission: 'estoque.movimentar',
+        permission: 'estoque.visualizar',
       },
       {
         href: '/admin/estoque/lotes',
@@ -450,13 +471,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'UserCog',
         permission: 'usuarios.visualizar',
         roles: ['ADMIN', 'DONO'],
-      },
-      {
-        href: '/admin/impressoras',
-        label: 'Impressoras',
-        icon: 'Printer',
-        permission: 'cadastros.visualizar',
-        roles: ['ADMIN', 'DONO', 'GERENTE'],
       },
       {
         href: '/admin/visibilidade',
@@ -644,19 +658,35 @@ export function buildSidebarVisualSections(
       groupIds: ['inicio', 'mesas'],
       itemFilter: item => !['/', '/dashboard', '/mesas'].includes(item.href),
     },
+    {
+      id: 'indicadores',
+      label: 'INDICADORES',
+      groupIds: ['inicio'],
+      itemFilter: item => item.href === '/dashboard',
+    },
     { id: 'cardapio', label: 'CARDÁPIO', groupIds: ['cardapio'] },
     { id: 'estoque', label: 'ESTOQUE', groupIds: ['estoque'] },
+    { id: 'producao-impressao', label: 'PRODUÇÃO E IMPRESSÃO', groupIds: ['producao-impressao'] },
     {
       id: 'caixa',
       label: 'CAIXA',
       groupIds: ['caixa'],
       itemFilter: item => ['/caixa', '/caixa/fechamento', '/caixa/historico'].includes(item.href),
     },
+    { id: 'financeiro', label: 'FINANCEIRO', groupIds: ['financeiro'] },
     {
       id: 'nota-fiscal',
       label: 'NOTA FISCAL',
       groupIds: ['caixa', 'administracao'],
       itemFilter: item => ['/fiscal/notas', '/fiscal/radar-xml', '/admin/fiscal'].includes(item.href),
+    },
+    { id: 'ponto', label: 'CONTROLE DE PONTO', groupIds: ['ponto'] },
+    { id: 'cadastros', label: 'CADASTROS', groupIds: ['cadastros'] },
+    {
+      id: 'administracao',
+      label: 'ADMINISTRAÇÃO',
+      groupIds: ['administracao'],
+      itemFilter: item => ['/admin/usuarios', '/admin/visibilidade'].includes(item.href),
     },
   ]
 

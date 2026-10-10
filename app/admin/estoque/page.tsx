@@ -189,7 +189,7 @@ export default function EstoquePage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-600">
-              <tr><th className="px-4 py-3">Tipo</th><th className="px-4 py-3 text-right">Registros</th><th className="px-4 py-3 text-right">Quantidade</th><th className="px-4 py-3 text-right">Valor</th></tr>
+              <tr><th className="px-4 py-3">Tipo</th><th className="px-4 py-3 text-right">Registros</th><th className="px-4 py-3 text-right">Quantidade líquida</th><th className="px-4 py-3 text-right">Valor líquido</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {data?.relatorio.porTipo.map((item) => (

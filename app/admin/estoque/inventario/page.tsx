@@ -63,25 +63,24 @@ export default function InventarioEstoquePage() {
       showToast('Informe uma contagem válida', 'error')
       return
     }
-    if (diferenca === null || Math.abs(diferenca) < 0.0005) {
-      showToast('Saldo contado igual ao saldo atual. Nenhum ajuste necessário.', 'success')
-      return
-    }
-
     setSalvando(true)
     try {
-      await apiFetch('/insumos/movimentos', {
+      const resultado = await apiFetch<{ movimento: unknown | null; semDivergencia: boolean }>('/insumos/inventario', {
         method: 'POST',
         body: {
           insumoId: insumo.id,
-          tipo: 'INVENTARIO',
-          sentido: diferenca > 0 ? 'ENTRADA' : 'SAIDA',
-          quantidade: Math.abs(diferenca),
+          saldoContado,
+          saldoReferencia: saldoAtual,
           documento: documento.trim() || null,
           motivo: motivo.trim() || 'Contagem de inventário',
         },
       })
-      showToast('Inventário registrado e saldo ajustado.', 'success')
+      showToast(
+        resultado.semDivergencia
+          ? 'Contagem registrada. O saldo já estava correto.'
+          : 'Inventário registrado e saldo ajustado.',
+        'success'
+      )
       setContado('')
       setDocumento('')
       setMotivo('Contagem de inventário')
