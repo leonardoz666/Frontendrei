@@ -38,9 +38,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   const isWaiter = user?.role === 'GARCOM'
   const isStockkeeper = user?.role === 'ESTOQUISTA'
+  const isSimplifiedStockkeeper = isStockkeeper && user?.modoEstoque === 'SIMPLIFICADO'
   const isStockRoute = pathname === '/admin/estoque' || pathname.startsWith('/admin/estoque/')
-  const isStockRouteBlocked = isStockkeeper && !isStockRoute
-  const sidebarOffset = isLoginPage || !user || isWaiter ? '' : isStockkeeper || !isCollapsed ? 'md:ml-72' : 'md:ml-[88px]'
+  const simplifiedStockRoute = pathname === '/admin/estoque/registro'
+  const isStockRouteBlocked = isStockkeeper && (isSimplifiedStockkeeper ? !simplifiedStockRoute : !isStockRoute)
+  const sidebarOffset = isLoginPage || !user || isWaiter || isSimplifiedStockkeeper ? '' : isStockkeeper || !isCollapsed ? 'md:ml-72' : 'md:ml-[88px]'
   const supportHref = isLoginPage || !user ? null : resolveSupportHref(process.env.NEXT_PUBLIC_SUPORTE_WHATSAPP)
 
   // Estado recolhido persistido: lido após a montagem para não divergir do SSR.
@@ -91,8 +93,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   // O cargo de estoquista é operacional e permanece restrito ao módulo de estoque,
   // inclusive quando alguém tenta abrir outra URL diretamente.
   useEffect(() => {
-    if (isStockRouteBlocked) router.replace('/admin/estoque')
-  }, [isStockRouteBlocked, router])
+    if (isStockRouteBlocked) router.replace(isSimplifiedStockkeeper ? '/admin/estoque/registro' : '/admin/estoque')
+  }, [isSimplifiedStockkeeper, isStockRouteBlocked, router])
 
   // Atalho global (PRD seção 13): F8 abre o mapa de mesas.
   useEffect(() => {
@@ -133,7 +135,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen bg-gray-100">
       {!isLoginPage && user && (
         <>
-          {isWaiter ? (
+          {isSimplifiedStockkeeper ? (
+            <header className="sticky top-0 z-50 flex min-h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2 shadow-sm sm:px-6">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-950">Rei do Pirão</p>
+                <p className="truncate text-xs font-medium text-slate-500">Registro simplificado de estoque</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="hidden max-w-40 truncate text-sm font-semibold text-slate-700 sm:block">{user?.name}</span>
+                <button type="button" onClick={handleLogout} title="Sair" aria-label="Sair" className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100">
+                  <LogOut size={17} />
+                </button>
+              </div>
+            </header>
+          ) : isWaiter ? (
             <header className="sticky top-0 z-30 grid min-h-[60px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-200 bg-white px-3 py-2 shadow-sm sm:px-5 md:px-8 xl:min-h-[76px] xl:grid-cols-[1fr_auto_1fr] xl:gap-6 xl:py-0">
               <div className="hidden shrink-0 items-center gap-3 xl:flex">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-600 text-xl font-bold text-white">R</div>

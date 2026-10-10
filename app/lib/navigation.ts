@@ -67,6 +67,8 @@ export type NavPermission =
   | 'estoque.movimentar'
   | 'estoque.ajustar'
   | 'estoque.negativo'
+  | 'estoque.solicitar'
+  | 'estoque.revisar'
   | 'ponto.visualizar'
   | 'ponto.registrar'
   | 'ponto.ajustar'
@@ -153,6 +155,7 @@ export interface NavUser {
   role?: string | null
   permissions?: string[] | null
   uiPreferences?: UiPreferences | null
+  modoEstoque?: 'COMPLETO' | 'SIMPLIFICADO' | null
 }
 
 /** Grupos + itens visíveis para um usuário (grupo sem item visível não é renderizado). */
@@ -328,6 +331,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Movimentações',
         icon: 'History',
         permission: 'estoque.movimentar',
+      },
+      {
+        href: '/admin/estoque/lotes',
+        label: 'Lotes para revisão',
+        icon: 'ClipboardList',
+        permission: 'estoque.revisar',
       },
       {
         href: '/admin/estoque/distribuicoes',

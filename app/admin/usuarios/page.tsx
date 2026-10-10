@@ -41,6 +41,7 @@ interface User {
   permissions: string[]
   defaultRolePermissions?: string[]
   customPermissions?: string[]
+  modoEstoque: 'COMPLETO' | 'SIMPLIFICADO'
 }
 
 interface PermissionGroup {
@@ -82,6 +83,7 @@ export default function AdminUsersPage() {
   const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [senha, setSenha] = useState('')
   const [role, setRole] = useState('GARCOM')
+  const [modoEstoque, setModoEstoque] = useState<'COMPLETO' | 'SIMPLIFICADO'>('COMPLETO')
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
   const [editingId, setEditingId] = useState<number | null>(null)
   const [isCreating, setIsCreating] = useState(false)
@@ -161,6 +163,7 @@ export default function AdminUsersPage() {
     body.append('email', email)
     body.append('codOperador', codOperador)
     body.append('ativo', String(ativo))
+    if (isAdmin && role === 'ESTOQUISTA') body.append('modoEstoque', modoEstoque)
     if (senha || !editingId) {
       body.append('senha', senha)
     }
@@ -201,6 +204,7 @@ export default function AdminUsersPage() {
     setFotoFile(null)
     setSenha('')
     setRole('GARCOM')
+    setModoEstoque('COMPLETO')
     setSelectedPermissions(permissionSchema?.roleDefaults.GARCOM ?? [])
     setEditingId(null)
     setIsCreating(false)
@@ -218,6 +222,7 @@ export default function AdminUsersPage() {
     setFoto(user.foto)
     setFotoFile(null)
     setRole(user.role)
+    setModoEstoque(user.modoEstoque ?? 'COMPLETO')
     setSelectedPermissions(user.permissions)
     setSenha('')
   }
@@ -229,6 +234,7 @@ export default function AdminUsersPage() {
 
   const handleRoleChange = (nextRole: string) => {
     setRole(nextRole)
+    if (nextRole !== 'ESTOQUISTA') setModoEstoque('COMPLETO')
     setSelectedPermissions(permissionSchema?.roleDefaults[nextRole] ?? [])
   }
 
@@ -344,6 +350,25 @@ export default function AdminUsersPage() {
                   description="Permite entrar e operar o sistema."
                   className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2"
                 />
+                {isAdmin && role === 'ESTOQUISTA' && (
+                  <fieldset className="rounded-lg border border-orange-200 bg-orange-50/60 p-4 md:col-span-2">
+                    <legend className="px-1 text-sm font-bold text-slate-900">Tela de estoque</legend>
+                    <p className="mb-3 text-sm text-slate-600">Escolha como este estoquista vai registrar o trabalho.</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {([
+                        { value: 'COMPLETO', title: 'Tela completa', description: 'Acesso ao painel, cadastros e movimentações diretas.' },
+                        { value: 'SIMPLIFICADO', title: 'Registro simplificado', description: 'Cria lotes para o administrador revisar e lançar.' },
+                      ] as const).map(option => (
+                        <label key={option.value} className={`cursor-pointer rounded-lg border p-3 ${modoEstoque === option.value ? 'border-orange-500 bg-white ring-2 ring-orange-100' : 'border-slate-200 bg-white'}`}>
+                          <span className="flex items-start gap-3">
+                            <input type="radio" name="modoEstoque" value={option.value} checked={modoEstoque === option.value} onChange={() => setModoEstoque(option.value)} className="mt-1 accent-orange-600" />
+                            <span><strong className="block text-sm text-slate-900">{option.title}</strong><span className="mt-0.5 block text-xs leading-5 text-slate-600">{option.description}</span></span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
               </div>
             </section>
 
