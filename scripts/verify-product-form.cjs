@@ -5,7 +5,7 @@ const { buildProductFormData } = require('../app/lib/product-form')
 const form = buildProductFormData({
   nome: 'Suco', codigo: '  42  ', descricao: '  Natural  ', preco: '',
   valorPromo: ' 8 ', custo: '', categoriaId: '3', tipo: 'COMUM', tipoTamanhoId: '9',
-  dispositivoId: '', ordemProduto: '', ativo: true, file: null, tipoOpcao: 'sabores',
+  dispositivoIds: [12, 5], ordemProduto: '', ativo: true, file: null, tipoOpcao: 'sabores',
   sabores: ['Manga'], isDrink: true, isFood: false, favorito: false, destaque: false,
   controlaEstoque: false, autoatendimento: true, fiscal: false, ncm: ' 2202 ',
   cfop: '', cstCsosn: '', aliquotaIcms: '', permitirObservacao: true,
@@ -17,6 +17,8 @@ assert.equal(form.get('descricao'), 'Natural')
 assert.equal(form.get('preco'), '0')
 assert.equal(form.get('custo'), '0')
 assert.equal(form.get('tipoTamanhoId'), '')
+assert.equal(form.get('dispositivoId'), '12')
+assert.deepEqual(JSON.parse(form.get('dispositivoIds')), [12, 5])
 assert.equal(form.get('ordem'), '0')
 assert.equal(form.get('isDrink'), 'true')
 assert.equal(form.get('isFood'), 'false')
@@ -26,4 +28,4 @@ assert.deepEqual(JSON.parse(form.get('sabores')), ['Manga'])
 assert.deepEqual(JSON.parse(form.get('gruposComplemento')), [
   { grupoId: 7, ordem: 0 }, { grupoId: 4, ordem: 1 },
 ])
-console.log('12 verificações do formulário de produtos passaram')
+console.log('14 verificações do formulário de produtos passaram')
