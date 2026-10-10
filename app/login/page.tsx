@@ -8,6 +8,48 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ChefHat } from 'lucide-react'
 import { ApiError, apiFetch } from '@/app/lib/api'
 
+type LoginResponse = { user?: { role?: string } }
+
+type LoginLocation = {
+  latitude: number
+  longitude: number
+  accuracy: number
+}
+
+function errorCode(error: unknown): string | null {
+  if (!(error instanceof ApiError) || !error.body || typeof error.body !== 'object') return null
+  const code = (error.body as Record<string, unknown>).code
+  return typeof code === 'string' ? code : null
+}
+
+function requestCurrentLocation(): Promise<LoginLocation> {
+  if (!navigator.geolocation) {
+    return Promise.reject(new Error('Este aparelho não oferece localização. O login de garçom não pode ser liberado.'))
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      position => resolve({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      }),
+      positionError => {
+        if (positionError.code === positionError.PERMISSION_DENIED) {
+          reject(new Error('Permita o acesso à localização para entrar como garçom.'))
+          return
+        }
+        if (positionError.code === positionError.TIMEOUT) {
+          reject(new Error('Não foi possível confirmar sua localização a tempo. Tente novamente.'))
+          return
+        }
+        reject(new Error('Não foi possível confirmar sua localização. Ative o GPS e tente novamente.'))
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 }
+    )
+  })
+}
+
 function paginaInicial(role?: string): string {
   return role === 'ESTOQUISTA' ? '/admin/estoque' : '/'
 }
@@ -17,6 +59,7 @@ export default function LoginPage() {
   const [senha, setSenha] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [locationStatus, setLocationStatus] = useState('')
   const router = useRouter()
 
   useEffect(() => {
@@ -52,19 +95,34 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setLocationStatus('')
     setLoading(true)
 
     try {
-      const data = await apiFetch<{ user?: { role?: string } }>('/auth/login', {
-        method: 'POST',
-        body: { login, senha },
-        redirectOn401: false,
-      })
+      let data: LoginResponse
+      try {
+        data = await apiFetch<LoginResponse>('/auth/login', {
+          method: 'POST',
+          body: { login, senha },
+          redirectOn401: false,
+        })
+      } catch (initialError) {
+        if (errorCode(initialError) !== 'WAITER_LOCATION_REQUIRED') throw initialError
+
+        setLocationStatus('Confirmando se você está no restaurante...')
+        const location = await requestCurrentLocation()
+        data = await apiFetch<LoginResponse>('/auth/login', {
+          method: 'POST',
+          body: { login, senha, location },
+          redirectOn401: false,
+        })
+      }
       router.push(paginaInicial(data.user?.role))
       router.refresh()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Erro ao conectar ao servidor')
+      setError(err instanceof Error ? err.message : 'Erro ao conectar ao servidor')
     } finally {
+      setLocationStatus('')
       setLoading(false)
     }
   }
@@ -123,6 +181,12 @@ export default function LoginPage() {
               {error && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center">
                   {error}
+                </div>
+              )}
+
+              {locationStatus && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-center text-sm font-medium text-blue-700" role="status">
+                  {locationStatus}
                 </div>
               )}
 

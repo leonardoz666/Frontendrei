@@ -42,6 +42,7 @@ interface User {
   defaultRolePermissions?: string[]
   customPermissions?: string[]
   modoEstoque: 'COMPLETO' | 'SIMPLIFICADO'
+  permitirLoginForaArea: boolean
 }
 
 interface PermissionGroup {
@@ -84,6 +85,7 @@ export default function AdminUsersPage() {
   const [senha, setSenha] = useState('')
   const [role, setRole] = useState('GARCOM')
   const [modoEstoque, setModoEstoque] = useState<'COMPLETO' | 'SIMPLIFICADO'>('COMPLETO')
+  const [permitirLoginForaArea, setPermitirLoginForaArea] = useState(false)
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
   const [editingId, setEditingId] = useState<number | null>(null)
   const [isCreating, setIsCreating] = useState(false)
@@ -164,6 +166,7 @@ export default function AdminUsersPage() {
     body.append('codOperador', codOperador)
     body.append('ativo', String(ativo))
     if (isAdmin && role === 'ESTOQUISTA') body.append('modoEstoque', modoEstoque)
+    if (isAdmin && role === 'GARCOM') body.append('permitirLoginForaArea', String(permitirLoginForaArea))
     if (senha || !editingId) {
       body.append('senha', senha)
     }
@@ -205,6 +208,7 @@ export default function AdminUsersPage() {
     setSenha('')
     setRole('GARCOM')
     setModoEstoque('COMPLETO')
+    setPermitirLoginForaArea(false)
     setSelectedPermissions(permissionSchema?.roleDefaults.GARCOM ?? [])
     setEditingId(null)
     setIsCreating(false)
@@ -223,6 +227,7 @@ export default function AdminUsersPage() {
     setFotoFile(null)
     setRole(user.role)
     setModoEstoque(user.modoEstoque ?? 'COMPLETO')
+    setPermitirLoginForaArea(user.permitirLoginForaArea ?? false)
     setSelectedPermissions(user.permissions)
     setSenha('')
   }
@@ -235,6 +240,7 @@ export default function AdminUsersPage() {
   const handleRoleChange = (nextRole: string) => {
     setRole(nextRole)
     if (nextRole !== 'ESTOQUISTA') setModoEstoque('COMPLETO')
+    if (nextRole !== 'GARCOM') setPermitirLoginForaArea(false)
     setSelectedPermissions(permissionSchema?.roleDefaults[nextRole] ?? [])
   }
 
@@ -350,6 +356,15 @@ export default function AdminUsersPage() {
                   description="Permite entrar e operar o sistema."
                   className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2"
                 />
+                {isAdmin && role === 'GARCOM' && (
+                  <Switch
+                    checked={permitirLoginForaArea}
+                    onCheckedChange={setPermitirLoginForaArea}
+                    label="Liberar login fora da área do restaurante"
+                    description="Permite que apenas este garçom entre no sistema mesmo estando fora do raio de 50 metros."
+                    className={`rounded-lg border px-4 py-3 md:col-span-2 ${permitirLoginForaArea ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}
+                  />
+                )}
                 {isAdmin && role === 'ESTOQUISTA' && (
                   <fieldset className="rounded-lg border border-orange-200 bg-orange-50/60 p-4 md:col-span-2">
                     <legend className="px-1 text-sm font-bold text-slate-900">Tela de estoque</legend>
