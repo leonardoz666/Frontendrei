@@ -15,6 +15,7 @@ type Lote = {
   tipo: TipoLote
   status: string
   documento: string | null
+  entreguePara: string | null
   observacao: string | null
   criadoEm: string
   motivoRevisao: string | null
@@ -63,6 +64,7 @@ export default function RegistroEstoqueSimplificadoPage() {
   const [tipo, setTipo] = useState<TipoLote>('ENTRADA')
   const [itens, setItens] = useState<ItemRascunho[]>([itemVazio()])
   const [documento, setDocumento] = useState('')
+  const [entreguePara, setEntreguePara] = useState('')
   const [observacao, setObservacao] = useState('')
   const [salvando, setSalvando] = useState(false)
   const enviandoRef = useRef(false)
@@ -79,7 +81,7 @@ export default function RegistroEstoqueSimplificadoPage() {
   const insumosOrdenados = useMemo(() => [...insumos].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), [insumos])
 
   const selecionarTipo = (novoTipo: TipoLote) => {
-    const preenchido = itens.some(item => item.insumoId || item.quantidade || item.observacao)
+    const preenchido = Boolean(entreguePara.trim()) || itens.some(item => item.insumoId || item.quantidade || item.observacao)
     if (preenchido && novoTipo !== tipo) {
       showToast('Envie ou limpe o lote atual antes de trocar o tipo', 'warning')
       return
@@ -98,6 +100,7 @@ export default function RegistroEstoqueSimplificadoPage() {
   const limpar = () => {
     setItens([itemVazio()])
     setDocumento('')
+    setEntreguePara('')
     setObservacao('')
   }
 
@@ -117,6 +120,10 @@ export default function RegistroEstoqueSimplificadoPage() {
       showToast('Informe o motivo da perda', 'error')
       return
     }
+    if (tipo === 'SAIDA' && !entreguePara.trim()) {
+      showToast('Informe para quem o material foi entregue', 'error')
+      return
+    }
 
     enviandoRef.current = true
     setSalvando(true)
@@ -127,6 +134,7 @@ export default function RegistroEstoqueSimplificadoPage() {
         body: {
           tipo,
           documento: documento.trim() || null,
+          entreguePara: tipo === 'SAIDA' ? entreguePara.trim() : null,
           observacao: observacao.trim() || null,
           itens: validos.map(item => ({
             insumoId: Number(item.insumoId),
@@ -206,6 +214,7 @@ export default function RegistroEstoqueSimplificadoPage() {
         </div>
 
         <div className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 sm:p-5">
+          {tipo === 'SAIDA' && <label className="sm:col-span-2"><span className="mb-1 block text-sm font-semibold text-slate-800">Entregue para</span><input value={entreguePara} onChange={event => setEntreguePara(event.target.value)} disabled={salvando} placeholder="Nome da pessoa, setor ou unidade" className="h-11 w-full rounded-lg border border-slate-400 bg-white px-3 text-sm text-slate-950 outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-100" required /><span className="mt-1 block text-xs text-slate-500">Identifique quem recebeu o material.</span></label>}
           <label><span className="mb-1 block text-sm font-medium text-slate-700">Documento</span><input value={documento} onChange={event => setDocumento(event.target.value)} placeholder="NF, requisição ou referência" className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:ring-2 focus:ring-orange-500" /></label>
           <label><span className="mb-1 block text-sm font-medium text-slate-700">Observação geral</span><input value={observacao} onChange={event => setObservacao(event.target.value)} placeholder={tipo === 'PERDA' ? 'Obrigatória se os itens não tiverem motivo' : 'Opcional'} className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:ring-2 focus:ring-orange-500" /></label>
           <button type="submit" disabled={salvando} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-orange-600 px-5 text-sm font-bold text-white shadow-sm hover:bg-orange-700 disabled:opacity-60 sm:col-span-2"><Send size={18} />{salvando ? 'Enviando...' : `Enviar lote com ${itens.length} item(ns)`}</button>
@@ -216,7 +225,7 @@ export default function RegistroEstoqueSimplificadoPage() {
         <div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-950">Histórico recente</h2><p className="text-sm text-slate-500">Acompanhe o resultado dos seus lotes.</p></div><Scale className="h-5 w-5 text-slate-400" /></div>
         {erroHistorico ? <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{detalheErroHistorico instanceof Error ? detalheErroHistorico.message : 'Falha ao carregar o histórico'}</div> : carregandoHistorico ? <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">Carregando...</p> : historico?.data.length ? <div className="space-y-2">{historico.data.map(lote => {
           const status = STATUS[lote.status] ?? { label: lote.status, classe: 'bg-slate-100 text-slate-700' }
-          return <article key={lote.id} className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-bold text-slate-900">Lote #{lote.id} · {TIPOS.find(item => item.tipo === lote.tipo)?.titulo}</h3><p className="mt-0.5 text-xs text-slate-500">{new Date(lote.criadoEm).toLocaleString('pt-BR')} · {lote.itens.length} item(ns)</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.classe}`}>{status.label}</span></div><p className="mt-2 text-sm text-slate-600">{lote.itens.slice(0, 3).map(item => item.insumo.nome).join(', ')}{lote.itens.length > 3 ? ` e mais ${lote.itens.length - 3}` : ''}</p>{lote.motivoRevisao && <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">{lote.motivoRevisao}</p>}{lote.status === 'PENDENTE' && <button type="button" onClick={() => void cancelar(lote)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700"><X size={14} />Cancelar lote</button>}</article>
+          return <article key={lote.id} className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-bold text-slate-900">Lote #{lote.id} · {TIPOS.find(item => item.tipo === lote.tipo)?.titulo}</h3><p className="mt-0.5 text-xs text-slate-500">{new Date(lote.criadoEm).toLocaleString('pt-BR')} · {lote.itens.length} item(ns)</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.classe}`}>{status.label}</span></div>{lote.entreguePara && <p className="mt-2 text-sm font-semibold text-slate-700">Entregue para: {lote.entreguePara}</p>}<p className="mt-2 text-sm text-slate-600">{lote.itens.slice(0, 3).map(item => item.insumo.nome).join(', ')}{lote.itens.length > 3 ? ` e mais ${lote.itens.length - 3}` : ''}</p>{lote.motivoRevisao && <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">{lote.motivoRevisao}</p>}{lote.status === 'PENDENTE' && <button type="button" onClick={() => void cancelar(lote)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700"><X size={14} />Cancelar lote</button>}</article>
         })}</div> : <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">Nenhum lote enviado ainda.</div>}
       </section>
     </main>

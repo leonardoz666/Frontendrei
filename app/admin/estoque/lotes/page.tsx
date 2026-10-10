@@ -29,6 +29,7 @@ type Lote = {
   tipo: TipoLote
   status: string
   documento: string | null
+  entreguePara: string | null
   observacao: string | null
   motivoRevisao: string | null
   criadoEm: string
@@ -171,7 +172,7 @@ export default function RevisaoLotesEstoquePage() {
             </header>
 
             <div className="max-h-[calc(100dvh-12rem)] overflow-y-auto">
-              {(lote.documento || lote.observacao) && <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:grid-cols-2 sm:px-6">{lote.documento && <p><span className="font-bold text-slate-700">Documento:</span> {lote.documento}</p>}{lote.observacao && <p><span className="font-bold text-slate-700">Observação:</span> {lote.observacao}</p>}</div>}
+              {(lote.entreguePara || lote.documento || lote.observacao) && <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:grid-cols-2 sm:px-6">{lote.entreguePara && <p className="sm:col-span-2"><span className="font-bold text-slate-800">Entregue para:</span> {lote.entreguePara}</p>}{lote.documento && <p><span className="font-bold text-slate-700">Documento:</span> {lote.documento}</p>}{lote.observacao && <p><span className="font-bold text-slate-700">Observação:</span> {lote.observacao}</p>}</div>}
               {divergencias.length > 0 && <div className="m-4 flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:mx-6"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><strong>{divergencias.length} saldo(s) mudaram desde a contagem.</strong><p className="mt-0.5">Confira os valores atuais antes de continuar.</p></div></div>}
 
               <div className="divide-y divide-slate-100">
