@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
-import { LogOut, MessageCircle } from 'lucide-react'
+import { LogOut, Menu, MessageCircle } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { apiFetch } from '@/app/lib/api'
 import { useToast } from '@/contexts/ToastContext'
@@ -189,13 +189,30 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </div>
             </header>
           ) : (
-            <Sidebar
-              isOpen={isSidebarOpen}
-              onClose={() => setIsSidebarOpen(false)}
-              user={user}
-              collapsed={isStockkeeper ? false : isCollapsed}
-              onToggleCollapse={isStockkeeper ? undefined : toggleCollapsed}
-            />
+            <>
+              <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-3 shadow-sm md:hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(true)}
+                  aria-label="Abrir menu"
+                  aria-expanded={isSidebarOpen}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                >
+                  <Menu size={21} />
+                </button>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-950">Rei do Pirão</p>
+                  <p className="truncate text-xs font-medium text-slate-500">{isStockkeeper ? 'Estoque' : 'Menu do sistema'}</p>
+                </div>
+              </header>
+              <Sidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                user={user}
+                collapsed={isStockkeeper ? false : isCollapsed}
+                onToggleCollapse={isStockkeeper ? undefined : toggleCollapsed}
+              />
+            </>
           )}
 
           {supportHref && (
